@@ -1,0 +1,2389 @@
+{
+  "schema_version": 1,
+  "status": "starter_manifest",
+  "note": "Names are catalog entries only. Null assets mean not yet supplied or verified; this manifest does not claim that 3D models exist.",
+  "franchises": [
+    {
+      "id": "fnaf",
+      "name": "Five Nights at Freddy's"
+    },
+    {
+      "id": "apex",
+      "name": "Apex Legends"
+    },
+    {
+      "id": "fortnite",
+      "name": "Fortnite"
+    },
+    {
+      "id": "valorant",
+      "name": "VALORANT"
+    },
+    {
+      "id": "halflife",
+      "name": "Half-Life"
+    },
+    {
+      "id": "overwatch",
+      "name": "Overwatch"
+    },
+    {
+      "id": "residentevil",
+      "name": "Resident Evil"
+    },
+    {
+      "id": "cyberpunk",
+      "name": "Cyberpunk 2077"
+    },
+    {
+      "id": "doom",
+      "name": "DOOM"
+    },
+    {
+      "id": "mortalkombat",
+      "name": "Mortal Kombat"
+    }
+  ],
+  "characters": [
+    {
+      "id": "fnaf.springtrap",
+      "name": "Springtrap",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.freddy-fazbear",
+      "name": "Freddy Fazbear",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.bonnie",
+      "name": "Bonnie",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.chica",
+      "name": "Chica",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.foxy",
+      "name": "Foxy",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.the-puppet",
+      "name": "The Puppet",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.circus-baby",
+      "name": "Circus Baby",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.ennard",
+      "name": "Ennard",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.glamrock-freddy",
+      "name": "Glamrock Freddy",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.roxanne-wolf",
+      "name": "Roxanne Wolf",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fnaf.the-mimic",
+      "name": "The Mimic",
+      "franchise": "Five Nights at Freddy's",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.wraith",
+      "name": "Wraith",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.bangalore",
+      "name": "Bangalore",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.bloodhound",
+      "name": "Bloodhound",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.lifeline",
+      "name": "Lifeline",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.pathfinder",
+      "name": "Pathfinder",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.octane",
+      "name": "Octane",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.mirage",
+      "name": "Mirage",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.revenant",
+      "name": "Revenant",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.valkyrie",
+      "name": "Valkyrie",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "apex.conduit",
+      "name": "Conduit",
+      "franchise": "Apex Legends",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.jonesy",
+      "name": "Jonesy",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.peely",
+      "name": "Peely",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.the-foundation",
+      "name": "The Foundation",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.midas",
+      "name": "Midas",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.meowscles",
+      "name": "Meowscles",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.fishstick",
+      "name": "Fishstick",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.raven",
+      "name": "Raven",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.hope",
+      "name": "Hope",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.the-ageless",
+      "name": "The Ageless",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "fortnite.the-visitor",
+      "name": "The Visitor",
+      "franchise": "Fortnite",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.jett",
+      "name": "Jett",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.phoenix",
+      "name": "Phoenix",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.sage",
+      "name": "Sage",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.reyna",
+      "name": "Reyna",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.omen",
+      "name": "Omen",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.sova",
+      "name": "Sova",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.killjoy",
+      "name": "Killjoy",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.raze",
+      "name": "Raze",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.chamber",
+      "name": "Chamber",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "valorant.clove",
+      "name": "Clove",
+      "franchise": "VALORANT",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.gordon-freeman",
+      "name": "Gordon Freeman",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.alyx-vance",
+      "name": "Alyx Vance",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.g-man",
+      "name": "G-Man",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.barney-calhoun",
+      "name": "Barney Calhoun",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.dr-kleiner",
+      "name": "Dr. Kleiner",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.dog",
+      "name": "Dog",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.combine-soldier",
+      "name": "Combine Soldier",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "halflife.vortigaunt",
+      "name": "Vortigaunt",
+      "franchise": "Half-Life",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.tracer",
+      "name": "Tracer",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.d-va",
+      "name": "D.Va",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.reaper",
+      "name": "Reaper",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.soldier-76",
+      "name": "Soldier: 76",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.mercy",
+      "name": "Mercy",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.genji",
+      "name": "Genji",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.widowmaker",
+      "name": "Widowmaker",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.junkrat",
+      "name": "Junkrat",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.kiriko",
+      "name": "Kiriko",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "overwatch.ramattra",
+      "name": "Ramattra",
+      "franchise": "Overwatch",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.leon-s-kennedy",
+      "name": "Leon S. Kennedy",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.jill-valentine",
+      "name": "Jill Valentine",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.claire-redfield",
+      "name": "Claire Redfield",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.ada-wong",
+      "name": "Ada Wong",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.chris-redfield",
+      "name": "Chris Redfield",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.nemesis",
+      "name": "Nemesis",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.albert-wesker",
+      "name": "Albert Wesker",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.lady-dimitrescu",
+      "name": "Lady Dimitrescu",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "residentevil.ethan-winters",
+      "name": "Ethan Winters",
+      "franchise": "Resident Evil",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "cyberpunk.v",
+      "name": "V",
+      "franchise": "Cyberpunk 2077",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "cyberpunk.johnny-silverhand",
+      "name": "Johnny Silverhand",
+      "franchise": "Cyberpunk 2077",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "cyberpunk.judy-alvarez",
+      "name": "Judy Alvarez",
+      "franchise": "Cyberpunk 2077",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "cyberpunk.panam-palmer",
+      "name": "Panam Palmer",
+      "franchise": "Cyberpunk 2077",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "cyberpunk.jackie-welles",
+      "name": "Jackie Welles",
+      "franchise": "Cyberpunk 2077",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "cyberpunk.songbird",
+      "name": "Songbird",
+      "franchise": "Cyberpunk 2077",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "cyberpunk.adam-smasher",
+      "name": "Adam Smasher",
+      "franchise": "Cyberpunk 2077",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "doom.doom-slayer",
+      "name": "Doom Slayer",
+      "franchise": "DOOM",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "doom.samuel-hayden",
+      "name": "Samuel Hayden",
+      "franchise": "DOOM",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "doom.vega",
+      "name": "VEGA",
+      "franchise": "DOOM",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "doom.the-icon-of-sin",
+      "name": "The Icon of Sin",
+      "franchise": "DOOM",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "doom.marauder",
+      "name": "Marauder",
+      "franchise": "DOOM",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "doom.cyberdemon",
+      "name": "Cyberdemon",
+      "franchise": "DOOM",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.scorpion",
+      "name": "Scorpion",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.sub-zero",
+      "name": "Sub-Zero",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.liu-kang",
+      "name": "Liu Kang",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.kitana",
+      "name": "Kitana",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.raiden",
+      "name": "Raiden",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.johnny-cage",
+      "name": "Johnny Cage",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.mileena",
+      "name": "Mileena",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.reptile",
+      "name": "Reptile",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    },
+    {
+      "id": "mortalkombat.noob-saibot",
+      "name": "Noob Saibot",
+      "franchise": "Mortal Kombat",
+      "model": null,
+      "thumbnail": null,
+      "animations": {
+        "idle": null,
+        "walk": null,
+        "run": null,
+        "turn_left": null,
+        "turn_right": null,
+        "turn_around": null,
+        "talk": null,
+        "react": null
+      },
+      "voice": {
+        "mode": "not_configured",
+        "asset": null,
+        "permission_verified": false
+      },
+      "asset_status": "placeholder",
+      "source_url": null,
+      "license": null,
+      "notes": "Model, animations, and voice are not bundled. Add only assets with verified permission and license."
+    }
+  ]
+}
