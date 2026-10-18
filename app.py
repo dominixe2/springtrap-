@@ -104,7 +104,7 @@ class SpringtrapApp:
         if avatar_file is None:
             messagebox.showerror(
                 "3D avatar není nalezen",
-                "Soubor avatar-3d.html chybí. Stáhni kompletní složku springtrap z větve springtrap-rewrite."
+                "Soubor avatar-3d.html chybí. Stáhni celý repozitář Springtrap a spusť aplikaci z jeho kořenové složky."
             )
             return
         webbrowser.open(avatar_file.resolve().as_uri())
