@@ -17,7 +17,7 @@ První desktopový základ pro Windows 10/11. Používá Python a knihovny dodá
 - Gemini API key. Použití API může mít kvóty nebo náklady podle účtu a aktuálních podmínek.
 
 ## Spuštění
-1. Stáhni nebo naklonuj větev `springtrap-rewrite` a otevři složku `springtrap`.
+1. Stáhni tento repozitář `dominixe2/springtrap-` přes Code → Download ZIP a rozbal jej. Spusť aplikaci z kořenové složky repozitáře.
 2. Dvakrát klikni na `start-springtrap.bat`.
 3. Při prvním spuštění se otevře velké okno pro vložení Gemini API klíče. Klíč se při psaní skryje a uloží se šifrovaně pomocí Windows DPAPI do profilu aktuálního uživatele. Při dalších spuštěních se znovu nezadává. V aplikaci ho lze změnit tlačítkem **API klíč**.
 4. Klíč neposílej do chatu, nevkládej ho do GitHubu a nesdílej složku s uloženým klíčem. Používá se účet Google, kvóty a podmínky jeho vlastníka.
