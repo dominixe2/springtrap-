@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Springtrap 3D • Springtrap Desktop</title>
+<style>
+:root{color-scheme:dark;--bg:#0c110e;--panel:#18221b;--lime:#b8e986;--text:#e6eee5}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 35%,#273629,#0c110e 70%);color:var(--text);font:14px "Segoe UI",sans-serif;overflow:hidden}
+#scene{position:fixed;inset:0;width:100%;height:100%}
+header{position:fixed;top:18px;left:22px;z-index:2;pointer-events:none}h1{font-size:22px;letter-spacing:3px;margin:0;color:var(--lime)}header p{margin:6px 0;color:#9cad99}
+.panel{position:fixed;z-index:2;left:18px;bottom:18px;background:#101811dd;border:1px solid #506347;border-radius:14px;padding:14px;width:min(340px,calc(100vw - 36px));backdrop-filter:blur(12px)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:7px 0}button{background:#30462e;color:white;border:1px solid #617c56;border-radius:8px;padding:9px 12px;cursor:pointer}button:hover{background:#426d3d}button.active{background:#b8e986;color:#101610}label{display:block;color:#b8c8b4;margin-top:10px}input{width:100%;accent-color:#b8e986}small{color:#91a18d;line-height:1.45;display:block;margin-top:9px}
+#hint{position:fixed;right:18px;bottom:20px;text-align:right;color:#a8b7a3;z-index:2;pointer-events:none}
+#loading{position:fixed;inset:0;display:grid;place-items:center;background:#0c110e;z-index:5;color:var(--lime)}
+@media(max-width:600px){#hint{display:none}header{top:12px;left:14px}}
+</style>
+</head>
+<body>
+<div id="loading">Načítám 3D animatronika…</div>
+<canvas id="scene"></canvas>
+<header><h1>SPRINGTRAP // 3D LAB</h1><p>Interaktivní animatronik • prototyp 01</p></header>
+<div class="panel">
+  <strong style="color:var(--lime)">OVLÁDÁNÍ POSTAVY</strong>
+  <div class="row">
+    <button id="front">Zepředu</button><button id="side">Z boku</button><button id="back">Záda</button>
+  </div>
+  <div class="row">
+    <button id="idle" class="active">Idle</button><button id="talk">Mluvení</button><button id="react">Reakce</button>
+  </div>
+  <label>Otočení <input id="rotation" type="range" min="-180" max="180" value="0"></label>
+  <label>Zoom <input id="zoom" type="range" min="4" max="11" value="7" step=".1"></label>
+  <small>Táhni myší pro otočení. Model je procedurální originální prototyp, nikoli oficiální herní asset. Pro finální kvalitu bude následovat detailní mesh, rig a animace.</small>
+</div>
+<div id="hint">MYŠ: otočit · Kolečko: přiblížit<br>← →: otočení · T: mluvení</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.min.js"></script>
+<script>
+const canvas=document.querySelector('#scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x0c110e,12,26);
+const camera=new THREE.PerspectiveCamera(36,innerWidth/innerHeight,.1,100);camera.position.set(0,2.1,7);
+scene.add(new THREE.HemisphereLight(0xcde8d0,0x222b20,2));
+const key=new THREE.DirectionalLight(0xe4f5d7,3.2);key.position.set(4,7,5);key.castShadow=true;scene.add(key);
+const rim=new THREE.PointLight(0x8fbd55,28,12);rim.position.set(-4,3,-3);scene.add(rim);
+const floor=new THREE.Mesh(new THREE.CircleGeometry(7,64),new THREE.MeshStandardMaterial({color:0x172019,roughness:.94}));floor.rotation.x=-Math.PI/2;floor.position.y=-1.95;floor.receiveShadow=true;scene.add(floor);
+const grid=new THREE.GridHelper(14,28,0x385139,0x233326);grid.position.y=-1.94;scene.add(grid);
+const root=new THREE.Group();root.scale.setScalar(1.12);scene.add(root);
+const mat=(color,roughness=.82,metalness=.08)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
+const moss=mat(0x65794a),darkMoss=mat(0x3e4e32),edge=mat(0x9aa66a),metal=mat(0x303a30,.38,.72),rust=mat(0x754735),black=mat(0x101611),ivory=mat(0xe0e0b8,.4),red=mat(0xff3927,.28,.15),gold=mat(0xb0a15a,.4,.5);
+function part(parent,geo,material,pos,scale,rot){const m=new THREE.Mesh(geo,material);m.position.set(...pos);if(scale)m.scale.set(...scale);if(rot)m.rotation.set(...rot);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
+function sphere(parent,material,pos,scale){return part(parent,new THREE.SphereGeometry(1,24,18),material,pos,scale)}
+function box(parent,material,pos,scale,rot){return part(parent,new THREE.BoxGeometry(1,1,1),material,pos,scale,rot)}
+function rod(parent,a,b,r,material){const v1=new THREE.Vector3(...a),v2=new THREE.Vector3(...b),d=v2.clone().sub(v1);const m=part(parent,new THREE.CylinderGeometry(r,r,d.length(),10),material,[...(v1.add(v2).multiplyScalar(.5).toArray())]);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return m}
+function ear(parent,x,z,lean,broken=false){const pivot=new THREE.Group();pivot.position.set(x,1.65,z);parent.add(pivot);part(pivot,new THREE.CapsuleGeometry(.16,broken?.7:1.1,4,8),moss,[lean,broken?.23:.63,0],[1,1,1],[0,0,lean*.2]);sphere(pivot,edge,[lean,broken?.57:1.25,.005],[.12,.13,.13]);if(broken){part(pivot,new THREE.ConeGeometry(.13,.3,7),darkMoss,[lean,.93,0],[1,1,1],[0,0,Math.PI]);}return pivot}
+const torso=new THREE.Group();root.add(torso);
+sphere(torso,moss,[0,-.48,0],[.61,.82,.36]);
+box(torso,darkMoss,[0,-.48,.335],[.39,.48,.055]);
+for(let i=0;i<5;i++)box(torso,edge,[-.25+i*.125,-.36-(i%2)*.12,.371],[.045,.025,.018]);
+sphere(torso,rust,[-.28,-.1,.18],[.19,.2,.22]);sphere(torso,darkMoss,[.29,-.68,.2],[.22,.26,.19]);
+const neck=new THREE.Group();neck.position.set(0,.17,0);torso.add(neck);
+rod(neck,[0,-.05,0],[0,.2,0],.16,metal);
+const head=new THREE.Group();head.position.set(0,.65,.015);neck.add(head);
+sphere(head,moss,[0,.15,0],[.57,.51,.43]);
+sphere(head,darkMoss,[0,-.14,.28],[.42,.22,.25]);
+sphere(head,moss,[-.24,-.06,.37],[.26,.17,.2]);sphere(head,moss,[.24,-.06,.37],[.26,.17,.2]);
+sphere(head,black,[0,-.03,.54],[.12,.075,.045]);
+const jaw=new THREE.Group();jaw.position.set(0,-.19,.32);head.add(jaw);
+sphere(jaw,darkMoss,[0,-.03,.035],[.36,.12,.19]);
+for(let i=0;i<7;i++)part(jaw,new THREE.ConeGeometry(.035,.095,5),ivory,[-.24+i*.08,-.01,.19],[1,1,1],[Math.PI,0,0]);
+const eyes=[];
+for(const x of [-.235,.235]){sphere(head,black,[x,.2,.374],[.17,.17,.09]);sphere(head,ivory,[x,.2,.445],[.105,.11,.045]);eyes.push(sphere(head,red,[x,.2,.482],[.058,.066,.025]));sphere(head,black,[x,.2,.506],[.022,.035,.012]);}
+const ears=[ear(head,-.3,.0,-.14,false),ear(head,.3,-.01,.2,true)];
+// Torn plating and patchwork on the head
+part(head,rust,new THREE.SphereGeometry(1,12,8),[-.39,.28,.18],[.13,.18,.07],[.2,0,-.3]);
+part(head,edge,new THREE.BoxGeometry(.12,.035,.025),[.1,.42,.365],[1,1,1],[0,0,-.2]);
+rod(head,[-.43,.03,.25],[-.35,-.12,.32],.025,metal);
+const bolts=[[-.47,.15,.28],[.46,.12,.28],[-.32,-.23,.35],[.31,-.25,.35]];
+for(const p of bolts)sphere(head,gold,p,[.035,.035,.02]);
+// body mechanics and limbs
+for(const side of [-1,1]){
+ const shoulder=[side*.49,-.1,0],elbow=[side*.68,-.62,.02],wrist=[side*.57,-1.0,.11];
+ sphere(torso,darkMoss,shoulder,[.22,.23,.22]);rod(torso,shoulder,elbow,.13,metal);sphere(torso,moss,elbow,[.17,.18,.17]);rod(torso,elbow,wrist,.1,metal);
+ sphere(torso,moss,wrist,[.16,.15,.16]);for(let j=0;j<3;j++)rod(torso,[wrist[0]+side*(j-.9)*.07,wrist[1]-.04,wrist[2]+.03],[wrist[0]+side*(j-.9)*.1,wrist[1]-.2,wrist[2]+.13],.035,edge);
+ const hip=[side*.28,-1.12,0],knee=[side*.31,-1.53,.02],ankle=[side*.33,-1.79,.1];
+ sphere(torso,darkMoss,hip,[.25,.22,.25]);rod(torso,hip,knee,.16,metal);sphere(torso,moss,knee,[.18,.17,.19]);rod(torso,knee,ankle,.12,metal);
+ sphere(torso,moss,[side*.34,-1.82,.2],[.24,.13,.34]);sphere(torso,rust,[side*.42,-1.8,.25],[.07,.08,.14]);
+}
+// torn patches and cables
+for(let i=0;i<6;i++){const x=(i%3-1)*.25,y=-.4-Math.floor(i/3)*.24;box(torso,i%2?rust:darkMoss,[x,y,.36],[.09,.12,.035],[0,0,(i%3-1)*.16]);}
+rod(torso,[-.44,-.25,.12],[-.32,-.64,.25],.025,gold);
+rod(torso,[.38,-.2,.12],[.47,-.55,.18],.022,rust);
+const joints=[];torso.traverse(o=>{if(o.isMesh&&o.material===metal)joints.push(o)});
+const state={mode:'idle',targetY:0,drag:false,lastX:0,mouseMoved:false};
+function setMode(mode){state.mode=mode;document.querySelectorAll('.panel button').forEach(b=>b.classList.remove('active'));document.querySelector('#'+mode)?.classList.add('active')}
+document.querySelector('#front').onclick=()=>{state.targetY=0;document.querySelector('#rotation').value=0};
+document.querySelector('#side').onclick=()=>{state.targetY=Math.PI/2;document.querySelector('#rotation').value=90};
+document.querySelector('#back').onclick=()=>{state.targetY=Math.PI;document.querySelector('#rotation').value=180};
+document.querySelector('#idle').onclick=()=>setMode('idle');document.querySelector('#talk').onclick=()=>setMode('talk');document.querySelector('#react').onclick=()=>setMode('react');
+document.querySelector('#rotation').oninput=e=>state.targetY=THREE.MathUtils.degToRad(+e.target.value);
+document.querySelector('#zoom').oninput=e=>camera.position.z=+e.target.value;
+canvas.addEventListener('pointerdown',e=>{state.drag=true;state.lastX=e.clientX;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointerup',()=>state.drag=false);
+canvas.addEventListener('pointermove',e=>{if(state.drag){state.targetY+=(e.clientX-state.lastX)*.009;state.lastX=e.clientX;document.querySelector('#rotation').value=THREE.MathUtils.radToDeg(((state.targetY+Math.PI)%(Math.PI*2))-Math.PI)}});
+canvas.addEventListener('wheel',e=>{camera.position.z=THREE.MathUtils.clamp(camera.position.z+e.deltaY*.006,4,11);document.querySelector('#zoom').value=camera.position.z},{passive:true});
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')state.targetY-=.15;if(e.key==='ArrowRight')state.targetY+=.15;if(e.key.toLowerCase()==='t')setMode(state.mode==='talk'?'idle':'talk')});
+const clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);const t=clock.getElapsedTime();root.rotation.y+=(state.targetY-root.rotation.y)*.08;root.position.y=Math.sin(t*1.25)*.045;
+neck.rotation.x=Math.sin(t*0.83)*.035+(state.mode==='talk'?Math.sin(t*5.7)*.075:0)+(state.mode==='react'?Math.sin(t*3.1)*.12:0);
+head.rotation.z=Math.sin(t*.57)*.035+Math.sin(t*.31)*.02+(state.mode==='react'?Math.sin(t*3.8)*.09:0);
+jaw.rotation.x=state.mode==='talk'?(Math.sin(t*8.2)*.19+.22):state.mode==='react'?Math.max(0,Math.sin(t*3.2))*.12:Math.sin(t*.91)*.025;
+ears[0].rotation.z=Math.sin(t*.73)*.045;ears[1].rotation.z=.12+Math.sin(t*1.03)*.05;
+eyes.forEach((eye,i)=>{eye.material.emissive=new THREE.Color(0x9f1008);eye.material.emissiveIntensity=.22+Math.sin(t*1.3+i)*.12});
+if(state.mode==='idle'){torso.rotation.z=Math.sin(t*.42)*.012;torso.rotation.x=Math.sin(t*.61)*.012;}else if(state.mode==='talk'){torso.rotation.z=Math.sin(t*2.1)*.018;}else{torso.rotation.z=Math.sin(t*3.4)*.035;}
+renderer.render(scene,camera)}
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+document.querySelector('#loading').remove();animate();
+</script>
+</body>
+</html>
