@@ -15,7 +15,7 @@ SYSTEM_PROMPT = """Jsi Springtrap, virtuální společník na ploše Windows.
 Mluvíš přirozenou češtinou, přátelsky, hravě a občas lehce sarkasticky.
 Jsi stručný, ale užitečný. Nikdy netvrď, že vidíš obrazovku, pokud ti nebyl
 předán její snímek. Když si nejsi jistý, řekni to. Nepředstírej ovládání
-počítače ani her. Respektuj uživatelovo soukromí a pokyny k režimu nerušit.
+počítače ani her. Respektuj uživatelovo soukromí a pokyny k režimu neruš.
 """
 
 class GeminiBrainError(RuntimeError):
@@ -76,6 +76,10 @@ class GeminiBrain:
             ) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             raise GeminiBrainError(f"Gemini API není dostupné: {exc}") from exc
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise GeminiBrainError(
+                "Gemini vrátilo neplatnou odpověď."
+            ) from exc
 
         try:
             return "".join(

@@ -56,6 +56,24 @@ class GeminiBrainTests(unittest.TestCase):
         with self.assertRaisesRegex(GeminiBrainError, "HTTP 403"):
             brain.ask("Test")
 
+    @patch("brain.gemini_brain.urllib.request.urlopen")
+    def test_malformed_json_is_converted_to_clear_error(self, mock_urlopen):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b"{not-json"
+        mock_urlopen.return_value = response
+        brain = GeminiBrain(api_key="test-key", model="test-model")
+        with self.assertRaisesRegex(GeminiBrainError, "neplatnou odpověď"):
+            brain.ask("Test")
+
+    @patch("brain.gemini_brain.urllib.request.urlopen")
+    def test_invalid_utf8_is_converted_to_clear_error(self, mock_urlopen):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b"\xff"
+        mock_urlopen.return_value = response
+        brain = GeminiBrain(api_key="test-key", model="test-model")
+        with self.assertRaisesRegex(GeminiBrainError, "neplatnou odpověď"):
+            brain.ask("Test")
+
 
 if __name__ == "__main__":
     unittest.main()
