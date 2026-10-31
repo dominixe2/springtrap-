@@ -186,3 +186,25 @@ def test_home_page_restores_and_clears_persisted_conversation():
     assert response.status_code == 200
     assert "fetch('/v1/conversations?limit=100')" in response.text
     assert "fetch('/v1/conversations',{method:'DELETE'})" in response.text
+
+
+def test_tool_registry_is_explicit_and_defaults_to_deny():
+    response = client.get("/v1/tools")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["default_policy"] == "deny"
+    assert {item["id"] for item in body["tools"]} == {"profile.read", "memory.list", "memory.create"}
+    assert next(item for item in body["tools"] if item["id"] == "memory.create")["confirmation_required"] is True
+
+
+def test_tool_execution_is_allowlisted_and_memory_write_requires_confirmation():
+    assert client.post("/v1/tools/profile.read/execute", json={}).status_code == 200
+    assert client.post("/v1/tools/shell/execute", json={}).status_code == 404
+    denied = client.post("/v1/tools/memory.create/execute", json={"arguments": {"content": "test"}})
+    assert denied.status_code == 403
+    saved = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": {"content": "poznámka z nástroje", "category": "context"}, "confirmed": True
+    })
+    assert saved.status_code == 200
+    assert saved.json()["result"]["content"] == "poznámka z nástroje"
+    assert client.get("/v1/memories").json()["memories"][0]["content"] == "poznámka z nástroje"
