@@ -83,6 +83,11 @@ class ProfileRequest(BaseModel):
     style: str = Field(default="friendly", min_length=1, max_length=40)
 
 
+class ToolExecuteRequest(BaseModel):
+    arguments: dict[str, object] = Field(default_factory=dict)
+    confirmed: bool = False
+
+
 @app.get("/")
 async def home():
     return FileResponse(STATIC / "index.html")
@@ -176,6 +181,56 @@ async def capabilities():
             {"id": "device.sync", "label": "Synchronizace zařízení", "requires_encrypted_pairing": True},
         ],
     }
+
+
+@app.get("/v1/tools")
+async def list_tools():
+    """List the small, explicit set of tools this server can actually execute."""
+    return {
+        "default_policy": "deny",
+        "tools": [
+            {"id": "profile.read", "description": "Read the local assistant profile", "risk": "read", "confirmation_required": False},
+            {"id": "memory.list", "description": "List saved local memories", "risk": "read", "confirmation_required": False},
+            {"id": "memory.create", "description": "Create one local memory note", "risk": "local_write", "confirmation_required": True},
+        ],
+    }
+
+
+@app.post("/v1/tools/{tool_id}/execute")
+async def execute_tool(tool_id: str, request: ToolExecuteRequest):
+    """Execute only hard-coded local tools; never dispatch arbitrary code or shell commands."""
+    if tool_id == "profile.read":
+        if request.arguments:
+            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
+        with database() as db:
+            row = db.execute("SELECT agent_name, language, style, updated_at FROM profile WHERE id=1").fetchone()
+        return {"tool": tool_id, "result": dict(row)}
+
+    if tool_id == "memory.list":
+        if request.arguments:
+            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
+        with database() as db:
+            rows = db.execute("SELECT id, content, category, created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
+        return {"tool": tool_id, "result": {"memories": [dict(row) for row in rows]}}
+
+    if tool_id == "memory.create":
+        if not request.confirmed:
+            raise HTTPException(status_code=403, detail="Uložení poznámky vyžaduje potvrzení uživatele.")
+        if set(request.arguments) - {"content", "category"}:
+            raise HTTPException(status_code=422, detail="Nástroj obdržel nepovolené argumenty.")
+        content = request.arguments.get("content")
+        category = request.arguments.get("category", "context")
+        if not isinstance(content, str) or not content.strip() or len(content) > 1000:
+            raise HTTPException(status_code=422, detail="Obsah poznámky musí mít 1 až 1000 znaků.")
+        if not isinstance(category, str) or not category.strip() or len(category) > 40:
+            raise HTTPException(status_code=422, detail="Kategorie musí mít 1 až 40 znaků.")
+        with database() as db:
+            cursor = db.execute("INSERT INTO memories(content, category, created_at) VALUES (?, ?, ?)", (content.strip(), category.strip(), utc_now()))
+            db.commit()
+            row = db.execute("SELECT id, content, category, created_at FROM memories WHERE id=?", (cursor.lastrowid,)).fetchone()
+        return {"tool": tool_id, "result": dict(row)}
+
+    raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
 
 
 @app.get("/v1/profile")
