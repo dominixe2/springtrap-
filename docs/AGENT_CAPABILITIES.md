@@ -53,8 +53,9 @@ Build one Czech-first personal agent for Android first, with an optional Windows
 - Paired agents exchange only explicitly shared messages and scoped data.
 
 ### Voice
-- Push-to-talk first; speech-to-text and text-to-speech adapters selected by platform.
-- Wake word is optional and only after battery, privacy, and Android background constraints are addressed.
+- Basic browser voice input/output is present: Czech browser SpeechRecognition where supported, speechSynthesis replies, and a stop control.
+- This browser layer is not a continuous live conversation: no full-duplex streaming, reliable barge-in while the agent speaks, or background wake word yet.
+- Next voice phase: platform adapters, streaming audio, voice activity detection, interruption handling, then optional wake word only after battery, privacy, and Android background constraints are addressed.
 - Voice actions that change external state require the same confirmations as text actions.
 
 ## Delivery phases
@@ -68,9 +69,9 @@ Build one Czech-first personal agent for Android first, with an optional Windows
 
 ## Current implementation status (2026-10-31)
 
-Implemented in this branch: FastAPI local backend, responsive web UI, optional Ollama chat adapter, SQLite profile/memory/history, memory CRUD/export, PWA shell cache, and browser-local fallback for basic profile/notes/history when the API is unreachable.
+Implemented in this branch: FastAPI local backend, responsive web UI, optional Ollama chat adapter, SQLite profile/memory/history, memory CRUD/export, PWA shell cache, browser-local fallback for basic profile/notes/history when the API is unreachable, and basic Czech browser voice input/output (browser-dependent).
 
-Not implemented yet: Android APK/native app, on-device LLM runtime, real offline AI generation, tool registry/execution, web research, image/file model pipeline, voice, Windows worker, authenticated pairing, encrypted sync, task scheduler, and external integrations. The browser fallback uses localStorage and does not sync with SQLite or another device.
+Not implemented yet: Android APK/native app, on-device LLM runtime, real offline AI generation, tool registry/execution, web research, image/file model pipeline, live duplex voice with barge-in, wake word/background listening, Windows worker, authenticated pairing, encrypted sync, task scheduler, and external integrations. The browser fallback uses localStorage and does not sync with SQLite or another device.
 
 ## Acceptance criteria
 
