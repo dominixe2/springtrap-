@@ -32,6 +32,20 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 </div>
 <section class="settings"><span>Režim: lokální</span><span id="modelState">Model: neověřen</span><button id="check">Ověřit Ollamu</button><button id="clear">Vymazat konverzaci</button></section>
 <section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><button id="exportMemory" type="button">Exportovat poznámky</button></div><form id="memoryForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0"><input id="memoryText" maxlength="1000" placeholder="Např. Odpovídej mi stručně a česky…" aria-label="Nová poznámka do paměti" required><select id="memoryCategory" aria-label="Kategorie paměti"><option value="preference">Preference</option><option value="project">Projekt</option><option value="context">Kontext</option><option value="goal">Cíl</option></select><button class="primary" type="submit">Uložit poznámku</button></form><div id="memoryList" class="muted" aria-live="polite">Načítám paměť…</div><small>Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani tajné klíče.</small></section>
+
+<section class="settings" style="align-items:stretch;flex-direction:column">
+  <strong>🎛️ Jak se mám přizpůsobit</strong>
+  <small>Nastav si dlouhodobé preference. Micro Helper je použije v každé další konverzaci. Můžeš je kdykoli změnit nebo smazat.</small>
+  <form id="preferenceForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0">
+    <select id="preferenceCategory" aria-label="Oblast preference">
+      <option value="communication">Komunikace</option><option value="work">Práce a úkoly</option><option value="interests">Zájmy</option><option value="boundaries">Co nedělat</option><option value="other">Ostatní</option>
+    </select>
+    <input id="preferenceName" maxlength="80" placeholder="Co si mám zapamatovat? (např. délka odpovědí)" required>
+    <input id="preferenceValue" maxlength="500" placeholder="Jak to má být? (např. stručně a rovnou k věci)" required>
+    <button class="primary" type="submit">Uložit pravidlo</button>
+  </form>
+  <div id="preferenceList" class="muted" aria-live="polite">Načítám nastavení chování…</div>
+</section>
 </main>
 <script>
 const $=id=>document.getElementById(id);let history=[];
@@ -202,6 +216,68 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
    lastSpoken=text;
    speak(text);
  }).observe(messages,{childList:true,subtree:true,characterData:true});
+})();
+</script>
+
+<script>
+(() => {
+ const $ = id => document.getElementById(id);
+ async function renderPreferences() {
+   const root = $("preferenceList");
+   if (!root) return;
+   try {
+     const response = await fetch("/v1/preferences");
+     const data = await response.json();
+     root.replaceChildren();
+     if (!data.preferences.length) {
+       root.textContent = "Zatím žádná pravidla. Přidej třeba styl odpovědí, oblíbená témata nebo věci, kterým se mám vyhnout.";
+       return;
+     }
+     for (const item of data.preferences) {
+       const row = document.createElement("div");
+       row.style.cssText = "display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)";
+       const text = document.createElement("span");
+       text.style.flex = "1";
+       text.textContent = item.category + " · " + item.preference + ": " + item.value;
+       const edit = document.createElement("button");
+       edit.type = "button";
+       edit.textContent = "Upravit";
+       edit.onclick = async () => {
+         const value = window.prompt("Uprav pravidlo:", item.value);
+         if (value === null || !value.trim()) return;
+         const response = await fetch("/v1/preferences", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({category:item.category,preference:item.preference,value:value.trim()})});
+         if (response.ok) renderPreferences();
+       };
+       const remove = document.createElement("button");
+       remove.type = "button";
+       remove.textContent = "Smazat";
+       remove.onclick = async () => {
+         if (!window.confirm("Smazat toto pravidlo přizpůsobení?")) return;
+         const response = await fetch("/v1/preferences/" + item.id, {method:"DELETE"});
+         if (response.ok) renderPreferences();
+       };
+       row.append(text, edit, remove);
+       root.append(row);
+     }
+   } catch (error) { root.textContent = "Místní API není dostupné."; }
+ }
+ $("preferenceForm")?.addEventListener("submit", async event => {
+   event.preventDefault();
+   const payload = {
+     category: $("preferenceCategory").value,
+     preference: $("preferenceName").value.trim(),
+     value: $("preferenceValue").value.trim()
+   };
+   if (!payload.preference || !payload.value) return;
+   const response = await fetch("/v1/preferences", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   if (response.ok) {
+     $("preferenceName").value = "";
+     $("preferenceValue").value = "";
+     await renderPreferences();
+     $("status").textContent = "Pravidlo přizpůsobení uloženo";
+   } else $("status").textContent = "Pravidlo se nepodařilo uložit";
+ });
+ renderPreferences();
 })();
 </script>
 </body></html>
