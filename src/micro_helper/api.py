@@ -112,6 +112,7 @@ async def status():
             "web_chat_ui", "health", "status", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear",
+            "capability_catalog",
         ],
         "not_yet_implemented": [
             "voice", "android_integration", "windows_worker",
@@ -119,6 +120,61 @@ async def status():
         ],
         "paid_api_required": False,
         "storage": {"type": "local_sqlite", "memories": memory_count, "messages": message_count},
+    }
+
+
+
+@app.get("/v1/capabilities")
+async def capabilities():
+    """Return an honest, machine-readable inventory of available and planned agent tools."""
+    return {
+        "agent": "Micro Helper",
+        "policy": {
+            "default": "deny",
+            "external_side_effects_require_confirmation": True,
+            "model_output_is_not_authorization": True,
+        },
+        "available": [
+            {
+                "id": "memory.list",
+                "label": "Zobrazit soukromou paměť",
+                "scope": "memory:read",
+                "confirmation": False,
+                "execution": "local_api",
+            },
+            {
+                "id": "memory.create",
+                "label": "Uložit poznámku do paměti",
+                "scope": "memory:write",
+                "confirmation": True,
+                "execution": "local_api",
+            },
+            {
+                "id": "profile.read",
+                "label": "Přečíst nastavení asistenta",
+                "scope": "profile:read",
+                "confirmation": False,
+                "execution": "local_api",
+            },
+        ],
+        "connectable": [
+            {
+                "id": "ollama",
+                "label": "Lokální AI model přes Ollama",
+                "kind": "local_provider",
+                "requires_user_setup": True,
+                "requires_paid_api": False,
+            },
+        ],
+        "planned": [
+            {"id": "web.search", "label": "Vyhledávání na webu", "requires_network": True},
+            {"id": "files.read", "label": "Čtení souborů", "requires_device_permission": True},
+            {"id": "windows.worker", "label": "Ovládání notebooku", "requires_pairing": True},
+            {"id": "calendar", "label": "Kalendář", "requires_oauth": True},
+            {"id": "messaging", "label": "Zprávy a e-mail", "requires_oauth": True},
+            {"id": "device.voice", "label": "Hlasové ovládání", "requires_android_permissions": True},
+            {"id": "device.sync", "label": "Synchronizace zařízení", "requires_encrypted_pairing": True},
+        ],
     }
 
 
