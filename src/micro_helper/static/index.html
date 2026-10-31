@@ -135,6 +135,38 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       }
       const preferenceId = url.pathname.split("/").pop();
       if (url.pathname.startsWith("/v1/preferences/") && method === "DELETE") { db.preferences=(db.preferences||[]).filter(x=>x.id!==Number(preferenceId)); save(db); return reply({deleted:true}); }
+      const planMatch = url.pathname.match(/^\/v1\/learning\/plans(?:\/([^/]+))?$/);
+      if (url.pathname === "/v1/learning/plans" && method === "GET") {
+        db.learningPlans = db.learningPlans || [];
+        return reply({plans:[...db.learningPlans].sort((a,b)=>b.updated_at.localeCompare(a.updated_at))});
+      }
+      if (url.pathname === "/v1/learning/plans" && method === "POST") {
+        db.learningPlans = db.learningPlans || [];
+        const title=String(body.title||"").trim(), objective=String(body.objective||"").trim();
+        const status=String(body.status||"draft"), steps=Array.isArray(body.steps)?body.steps:[], sources=Array.isArray(body.sources)?body.sources:[];
+        if(!title||title.length>120||!objective||objective.length>4000||!["draft","active","paused"].includes(status)||steps.length>40||sources.length>40)return reply({detail:"Neplatný učební plán."},422);
+        const stamp=new Date().toISOString(), plan={id:crypto.randomUUID(),title,objective,status,steps,sources,version:1,created_at:stamp,updated_at:stamp};
+        db.learningPlans.push(plan);save(db);return reply(plan,201);
+      }
+      if (planMatch && method === "GET") {
+        db.learningPlans = db.learningPlans || [];
+        const plan=db.learningPlans.find(x=>x.id===decodeURIComponent(planMatch[1]));
+        return plan?reply(plan):reply({detail:"Učební plán nebyl nalezen."},404);
+      }
+      if (planMatch && method === "PUT") {
+        db.learningPlans = db.learningPlans || [];
+        const plan=db.learningPlans.find(x=>x.id===decodeURIComponent(planMatch[1]));
+        if(!plan)return reply({detail:"Učební plán nebyl nalezen."},404);
+        const title=String(body.title||"").trim(), objective=String(body.objective||"").trim(), status=String(body.status||"draft");
+        const steps=Array.isArray(body.steps)?body.steps:[], sources=Array.isArray(body.sources)?body.sources:[];
+        if(!title||title.length>120||!objective||objective.length>4000||!["draft","active","paused"].includes(status)||steps.length>40||sources.length>40)return reply({detail:"Neplatný učební plán."},422);
+        Object.assign(plan,{title,objective,status,steps,sources,version:plan.version+1,updated_at:new Date().toISOString()});save(db);return reply(plan);
+      }
+      if (planMatch && method === "DELETE") {
+        db.learningPlans = db.learningPlans || [];
+        const before=db.learningPlans.length;db.learningPlans=db.learningPlans.filter(x=>x.id!==decodeURIComponent(planMatch[1]));save(db);
+        return before===db.learningPlans.length?reply({detail:"Učební plán nebyl nalezen."},404):reply({deleted:true,id:decodeURIComponent(planMatch[1])});
+      }
       if (url.pathname === "/v1/memories" && method === "POST") {
         const memory = {id:db.nextId++,content:String(body.content||"").trim(),category:body.category||"preference",created_at:new Date().toISOString()};
         if (!memory.content) return reply({detail:"Poznámka nesmí být prázdná."},422);
