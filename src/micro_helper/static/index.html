@@ -23,6 +23,12 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 <section id="setup"><label>Jméno agenta <input id="agentName" value="Mykla" maxlength="30"></label><label>Model <input id="model" value="llama3.2" maxlength="80"></label><button class="primary" id="save">Uložit nastavení</button></section>
 <section id="messages"><div class="msg agent">Ahoj! Jsem Micro Helper. Zatím běžím v základním režimu. Připoj lokální Ollamu a můžeme spolu chatovat bez placeného API.</div></section>
 <form id="chat"><input id="prompt" autocomplete="off" placeholder="Napiš, co potřebuješ…" required><button class="primary">Odeslat</button></form>
+<div class="settings" id="voicePanel" aria-label="Hlasové ovládání">
+<button type="button" class="primary" id="voiceStart">🎙️ Mluvit</button>
+<button type="button" id="voiceStop">■ Zastavit hlas</button>
+<label><input type="checkbox" id="voiceReply" checked style="min-width:auto;flex:0"> Číst odpovědi nahlas</label>
+<small id="voiceStatus">Hlasový režim: čeká na spuštění</small>
+</div>
 <section class="settings"><span>Režim: lokální</span><span id="modelState">Model: neověřen</span><button id="check">Ověřit Ollamu</button><button id="clear">Vymazat konverzaci</button></section>
 <section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><button id="exportMemory" type="button">Exportovat poznámky</button></div><form id="memoryForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0"><input id="memoryText" maxlength="1000" placeholder="Např. Odpovídej mi stručně a česky…" aria-label="Nová poznámka do paměti" required><select id="memoryCategory" aria-label="Kategorie paměti"><option value="preference">Preference</option><option value="project">Projekt</option><option value="context">Kontext</option><option value="goal">Cíl</option></select><button class="primary" type="submit">Uložit poznámku</button></form><div id="memoryList" class="muted" aria-live="polite">Načítám paměť…</div><small>Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani tajné klíče.</small></section>
 </main>
@@ -101,4 +107,51 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 })();
 </script>
 
+
+<script>
+/* Browser voice bridge: push-to-talk input + spoken assistant replies. */
+(() => {
+ const start=document.getElementById("voiceStart");
+ const stop=document.getElementById("voiceStop");
+ const status=document.getElementById("voiceStatus");
+ const prompt=document.getElementById("prompt");
+ const form=document.getElementById("chat");
+ const speakToggle=document.getElementById("voiceReply");
+ const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+ let recognition=null;
+ const speak=text=>{
+   if(!speakToggle.checked||!("speechSynthesis" in window))return;
+   window.speechSynthesis.cancel();
+   const utterance=new SpeechSynthesisUtterance(text);
+   utterance.lang="cs-CZ"; utterance.rate=1; utterance.pitch=1;
+   window.speechSynthesis.speak(utterance);
+ };
+ if(!SpeechRecognition){start.disabled=true;status.textContent="Rozpoznávání řeči není v tomto prohlížeči dostupné. Zkus Chrome."; }
+ else {
+   recognition=new SpeechRecognition();
+   recognition.lang="cs-CZ"; recognition.continuous=false; recognition.interimResults=true;
+   recognition.onstart=()=>{status.textContent="Poslouchám…";start.disabled=true;};
+   recognition.onresult=event=>{
+     let text="";
+     for(let i=event.resultIndex;i<event.results.length;i++) text+=event.results[i][0].transcript;
+     prompt.value=text;
+     if(event.results[event.results.length-1].isFinal){status.textContent="Rozpoznáno. Odesílám…";form.requestSubmit();}
+   };
+   recognition.onerror=event=>{status.textContent="Mikrofon: "+event.error;};
+   recognition.onend=()=>{start.disabled=false;if(status.textContent==="Poslouchám…")status.textContent="Poslech ukončen";};
+   start.addEventListener("click",()=>{try{window.speechSynthesis?.cancel();recognition.start();}catch(error){status.textContent="Mikrofon už je aktivní";}});
+ }
+ stop.addEventListener("click",()=>{try{recognition?.stop();}catch(error){};window.speechSynthesis?.cancel();status.textContent="Hlas zastaven";});
+ const messages=document.getElementById("messages");
+ let lastSpoken="";
+ new MutationObserver(()=>{
+   if(!speakToggle.checked)return;
+   const items=messages.querySelectorAll(".msg.agent");
+   const last=items[items.length-1];
+   if(!last)return;
+   const text=last.textContent.trim();
+   if(text&&text!=="Přemýšlím…"&&text!==lastSpoken){lastSpoken=text;speak(text);}
+ }).observe(messages,{childList:true,subtree:true,characterData:true});
+})();
+</script>
 </body></html>
