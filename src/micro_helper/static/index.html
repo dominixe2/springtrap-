@@ -27,6 +27,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 <button type="button" class="primary" id="voiceStart">🎙️ Mluvit</button>
 <button type="button" id="voiceStop">■ Zastavit hlas</button>
 <label><input type="checkbox" id="voiceReply" checked style="min-width:auto;flex:0"> Číst odpovědi nahlas</label>
+<label><input type="checkbox" id="voiceHandsFree" checked style="min-width:auto;flex:0"> Pokračovat v rozhovoru bez mačkání</label>
 <small id="voiceStatus">Hlasový režim: čeká na spuštění</small>
 </div>
 <section class="settings"><span>Režim: lokální</span><span id="modelState">Model: neověřen</span><button id="check">Ověřit Ollamu</button><button id="clear">Vymazat konverzaci</button></section>
@@ -109,48 +110,96 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 
 
 <script>
-/* Browser voice bridge: push-to-talk input + spoken assistant replies. */
+/* Browser voice bridge: Czech speech input/output with hands-free turn taking. */
 (() => {
- const start=document.getElementById("voiceStart");
- const stop=document.getElementById("voiceStop");
+ const startButton=document.getElementById("voiceStart");
+ const stopButton=document.getElementById("voiceStop");
  const status=document.getElementById("voiceStatus");
  const prompt=document.getElementById("prompt");
  const form=document.getElementById("chat");
  const speakToggle=document.getElementById("voiceReply");
+ const handsFreeToggle=document.getElementById("voiceHandsFree");
  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
  let recognition=null;
+ let handsFree=false;
+ let restarting=false;
+ const setStatus=text=>{status.textContent=text;};
+ const beginListening=()=>{
+   if(!recognition||!handsFree||restarting)return;
+   restarting=true;
+   try{window.speechSynthesis?.cancel();recognition.start();}
+   catch(error){setStatus("Čekám na dokončení hlasového režimu");}
+   setTimeout(()=>{restarting=false;},500);
+ };
  const speak=text=>{
-   if(!speakToggle.checked||!("speechSynthesis" in window))return;
+   if(!speakToggle.checked||!("speechSynthesis" in window)){
+     if(handsFree)setTimeout(beginListening,350);
+     return;
+   }
    window.speechSynthesis.cancel();
    const utterance=new SpeechSynthesisUtterance(text);
-   utterance.lang="cs-CZ"; utterance.rate=1; utterance.pitch=1;
+   utterance.lang="cs-CZ";utterance.rate=1;utterance.pitch=1;
+   utterance.onstart=()=>setStatus("Odpovídám hlasem…");
+   utterance.onend=()=>{if(handsFree){setStatus("Poslouchám dál…");setTimeout(beginListening,250);}};
+   utterance.onerror=()=>{if(handsFree)setTimeout(beginListening,500);};
    window.speechSynthesis.speak(utterance);
  };
- if(!SpeechRecognition){start.disabled=true;status.textContent="Rozpoznávání řeči není v tomto prohlížeči dostupné. Zkus Chrome."; }
- else {
+ if(!SpeechRecognition){
+   startButton.disabled=true;
+   setStatus("Rozpoznávání řeči není v tomto prohlížeči dostupné. Zkus Chrome.");
+ }else{
    recognition=new SpeechRecognition();
-   recognition.lang="cs-CZ"; recognition.continuous=false; recognition.interimResults=true;
-   recognition.onstart=()=>{status.textContent="Poslouchám…";start.disabled=true;};
+   recognition.lang="cs-CZ";recognition.continuous=false;recognition.interimResults=true;
+   recognition.onstart=()=>{restarting=false;startButton.disabled=true;setStatus("Poslouchám…");};
    recognition.onresult=event=>{
-     let text="";
-     for(let i=event.resultIndex;i<event.results.length;i++) text+=event.results[i][0].transcript;
-     prompt.value=text;
-     if(event.results[event.results.length-1].isFinal){status.textContent="Rozpoznáno. Odesílám…";form.requestSubmit();}
+     let finalText="";
+     let interimText="";
+     for(let i=event.resultIndex;i<event.results.length;i++){
+       const transcript=event.results[i][0].transcript;
+       if(event.results[i].isFinal)finalText+=transcript;
+       else interimText+=transcript;
+     }
+     if(finalText.trim()){
+       prompt.value=finalText.trim();
+       setStatus("Rozpoznáno. Zpracovávám…");
+       recognition.stop();
+       form.requestSubmit();
+     }else if(interimText)prompt.value=interimText;
    };
-   recognition.onerror=event=>{status.textContent="Mikrofon: "+event.error;};
-   recognition.onend=()=>{start.disabled=false;if(status.textContent==="Poslouchám…")status.textContent="Poslech ukončen";};
-   start.addEventListener("click",()=>{try{window.speechSynthesis?.cancel();recognition.start();}catch(error){status.textContent="Mikrofon už je aktivní";}});
+   recognition.onerror=event=>{
+     setStatus("Mikrofon: "+event.error);
+     if(handsFree&&event.error!=="not-allowed"&&event.error!=="service-not-allowed")setTimeout(beginListening,900);
+     else if(event.error==="not-allowed")handsFree=false;
+   };
+   recognition.onend=()=>{
+     startButton.disabled=false;
+     if(handsFree&&status.textContent==="Poslouchám…")setStatus("Čekám na odpověď…");
+   };
+   startButton.addEventListener("click",()=>{
+     handsFree=handsFreeToggle.checked;
+     try{recognition.start();}catch(error){setStatus("Mikrofon už je aktivní");}
+   });
  }
- stop.addEventListener("click",()=>{try{recognition?.stop();}catch(error){};window.speechSynthesis?.cancel();status.textContent="Hlas zastaven";});
+ stopButton.addEventListener("click",()=>{
+   handsFree=false;
+   try{recognition?.stop();}catch(error){}
+   window.speechSynthesis?.cancel();
+   startButton.disabled=false;
+   setStatus("Hlasový rozhovor zastaven");
+ });
+ handsFreeToggle.addEventListener("change",()=>{
+   if(!handsFreeToggle.checked){handsFree=false;setStatus("Automatické pokračování vypnuto");}
+ });
  const messages=document.getElementById("messages");
  let lastSpoken="";
  new MutationObserver(()=>{
-   if(!speakToggle.checked)return;
    const items=messages.querySelectorAll(".msg.agent");
    const last=items[items.length-1];
    if(!last)return;
    const text=last.textContent.trim();
-   if(text&&text!=="Přemýšlím…"&&text!==lastSpoken){lastSpoken=text;speak(text);}
+   if(!text||text==="Přemýšlím…"||text===lastSpoken)return;
+   lastSpoken=text;
+   speak(text);
  }).observe(messages,{childList:true,subtree:true,characterData:true});
 })();
 </script>
