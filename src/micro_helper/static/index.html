@@ -84,7 +84,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 (() => {
   const nativeFetch = window.fetch.bind(window);
   const key = "micro_helper_offline_v1";
-  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],messages:[],nextId:1}; } };
+  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],messages:[],nextId:1}; } };
   const save = data => localStorage.setItem(key, JSON.stringify(data));
   const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
   window.fetch = async (input, init={}) => {
@@ -98,6 +98,18 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);
       if (url.pathname === "/v1/profile" && method === "PUT") { db.profile = {...db.profile,...body}; save(db); return reply(db.profile); }
       if (url.pathname === "/v1/memories" && method === "GET") return reply({memories:[...db.memories].reverse()});
+      if (url.pathname === "/v1/preferences" && method === "GET") return reply({preferences:db.preferences||[]});
+      if (url.pathname === "/v1/preferences" && method === "POST") {
+        db.preferences=db.preferences||[];
+        const category=String(body.category||"other"), preference=String(body.preference||"").trim(), value=String(body.value||"").trim();
+        if(!preference||!value)return reply({detail:"Preference nesmí být prázdná."},422);
+        let item=db.preferences.find(x=>x.category===category&&x.preference===preference);
+        if(item)item.value=value;
+        else {item={id:db.nextId++,category,preference,value,source:"user",updated_at:new Date().toISOString()};db.preferences.push(item);}
+        save(db);return reply(item,201);
+      }
+      const preferenceMatch=url.pathname.match(/^\\/v1\\/preferences\\/(\\d+)$/);
+      if(preferenceMatch&&method==="DELETE"){db.preferences=(db.preferences||[]).filter(x=>x.id!==Number(preferenceMatch[1]));save(db);return reply({deleted:true});}
       if (url.pathname === "/v1/memories" && method === "POST") {
         const memory = {id:db.nextId++,content:String(body.content||"").trim(),category:body.category||"preference",created_at:new Date().toISOString()};
         if (!memory.content) return reply({detail:"Poznámka nesmí být prázdná."},422);
