@@ -73,6 +73,15 @@ def database() -> Iterator[sqlite3.Connection]:
                 finished_at TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at);
+            CREATE TABLE IF NOT EXISTS preferences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                preference TEXT NOT NULL,
+                value TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'user',
+                updated_at TEXT NOT NULL,
+                UNIQUE(category, preference)
+            );
             """
         )
         connection.commit()
@@ -91,6 +100,12 @@ class TaskRequest(BaseModel):
     kind: str = Field(default="agent.draft", pattern="^agent\\.draft$", max_length=40)
     title: str = Field(min_length=1, max_length=120)
     input_text: str = Field(min_length=1, max_length=12000)
+
+
+class PreferenceRequest(BaseModel):
+    category: str = Field(min_length=1, max_length=40)
+    preference: str = Field(min_length=1, max_length=80)
+    value: str = Field(min_length=1, max_length=500)
 
 
 class MemoryRequest(BaseModel):
@@ -382,6 +397,49 @@ async def delete_memory(memory_id: int):
     return {"deleted": True, "id": memory_id}
 
 
+
+@app.get("/v1/preferences")
+async def list_preferences():
+    with database() as db:
+        rows = db.execute(
+            "SELECT id, category, preference, value, source, updated_at FROM preferences ORDER BY category, preference"
+        ).fetchall()
+    return {"preferences": [dict(row) for row in rows]}
+
+
+@app.post("/v1/preferences", status_code=201)
+async def create_or_update_preference(request: PreferenceRequest):
+    category = request.category.strip()
+    preference = request.preference.strip()
+    value = request.value.strip()
+    if not category or not preference or not value:
+        raise HTTPException(status_code=422, detail="Preference nesmí být prázdná.")
+    with database() as db:
+        db.execute(
+            """INSERT INTO preferences(category, preference, value, source, updated_at)
+               VALUES (?, ?, ?, 'user', ?)
+               ON CONFLICT(category, preference) DO UPDATE SET
+                 value=excluded.value, source='user', updated_at=excluded.updated_at""",
+            (category, preference, value, utc_now()),
+        )
+        db.commit()
+        row = db.execute(
+            "SELECT id, category, preference, value, source, updated_at FROM preferences WHERE category=? AND preference=?",
+            (category, preference),
+        ).fetchone()
+    return dict(row)
+
+
+@app.delete("/v1/preferences/{preference_id}")
+async def delete_preference(preference_id: int):
+    with database() as db:
+        cursor = db.execute("DELETE FROM preferences WHERE id=?", (preference_id,))
+        db.commit()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Preference nebyla nalezena.")
+    return {"deleted": True, "id": preference_id}
+
+
 @app.get("/v1/conversations")
 async def get_conversations(limit: int = 100):
     limit = max(1, min(limit, 200))
@@ -425,6 +483,9 @@ async def chat(request: ChatRequest):
         memories = db.execute(
             "SELECT content, category FROM memories ORDER BY id DESC LIMIT 30"
         ).fetchall()
+        preferences = db.execute(
+            "SELECT category, preference, value FROM preferences ORDER BY category, preference LIMIT 100"
+        ).fetchall()
         saved_history = db.execute(
             "SELECT role, content FROM messages ORDER BY id DESC LIMIT 20"
         ).fetchall()
@@ -449,6 +510,10 @@ async def chat(request: ChatRequest):
     )
     if memory_text:
         system_prompt += "\nUložené poznámky o uživateli (používej jen jako kontext):\n" + memory_text[:12000]
+    preference_text = "\n".join("- " + row["category"] + " / " + row["preference"] + ": " + row["value"] for row in preferences)
+    if preference_text:
+        system_prompt += "\nUživatelem potvrzené preference a pravidla chování (dodržuj je, pokud nejsou v rozporu s bezpečností):\n" + preference_text[:10000]
+    system_prompt += "\nUč se z výslovných oprav a preferencí. Pokud odvodíš novou dlouhodobou preferenci, nejprve se zeptej, zda ji máš uložit. Nikdy neukládej citlivé osobní údaje ani domněnky bez výslovného pokynu. Uživatel může kdykoli požádat o opravu nebo smazání preference."
 
     messages = [{"role": "system", "content": system_prompt}, *safe_history]
     messages.append({"role": "user", "content": request.message})
