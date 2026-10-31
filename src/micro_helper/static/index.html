@@ -57,6 +57,20 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
   </form>
   <div id="preferenceList" class="muted" aria-live="polite">Načítám nastavení chování…</div>
 </section>
+
+<section class="settings" style="align-items:stretch;flex-direction:column" id="learningPanel">
+  <strong>📚 Učební plány</strong>
+  <small>Vytvářej si dlouhodobé plány, přidávej kroky a zdroje. Plán je zatím bezpečná struktura dat, sám nespouští příkazy ani nezískává nová oprávnění.</small>
+  <form id="learningForm" style="display:grid;gap:8px;margin:0">
+    <input id="learningTitle" maxlength="120" placeholder="Název plánu" required>
+    <input id="learningObjective" maxlength="4000" placeholder="Co se má Micro Helper naučit nebo čeho dosáhnout?" required>
+    <textarea id="learningSteps" rows="3" maxlength="4000" placeholder="Kroky, každý na samostatný řádek" style="font:inherit;color:inherit;background:#0c1425;border:1px solid var(--line);border-radius:11px;padding:11px"></textarea>
+    <input id="learningSources" maxlength="4000" placeholder="Zdroje, každý na samostatný řádek (volitelné)">
+    <select id="learningStatus"><option value="draft">Koncept</option><option value="active">Aktivní</option><option value="paused">Pozastavený</option></select>
+    <button class="primary" type="submit">Vytvořit učební plán</button>
+  </form>
+  <div id="learningList" class="muted" aria-live="polite">Načítám učební plány…</div>
+</section>
 </main>
 <script>
 const $=id=>document.getElementById(id);let history=[];
@@ -340,6 +354,45 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
  });
  refreshTasks();
  setInterval(refreshTasks,8000);
+})();
+</script>
+
+<script>
+(() => {
+ const $=id=>document.getElementById(id);
+ const list=$("learningList"), form=$("learningForm");
+ const lines=id=>$(id).value.split("\\n").map(x=>x.trim()).filter(Boolean);
+ async function refresh(){
+   try{
+     const r=await fetch("/v1/learning/plans"); if(!r.ok)throw Error();
+     const data=await r.json(); list.replaceChildren();
+     if(!data.plans.length){list.textContent="Zatím nemáš žádný učební plán.";return;}
+     for(const p of data.plans){
+       const card=document.createElement("div");card.style.cssText="padding:12px 0;border-top:1px solid var(--line);display:grid;gap:6px";
+       const title=document.createElement("strong");title.textContent=p.title+" · "+({draft:"Koncept",active:"Aktivní",paused:"Pozastavený"}[p.status]||p.status)+" · v"+p.version;
+       const objective=document.createElement("div");objective.textContent=p.objective;
+       const steps=document.createElement("small");steps.textContent=p.steps.length?"Kroky: "+p.steps.join(" → "):"Bez definovaných kroků";
+       const actions=document.createElement("div");actions.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
+       const edit=document.createElement("button");edit.textContent="Upravit";edit.onclick=async()=>{
+         const title=prompt("Název plánu",p.title);if(title===null)return;
+         const objective=prompt("Cíl plánu",p.objective);if(objective===null)return;
+         const steps=prompt("Kroky oddělené znakem |",p.steps.join(" | "));if(steps===null)return;
+         const status=prompt("Stav: draft, active, paused",p.status);if(status===null)return;
+         const r=await fetch("/v1/learning/plans/"+encodeURIComponent(p.id),{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,objective,status,steps:steps.split("|").map(x=>x.trim()).filter(Boolean),sources:p.sources})});
+         if(r.ok)refresh();else alert("Plán se nepodařilo uložit. Zkontroluj údaje.");
+       };
+       const remove=document.createElement("button");remove.textContent="Smazat";remove.onclick=async()=>{if(!confirm("Opravdu smazat tento učební plán?"))return;const r=await fetch("/v1/learning/plans/"+encodeURIComponent(p.id),{method:"DELETE"});if(r.ok)refresh();};
+       actions.append(edit,remove);card.append(title,objective,steps,actions);list.append(card);
+     }
+   }catch(e){list.textContent="Učební plány vyžadují spuštěné místní API.";}
+ }
+ form?.addEventListener("submit",async e=>{
+   e.preventDefault();
+   const payload={title:$("learningTitle").value.trim(),objective:$("learningObjective").value.trim(),status:$("learningStatus").value,steps:lines("learningSteps"),sources:lines("learningSources")};
+   const r=await fetch("/v1/learning/plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   if(r.ok){form.reset();$("status").textContent="Učební plán vytvořen";refresh();}else $("status").textContent="Plán se nepodařilo vytvořit";
+ });
+ refresh();
 })();
 </script>
 </body></html>
