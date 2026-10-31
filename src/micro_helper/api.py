@@ -88,6 +88,12 @@ async def home():
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    """Serve the worker at the origin root so it can control the app shell."""
+    return FileResponse(STATIC / "sw.js", media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "micro-helper"}
