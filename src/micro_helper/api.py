@@ -163,6 +163,27 @@ async def create_memory(request: MemoryRequest):
     return dict(row)
 
 
+@app.put("/v1/memories/{memory_id}")
+async def update_memory(memory_id: int, request: MemoryRequest):
+    content = request.content.strip()
+    category = request.category.strip()
+    if not content:
+        raise HTTPException(status_code=422, detail="Paměť nesmí být prázdná.")
+    with database() as db:
+        cursor = db.execute(
+            "UPDATE memories SET content=?, category=? WHERE id=?",
+            (content, category, memory_id),
+        )
+        db.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Tahle paměť už neexistuje.")
+        row = db.execute(
+            "SELECT id, content, category, created_at FROM memories WHERE id=?",
+            (memory_id,),
+        ).fetchone()
+    return dict(row)
+
+
 @app.delete("/v1/memories/{memory_id}")
 async def delete_memory(memory_id: int):
     with database() as db:
