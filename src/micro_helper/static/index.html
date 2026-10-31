@@ -55,4 +55,50 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   }));
 }
 </script>
+
+<script>
+/* Offline-first local fallback: keeps notes/profile/history on this device when the API is unreachable.
+   AI replies are not fabricated offline; the user is told when no local model is available. */
+(() => {
+  const nativeFetch = window.fetch.bind(window);
+  const key = "micro_helper_offline_v1";
+  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],messages:[],nextId:1}; } };
+  const save = data => localStorage.setItem(key, JSON.stringify(data));
+  const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
+  window.fetch = async (input, init={}) => {
+    try { return await nativeFetch(input, init); }
+    catch (error) {
+      const url = new URL(typeof input === "string" ? input : input.url, location.href);
+      if (url.origin !== location.origin || !url.pathname.startsWith("/v1/")) throw error;
+      const method = (init.method || (typeof input !== "string" && input.method) || "GET").toUpperCase();
+      let body = {}; try { body = JSON.parse(init.body || "{}"); } catch {}
+      const db = load();
+      if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);
+      if (url.pathname === "/v1/profile" && method === "PUT") { db.profile = {...db.profile,...body}; save(db); return reply(db.profile); }
+      if (url.pathname === "/v1/memories" && method === "GET") return reply({memories:[...db.memories].reverse()});
+      if (url.pathname === "/v1/memories" && method === "POST") {
+        const memory = {id:db.nextId++,content:String(body.content||"").trim(),category:body.category||"preference",created_at:new Date().toISOString()};
+        if (!memory.content) return reply({detail:"Poznámka nesmí být prázdná."},422);
+        db.memories.push(memory); save(db); return reply(memory,201);
+      }
+      const memoryMatch = url.pathname.match(/^\/v1\/memories\/(\d+)$/);
+      if (memoryMatch && method === "PUT") { const m=db.memories.find(x=>x.id===Number(memoryMatch[1])); if(!m)return reply({detail:"Poznámka nenalezena"},404); m.content=String(body.content||"").trim();m.category=body.category||m.category;save(db);return reply(m); }
+      if (memoryMatch && method === "DELETE") { db.memories=db.memories.filter(x=>x.id!==Number(memoryMatch[1]));save(db);return reply({deleted:true}); }
+      if (url.pathname === "/v1/conversations" && method === "GET") return reply({messages:db.messages});
+      if (url.pathname === "/v1/conversations" && method === "DELETE") { db.messages=[];save(db);return reply({deleted:true}); }
+      if (url.pathname === "/v1/models") return reply({available:false,models:[]});
+      if (url.pathname === "/v1/status") return reply({product:"Micro Helper",mode:"offline-local",paid_api_required:false,storage:{type:"browser-localStorage",memories:db.memories.length,messages:db.messages.length}});
+      if (url.pathname === "/v1/chat" && method === "POST") {
+        const message=String(body.message||"").trim();
+        if(message){db.messages.push({id:db.nextId++,role:"user",content:message,created_at:new Date().toISOString()});save(db);}
+        return reply({reply:"Jsem v offline režimu. Poznámky a nastavení můžeš používat, ale pro skutečnou AI odpověď potřebuji dostupný lokální model nebo online službu. Zprávu jsem uložil pouze do tohoto zařízení."});
+      }
+      throw error;
+    }
+  };
+  window.addEventListener("online",()=>{const status=document.getElementById("status");if(status)status.textContent="Síť dostupná · ověřuji připojení";});
+  window.addEventListener("offline",()=>{const status=document.getElementById("status");if(status)status.textContent="Offline · místní režim";});
+})();
+</script>
+
 </body></html>
