@@ -110,3 +110,19 @@ def test_chat_uses_local_memory_and_persists_successful_exchange(monkeypatch):
     saved = client.get("/v1/conversations").json()["messages"]
     assert [item["role"] for item in saved] == ["user", "assistant"]
     assert saved[0]["content"] == "Ahoj"
+
+
+def test_memory_can_be_corrected_and_deleted():
+    created = client.post("/v1/memories", json={"content": "old note", "category": "context"})
+    memory_id = created.json()["id"]
+    updated = client.put(
+        f"/v1/memories/{memory_id}",
+        json={"content": "corrected note", "category": "goal"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["content"] == "corrected note"
+    assert updated.json()["category"] == "goal"
+    assert client.put(
+        f"/v1/memories/{memory_id + 9999}",
+        json={"content": "missing", "category": "context"},
+    ).status_code == 404
