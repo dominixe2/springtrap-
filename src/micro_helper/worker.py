@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import time
 
 import httpx
@@ -32,7 +33,7 @@ def run_once() -> bool:
         response = httpx.post(
             f"{OLLAMA_URL}/api/chat",
             json={
-                "model": "llama3.2",
+                "model": os.getenv("MICRO_HELPER_MODEL", "llama3.2"),
                 "stream": False,
                 "messages": [
                     {
