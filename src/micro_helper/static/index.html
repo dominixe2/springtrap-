@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Micro Helper</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#141c30;--line:#263451;--accent:#73d7c2;--muted:#9aabc4}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1a2940,#0b1020 65%);color:#edf4ff;font:16px system-ui;min-height:100vh}
+main{max-width:900px;margin:auto;padding:24px;display:flex;flex-direction:column;min-height:100vh}
+header{display:flex;align-items:center;gap:14px;padding:14px 0 22px}.orb{width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#d8fff6,#49bca9 35%,#205b72 70%);box-shadow:0 0 28px #4bc7b477}
+h1{font-size:21px;margin:0}small,.muted{color:var(--muted)}.status{margin-left:auto;font-size:12px}
+#setup,.chatbox,.settings{background:#121b2e;border:1px solid var(--line);border-radius:18px;padding:16px}
+#setup{margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select,button{font:inherit;color:inherit;background:#0c1425;border:1px solid var(--line);border-radius:11px;padding:11px}
+input{min-width:0;flex:1}button{cursor:pointer;background:#1b3447}button.primary{background:#23695f;border-color:#328e80}
+#messages{flex:1;min-height:340px;max-height:60vh;overflow:auto;padding:10px 2px}
+.msg{max-width:82%;padding:12px 15px;margin:10px 0;border-radius:15px;white-space:pre-wrap;line-height:1.45}.user{margin-left:auto;background:#21483f}.agent{background:#18263b;border:1px solid #2a3b56}
+form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+@media(max-width:600px){main{padding:14px}.msg{max-width:94%}#messages{max-height:none}}
+</style></head>
+<body><main>
+<header><div class="orb"></div><div><h1 id="title">Micro Helper</h1><small>Tvůj osobní lokální AI agent</small></div><span class="status" id="status">Připraven</span></header>
+<section id="setup"><label>Jméno agenta <input id="agentName" value="Mykla" maxlength="30"></label><label>Model <input id="model" value="llama3.2" maxlength="80"></label><button class="primary" id="save">Uložit nastavení</button></section>
+<section id="messages"><div class="msg agent">Ahoj! Jsem Micro Helper. Zatím běžím v základním režimu. Připoj lokální Ollamu a můžeme spolu chatovat bez placeného API.</div></section>
+<form id="chat"><input id="prompt" autocomplete="off" placeholder="Napiš, co potřebuješ…" required><button class="primary">Odeslat</button></form>
+<section class="settings"><span>Režim: lokální</span><span id="modelState">Model: neověřen</span><button id="check">Ověřit Ollamu</button><button id="clear">Vymazat konverzaci</button></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);let history=[];
+function add(text,who){const d=document.createElement('div');d.className='msg '+who;d.textContent=text;$('messages').append(d);$('messages').scrollTop=$('messages').scrollHeight;return d}
+$('save').onclick=()=>{localStorage.setItem('mh_name',$('agentName').value);localStorage.setItem('mh_model',$('model').value);$('title').textContent=$('agentName').value+' · Micro Helper';$('status').textContent='Nastavení uloženo'};
+$('agentName').value=localStorage.getItem('mh_name')||'Mykla';$('model').value=localStorage.getItem('mh_model')||'llama3.2';$('save').click();
+$('check').onclick=async()=>{try{const r=await fetch('/v1/models');const j=await r.json();$('modelState').textContent='Ollama: '+(j.available?j.models.join(', '):'není dostupná');}catch(e){$('modelState').textContent='Ollama: chyba spojení'}};
+$('clear').onclick=()=>{$('messages').innerHTML='';history=[];add('Konverzace vymazána.','agent')};
+$('chat').onsubmit=async e=>{e.preventDefault();const q=$('prompt').value.trim();if(!q)return;$('prompt').value='';add(q,'user');const wait=add('Přemýšlím…','agent');$('status').textContent='Pracuji';try{const r=await fetch('/v1/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q,model:$('model').value,history})});const j=await r.json();wait.textContent=j.reply||j.error||'Nepodařilo se získat odpověď.';if(j.reply){history.push({role:'user',content:q},{role:'assistant',content:j.reply});history=history.slice(-20)}}catch(err){wait.textContent='Backend není dostupný. Zkontroluj, že běží lokální server.'} $('status').textContent='Připraven'};
+</script></body></html>
