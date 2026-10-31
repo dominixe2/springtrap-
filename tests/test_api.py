@@ -135,3 +135,36 @@ def test_memory_ui_supports_edit_and_export():
     assert 'textContent="Upravit"' in response.text
     assert 'method:"PUT"' in response.text
     assert 'micro-helper-memory.json' in response.text
+
+
+
+def test_full_backup_round_trip_restores_profile_memories_and_messages():
+    client.put("/v1/profile", json={"agent_name": "Mykla", "language": "cs-CZ", "style": "stručný"})
+    client.post("/v1/memories", json={"content": "Testovací paměť", "category": "project"})
+    with api.database() as db:
+        db.execute("INSERT INTO messages(role, content, created_at) VALUES ('user', 'Ahoj', '2026-01-01T00:00:00Z')")
+        db.execute("INSERT INTO messages(role, content, created_at) VALUES ('assistant', 'Čau', '2026-01-01T00:00:01Z')")
+        db.commit()
+    backup = client.get("/v1/backup").json()
+    assert backup["format"] == "micro-helper-backup"
+    assert len(backup["memories"]) == 1
+    assert len(backup["messages"]) == 2
+
+    client.put("/v1/profile", json={"agent_name": "Other", "language": "cs-CZ", "style": "friendly"})
+    client.post("/v1/memories", json={"content": "Nová poznámka", "category": "context"})
+    assert client.post("/v1/backup/restore", json={"backup": backup}).status_code == 400
+
+    restored = client.post("/v1/backup/restore", json={"backup": backup, "confirm_replace": True})
+    assert restored.status_code == 200
+    assert restored.json() == {"restored": True, "memories": 1, "messages": 2}
+    assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
+    assert [m["content"] for m in client.get("/v1/memories").json()["memories"]] == ["Testovací paměť"]
+    assert [m["content"] for m in client.get("/v1/conversations").json()["messages"]] == ["Ahoj", "Čau"]
+
+
+def test_restore_rejects_invalid_backup():
+    response = client.post("/v1/backup/restore", json={
+        "backup": {"format": "wrong", "version": 1, "profile": {}, "memories": [], "messages": []},
+        "confirm_replace": True,
+    })
+    assert response.status_code == 422
