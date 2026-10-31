@@ -70,3 +70,19 @@ The worker polls the queue and uses the configured Ollama endpoint (`OLLAMA_URL`
 This is an initial job runner, not yet an autonomous general-purpose agent. It only creates text drafts; it cannot run shell commands, browse the web, control devices, send messages, or perform external side effects. If Ollama is unavailable, the task is marked failed rather than pretending it completed.
 
 **Cloud warning:** the Google Cloud Always Free `e2-micro` VM has 1 GB RAM and is suitable only for a lightweight API/queue, not for hosting a useful local LLM. The current API also has no remote-user authentication, so do not expose it to the public internet or deploy it as a phone-accessible cloud service yet. A secure pairing/authentication layer and a genuinely free model-provider strategy are still required before cloud deployment.
+
+
+## Background tasks
+
+The web UI includes a small task queue for text-only drafts. Start the API and the worker in two terminals:
+
+```powershell
+uvicorn micro_helper.api:app --host 127.0.0.1 --port 8000
+micro-helper-worker
+```
+
+The worker uses the profile name, communication style, and explicitly saved preferences. Select the model with `MICRO_HELPER_MODEL` (default `llama3.2`). This queue does not execute shell commands, browse the web, send messages, or control devices.
+
+## Android today
+
+The current deliverable is an installable PWA, not an APK. The API must run on a device that can run Python; the PWA alone is only the interface. The service worker caches the app shell, not the AI model or private API data. Cross-device live sync and authenticated pairing are not implemented, so do not expose the API publicly. Use the backup/export facilities for data portability where available; do not assume phone and notebook data are automatically shared.
