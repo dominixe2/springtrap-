@@ -28,6 +28,7 @@ def test_status_is_honest_about_scope():
     assert "persistent_local_memory" in body["implemented"]
     assert "browser_voice_input" in body["implemented"]
     assert "browser_voice_output" in body["implemented"]
+    assert "adaptive_user_preferences" in body["implemented"]
     assert "live_duplex_voice" in body["not_yet_implemented"]
     assert body["storage"]["type"] == "local_sqlite"
 
