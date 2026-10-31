@@ -26,7 +26,9 @@ def test_status_is_honest_about_scope():
     assert body["paid_api_required"] is False
     assert "ollama_chat_adapter" in body["implemented"]
     assert "persistent_local_memory" in body["implemented"]
-    assert "voice" in body["not_yet_implemented"]
+    assert "browser_voice_input" in body["implemented"]
+    assert "browser_voice_output" in body["implemented"]
+    assert "live_duplex_voice" in body["not_yet_implemented"]
     assert body["storage"]["type"] == "local_sqlite"
 
 
@@ -167,3 +169,13 @@ def test_capabilities_distinguish_available_from_planned_tools():
     planned = {item["id"] for item in body["planned"]}
     assert {"web.search", "windows.worker", "calendar", "device.sync"} <= planned
     assert not any(item["id"] == "web.search" for item in body["available"])
+
+
+def test_home_page_exposes_czech_browser_voice_controls():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'id="voiceStart"' in response.text
+    assert 'id="voiceStop"' in response.text
+    assert 'id="voiceReply"' in response.text
+    assert "SpeechRecognition" in response.text
+    assert "SpeechSynthesisUtterance" in response.text
