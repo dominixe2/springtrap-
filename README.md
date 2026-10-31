@@ -1,34 +1,44 @@
-# Springtrap Desktop Buddy
+# Micro Helper
 
-Samostatný prototyp desktopového společníka pro Windows 10/11. Projekt je oddělený od JARVIS: tento repozitář obsahuje pouze Springtrapa.
+Micro Helper is a free-first, local-first personal assistant foundation. The current branch provides a Czech-first browser UI, optional Ollama chat, persistent local profile, editable private notes, and conversation history stored in SQLite.
 
-## Co obsahuje
-- Windows chat aplikaci v Pythonu/Tkinteru (app.py).
-- Gemini API pro konverzaci (brain/gemini_brain.py).
-- Šifrované lokální uložení API klíče přes Windows DPAPI (key_store.py).
-- 3D avatar laboratoř (avatar-3d.html) a starší animovaný prototyp (avatar-prototype.html).
-- Volitelnou analýzu snímku obrazovky po výslovném kliknutí uživatele.
+## What works in this version
 
-## Spuštění na Windows
-1. Nainstaluj Python 3.10 nebo novější z https://www.python.org/downloads/windows/ a při instalaci zaškrtni Add Python to PATH.
-2. Stáhni tento repozitář přes Code → Download ZIP a rozbal ZIP.
-3. Dvakrát klikni na start-springtrap.bat nebo spusť v PowerShellu: python app.py
-4. Při prvním spuštění vlož Gemini API klíč z https://aistudio.google.com/apikey. Klíč se uloží šifrovaně pro aktuální účet Windows. Lze jej změnit tlačítkem API klíč.
+- Local FastAPI service and responsive browser UI.
+- Optional local LLM via Ollama. No paid API key is required; a compatible model must be downloaded locally.
+- Editable agent name, language, and communication style.
+- Local SQLite persistence for profile, user-managed memories, and successful chat messages.
+- Memory create/list/edit/delete API and UI controls, plus JSON export of saved notes.
+- Conversation history reload and explicit history deletion.
+- Ollama model discovery and graceful handling when Ollama is offline.
+- API validation and automated tests.
 
-Aplikace používá Python standard library, takže není potřeba instalovat balíčky přes pip. Připojení k internetu je potřeba pro Gemini; 3D laboratoř načítá Three.js z CDN.
+## Windows quick start
 
-## Co je prototyp a co ještě ne
-- Chat s Gemini a čtení odpovědí přes hlasové funkce Windows jsou prototypové funkce.
-- 3D avatar se otevírá v prohlížeči, není to zatím průhledné always-on-top okno na ploše.
-- Aplikace zatím nemá skutečnou automatickou detekci her ani autonomní ovládání počítače.
-- Snímek obrazovky se analyzuje až po kliknutí uživatele. Nepředstíráme nepřetržité sledování.
+Requires Python 3.11+ and, for AI chat, [Ollama](https://ollama.com/) with a model installed.
 
-## Soubory
-- README-WINDOWS.md: detailní návod pro Windows.
-- TODO.md: známá omezení a další kroky.
-- CHARACTER-ASSET-PIPELINE.md: plán práce s modely postav.
-- brain/: Gemini klient.
-- tests/: offline testy.
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+# Optional local AI: install Ollama separately, then run e.g. ollama pull llama3.2
+uvicorn micro_helper.api:app --host 127.0.0.1 --port 8000
+```
 
-## Bezpečnost
-Nikdy necommituj API klíč ani soubor s tajnými údaji. Veřejné issue a logy nesmí obsahovat API klíče. Ovládání počítače nebo automatické akce budou vyžadovat samostatné, výslovné povolení.
+Open http://127.0.0.1:8000. In another terminal, run `pytest -q` to validate the backend.
+
+The API binds to localhost by default. Keep it local unless you separately configure authentication and network security. Do not expose this development server directly to the internet.
+
+## Local data and privacy
+
+- Default database: `~/.micro-helper/micro_helper.sqlite3`.
+- Override the path with `MICRO_HELPER_DB`.
+- Override the Ollama endpoint with `OLLAMA_URL`.
+- Stored profile, manually saved memories, and successful chat exchanges stay in that local SQLite database. Deleting conversation history does not delete memory notes.
+- Do not store passwords, API keys, or other secrets in memories. The app does not encrypt the SQLite database.
+
+## Honest scope
+
+This is not yet a complete Android or Windows agent package. Voice, wake word, Android system integration, a Windows automation worker, encrypted sync, paired agents, and autonomous tool execution are **not implemented**. It does not control your computer or phone just because chat works. The current local web app is the usable foundation for those future modules.
+
+See `docs/ARCHITECTURE.md` and `docs/PRODUCT_SPEC.md` for the intended architecture and security rules.
