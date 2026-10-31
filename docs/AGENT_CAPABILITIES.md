@@ -69,9 +69,9 @@ Build one Czech-first personal agent for Android first, with an optional Windows
 
 ## Current implementation status (2026-10-31)
 
-Implemented in this branch: FastAPI local backend, responsive web UI, optional Ollama chat adapter, SQLite profile/memory/history, memory CRUD/export, PWA shell cache, browser-local fallback for basic profile/notes/history when the API is unreachable, and basic Czech browser voice input/output (browser-dependent).
+Implemented in this branch: FastAPI local backend, responsive web UI, optional Ollama chat adapter, SQLite profile/memory/history, memory CRUD/export, PWA shell cache, browser-local fallback for basic profile/notes/history when the API is unreachable, basic Czech browser voice input/output (browser-dependent), and a hard-coded local tool registry with profile.read, memory.list, and confirmation-gated memory.create.
 
-Not implemented yet: Android APK/native app, on-device LLM runtime, real offline AI generation, tool registry/execution, web research, image/file model pipeline, live duplex voice with barge-in, wake word/background listening, Windows worker, authenticated pairing, encrypted sync, task scheduler, and external integrations. The browser fallback uses localStorage and does not sync with SQLite or another device.
+Not implemented yet: Android APK/native app, on-device LLM runtime, real offline AI generation, model-driven tool selection, general tool execution, web research, image/file model pipeline, live duplex voice with barge-in, wake word/background listening, Windows worker, authenticated pairing, encrypted sync, task scheduler, and external integrations. The current tool registry is deliberately limited to three local operations; it does not grant shell, filesystem, network, or desktop access. The browser fallback uses localStorage and does not sync with SQLite or another device.
 
 ## Acceptance criteria
 
