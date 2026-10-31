@@ -11,6 +11,7 @@ Micro Helper is a free-first, local-first personal assistant foundation. The cur
 - Optional local LLM via Ollama. No paid API key is required; a compatible model must be downloaded locally.
 - Memory create/list/edit/delete controls and JSON export of saved notes.
 - Conversation history reload and explicit history deletion.
+- Basic Czech browser voice input (SpeechRecognition where supported) and spoken replies (browser speech synthesis), with a stop control. This is a first voice layer, not a live duplex conversation.
 - API validation and automated tests.
 
 ## Windows quick start
@@ -38,7 +39,8 @@ The API binds to localhost by default. Keep it local unless you separately confi
 - **Offline AI generation is not implemented.** The app needs a model running locally and reachable by the API. A cached web page alone is not an AI model.
 - **Cross-device sign-in and synchronization are not implemented yet.** The browser-local fallback does not sync to a notebook or phone.
 - A native Android APK and Microsoft Store package are not produced by this branch yet.
-- Voice, wake word, Android system integration, Windows automation worker, encrypted sync, paired devices, and autonomous tool execution are not implemented.
+- **Live duplex voice with barge-in, wake word, and background listening are not implemented.** Basic browser voice depends on browser speech APIs, microphone permission, and network/browser support; it is not guaranteed offline.
+- Native Android integration, Windows automation worker, encrypted sync, paired devices, and autonomous tool execution are not implemented.
 
 ## Local data and privacy
 
