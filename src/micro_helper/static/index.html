@@ -361,7 +361,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 (() => {
  const $=id=>document.getElementById(id);
  const list=$("learningList"), form=$("learningForm");
- const lines=id=>$(id).value.split("\\n").map(x=>x.trim()).filter(Boolean);
+ const lines=id=>$(id).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
  async function refresh(){
    try{
      const r=await fetch("/v1/learning/plans"); if(!r.ok)throw Error();
