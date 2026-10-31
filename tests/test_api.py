@@ -208,3 +208,71 @@ def test_tool_execution_is_allowlisted_and_memory_write_requires_confirmation():
     assert saved.status_code == 200
     assert saved.json()["result"]["content"] == "poznámka z nástroje"
     assert client.get("/v1/memories").json()["memories"][0]["content"] == "poznámka z nástroje"
+
+
+
+def test_task_queue_creates_lists_and_cancels():
+    created = client.post("/v1/tasks", json={
+        "kind": "agent.draft",
+        "title": "Připrav plán",
+        "input_text": "Připrav krátký plán učení."
+    })
+    assert created.status_code == 201
+    task = created.json()
+    assert task["status"] == "queued"
+    assert client.get("/v1/tasks").json()["tasks"][0]["id"] == task["id"]
+    assert client.get(f"/v1/tasks/{task['id']}").json()["title"] == "Připrav plán"
+    cancelled = client.post(f"/v1/tasks/{task['id']}/cancel")
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+
+
+def test_task_queue_rejects_unapproved_task_kinds_and_unknown_ids():
+    invalid = client.post("/v1/tasks", json={
+        "kind": "shell.execute", "title": "No", "input_text": "echo unsafe"
+    })
+    assert invalid.status_code == 422
+    assert client.get("/v1/tasks/not-a-real-task").status_code == 404
+    assert client.post("/v1/tasks/not-a-real-task/cancel").status_code == 404
+
+
+def test_worker_processes_one_draft_task(monkeypatch):
+    from micro_helper import worker
+
+    created = client.post("/v1/tasks", json={
+        "kind": "agent.draft", "title": "Návrh", "input_text": "Napiš krátký návrh."
+    })
+    task_id = created.json()["id"]
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": {"content": "Hotový návrh."}}
+
+    monkeypatch.setattr(worker.httpx, "post", lambda *args, **kwargs: FakeResponse())
+    assert worker.run_once() is True
+    task = client.get(f"/v1/tasks/{task_id}").json()
+    assert task["status"] == "completed"
+    assert task["result"] == "Hotový návrh."
+    assert worker.run_once() is False
+
+
+def test_worker_marks_task_failed_when_model_is_unavailable(monkeypatch):
+    from micro_helper import worker
+    import httpx
+
+    created = client.post("/v1/tasks", json={
+        "kind": "agent.draft", "title": "Návrh", "input_text": "Napiš návrh."
+    })
+    task_id = created.json()["id"]
+
+    def fail(*args, **kwargs):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(worker.httpx, "post", fail)
+    assert worker.run_once() is True
+    task = client.get(f"/v1/tasks/{task_id}").json()
+    assert task["status"] == "failed"
+    assert "offline" in task["error"]
