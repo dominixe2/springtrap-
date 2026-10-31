@@ -541,3 +541,8 @@ async def chat(request: ChatRequest):
         return {"error": f"Ollama vrátila chybu HTTP {exc.response.status_code}. Ověř název a stažení modelu."}
     except (httpx.HTTPError, ValueError):
         return {"error": "Nepodařilo se spojit s lokální Ollamou nebo přečíst její odpověď."}
+
+
+# Optional modular learning-plan API. Knowledge plans never grant execution permissions.
+from micro_helper.learning import router as learning_router
+app.include_router(learning_router)
