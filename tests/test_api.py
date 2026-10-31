@@ -16,4 +16,5 @@ def test_status_is_honest_about_scope():
     body = response.json()
     assert body["product"] == "Micro Helper"
     assert body["paid_api_required"] is False
-    assert "llm_chat" in body["not_yet_implemented"]
+    assert "ollama_chat_adapter" in body["implemented"]
+    assert "persistent_memory" in body["not_yet_implemented"]
