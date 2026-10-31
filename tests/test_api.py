@@ -148,7 +148,7 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert icon.status_code == 200
     assert "<svg" in icon.text
     assert worker.status_code == 200
-    assert "micro-helper-pwa-v1" in worker.text
+    assert "micro-helper-pwa-v2" in worker.text
 
 
 def test_home_page_has_offline_local_fallback():
