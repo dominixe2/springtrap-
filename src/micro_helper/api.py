@@ -112,10 +112,10 @@ async def status():
             "web_chat_ui", "health", "status", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear",
-            "capability_catalog",
+            "capability_catalog", "browser_voice_input", "browser_voice_output",
         ],
         "not_yet_implemented": [
-            "voice", "android_integration", "windows_worker",
+            "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
             "agent_messaging", "animated_mascot", "encrypted_cloud_sync",
         ],
         "paid_api_required": False,
