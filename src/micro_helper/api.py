@@ -83,6 +83,11 @@ class ProfileRequest(BaseModel):
     style: str = Field(default="friendly", min_length=1, max_length=40)
 
 
+class RestoreRequest(BaseModel):
+    backup: dict
+    confirm_replace: bool = False
+
+
 @app.get("/")
 async def home():
     return FileResponse(STATIC / "index.html")
@@ -115,6 +120,51 @@ async def status():
         "storage": {"type": "local_sqlite", "memories": memory_count, "messages": message_count},
     }
 
+
+
+@app.get("/v1/backup")
+async def export_backup():
+    """Export the complete local user data set as a portable JSON backup."""
+    with database() as db:
+        profile = db.execute("SELECT agent_name, language, style, updated_at FROM profile WHERE id=1").fetchone()
+        memories = db.execute("SELECT id, content, category, created_at FROM memories ORDER BY id").fetchall()
+        messages = db.execute("SELECT id, role, content, created_at FROM messages ORDER BY id").fetchall()
+    return {"format": "micro-helper-backup", "version": 1, "exported_at": utc_now(), "profile": dict(profile), "memories": [dict(row) for row in memories], "messages": [dict(row) for row in messages]}
+
+
+@app.post("/v1/backup/restore")
+async def restore_backup(request: RestoreRequest):
+    """Restore a complete backup only after explicit user confirmation."""
+    backup = request.backup
+    if not request.confirm_replace:
+        raise HTTPException(status_code=400, detail="Obnova vyžaduje confirm_replace=true.")
+    if backup.get("format") != "micro-helper-backup" or backup.get("version") != 1:
+        raise HTTPException(status_code=422, detail="Nepodporovaný nebo poškozený záložní soubor.")
+    profile, memories, messages = backup.get("profile"), backup.get("memories"), backup.get("messages")
+    if not isinstance(profile, dict) or not isinstance(memories, list) or not isinstance(messages, list):
+        raise HTTPException(status_code=422, detail="Záloha neobsahuje kompletní profil, paměti a historii.")
+    keys = ("agent_name", "language", "style", "updated_at")
+    if any(not isinstance(profile.get(key), str) for key in keys):
+        raise HTTPException(status_code=422, detail="Profil v záloze není platný.")
+    if len(memories) > 10000 or len(messages) > 100000:
+        raise HTTPException(status_code=413, detail="Záloha je příliš velká.")
+    try:
+        memory_rows = [(int(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
+        message_rows = [(int(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
+        if any(row[1] not in ("user", "assistant") for row in message_rows):
+            raise ValueError()
+        if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows):
+            raise ValueError()
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Záloha obsahuje neplatné záznamy.")
+    with database() as db:
+        db.execute("DELETE FROM memories")
+        db.execute("DELETE FROM messages")
+        db.execute("UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1", tuple(profile[k] for k in keys))
+        db.executemany("INSERT INTO memories(id, content, category, created_at) VALUES (?, ?, ?, ?)", memory_rows)
+        db.executemany("INSERT INTO messages(id, role, content, created_at) VALUES (?, ?, ?, ?)", message_rows)
+        db.commit()
+    return {"restored": True, "memories": len(memory_rows), "messages": len(message_rows)}
 
 @app.get("/v1/profile")
 async def get_profile():
