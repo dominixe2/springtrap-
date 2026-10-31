@@ -73,6 +73,7 @@ async def create_plan(payload: PlanInput):
              json.dumps(payload.steps, ensure_ascii=False), json.dumps(payload.sources, ensure_ascii=False), stamp, stamp),
         )
         row = db.execute("SELECT * FROM learning_plans WHERE id=?", (plan_id,)).fetchone()
+        db.commit()
     return _decode(row)
 
 
@@ -104,6 +105,7 @@ async def update_plan(plan_id: str, payload: PlanInput):
 async def delete_plan(plan_id: str):
     with _db() as db:
         cursor = db.execute("DELETE FROM learning_plans WHERE id=?", (plan_id,))
+        db.commit()
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail="Učební plán nebyl nalezen.")
     return {"deleted": True, "id": plan_id}
