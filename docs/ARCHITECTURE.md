@@ -18,3 +18,9 @@ Development starts on localhost and uses local persistence. Remote sync is optio
 
 ## Android constraints
 Background microphone, wake-word detection, SMS, calls and accessibility actions are subject to Android permissions and platform restrictions. A web app cannot promise always-on wake-word behavior.
+
+## Current task runner boundary
+
+The API persists task records in SQLite. The separate worker atomically claims queued work and currently supports only `agent.draft`, which asks the configured Ollama model for a text draft. The worker records completion or failure and respects cancellation by updating only tasks that remain in the running state. The task type is server-allowlisted; callers cannot submit executable code or choose arbitrary tools.
+
+This queue is groundwork for durable work, not a complete autonomous agent. Cloud hosting must wait for authenticated device pairing, HTTPS, secret management, and a safe model-provider configuration. The Google Cloud Always Free e2-micro resource is a lightweight control plane only; it cannot host a useful local model.
