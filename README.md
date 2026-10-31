@@ -1,31 +1,44 @@
 # Micro Helper
 
-Free-first, local-first personal AI agent for Android and Windows. The agent's identity, memory, permissions and tools are the product. An animated mascot is optional decoration only.
+Micro Helper is a free-first, local-first personal assistant foundation. The current branch provides a Czech-first browser UI, optional Ollama chat, persistent local profile, editable private notes, and conversation history stored in SQLite.
 
-## Free setup
-- The local core needs no paid API key or subscription.
-- Python backend and local browser UI run on your own computer.
-- Optional local language model through Ollama; inference uses your own hardware.
-- Voice, Android system integrations, cloud sync and remote access are separate modules and may have platform or hosting costs. They are not falsely advertised as complete.
+## What works in this version
 
-## Run the local foundation
-Requires Python 3.11+.
+- Local FastAPI service and responsive browser UI.
+- Optional local LLM via Ollama. No paid API key is required; a compatible model must be downloaded locally.
+- Editable agent name, language, and communication style.
+- Local SQLite persistence for profile, user-managed memories, and successful chat messages.
+- Memory create/list/delete API and UI controls.
+- Conversation history reload and explicit history deletion.
+- Ollama model discovery and graceful handling when Ollama is offline.
+- API validation and automated tests.
+
+## Windows quick start
+
+Requires Python 3.11+ and, for AI chat, [Ollama](https://ollama.com/) with a model installed.
 
 ```powershell
 py -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+# Optional local AI: install Ollama separately, then run e.g. ollama pull llama3.2
 uvicorn micro_helper.api:app --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000/health. Run tests with `pytest`.
+Open http://127.0.0.1:8000. In another terminal, run `pytest -q` to validate the backend.
 
-## Product rules
-- Each person has an independent agent profile and private memory.
-- Czech-first interaction and configurable personality, name and voice.
-- Offline tasks stay local; online tasks are queued until connectivity returns.
-- Permissions are granular. Read does not imply write, send, share or delete.
-- Sensitive actions require confirmation and are auditable.
-- Paired agents communicate only after both owners consent.
+The API binds to localhost by default. Keep it local unless you separately configure authentication and network security. Do not expose this development server directly to the internet.
 
-See `docs/` for the specification, architecture and roadmap. This is an actively rebuilt foundation, not yet a finished all-capable phone assistant.
+## Local data and privacy
+
+- Default database: `~/.micro-helper/micro_helper.sqlite3`.
+- Override the path with `MICRO_HELPER_DB`.
+- Override the Ollama endpoint with `OLLAMA_URL`.
+- Stored profile, manually saved memories, and successful chat exchanges stay in that local SQLite database. Deleting conversation history does not delete memory notes.
+- Do not store passwords, API keys, or other secrets in memories. The app does not encrypt the SQLite database.
+
+## Honest scope
+
+This is not yet a complete Android or Windows agent package. Voice, wake word, Android system integration, a Windows automation worker, encrypted sync, paired agents, and autonomous tool execution are **not implemented**. It does not control your computer or phone just because chat works. The current local web app is the usable foundation for those future modules.
+
+See `docs/ARCHITECTURE.md` and `docs/PRODUCT_SPEC.md` for the intended architecture and security rules.
