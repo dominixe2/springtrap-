@@ -150,7 +150,8 @@ async def health():
 async def status():
     with database() as db:
         memory_count = db.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
-        message_count = db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]\n        learning_plan_count = db.execute("SELECT COUNT(*) FROM learning_plans").fetchone()[0]
+        message_count = db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        learning_plan_count = db.execute("SELECT COUNT(*) FROM learning_plans").fetchone()[0]
     return {
         "product": "Micro Helper",
         "version": app.version,
