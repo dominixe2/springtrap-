@@ -276,3 +276,14 @@ def test_worker_marks_task_failed_when_model_is_unavailable(monkeypatch):
     task = client.get(f"/v1/tasks/{task_id}").json()
     assert task["status"] == "failed"
     assert "offline" in task["error"]
+
+
+
+def test_preferences_api_and_ui():
+    created = client.post('/v1/preferences', json={'category':'communication','preference':'tone','value':'friendly Czech'})
+    assert created.status_code == 201
+    assert created.json()['source'] == 'user'
+    assert client.get('/v1/preferences').json()['preferences'][0]['value'] == 'friendly Czech'
+    assert client.get('/').status_code == 200
+    assert 'preferenceForm' in client.get('/').text
+    assert client.delete('/v1/preferences/' + str(created.json()['id'])).json()['deleted'] is True
