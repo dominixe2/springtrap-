@@ -81,3 +81,8 @@ Not implemented yet: Android APK/native app, on-device LLM runtime, real offline
 - Every external side effect has a visible confirmation and audit result.
 - Device pairing and sync are authenticated, encrypted, revocable, and covered by conflict/restore tests.
 - Android release builds install on the target phone and pass real-device smoke tests before being called complete.
+
+
+### Adaptive user profile
+
+The API now stores explicit user-controlled behavior preferences in a separate SQLite table. The web UI lets the user create, edit (upsert), list, and delete preferences such as response detail, communication tone, interests, and boundaries. Confirmed preferences are injected into the system context for each local-model chat. The model is instructed to ask before saving a newly inferred long-term preference and not to store sensitive personal data or unconfirmed assumptions. This is transparent preference adaptation, not autonomous model training or weight fine-tuning.
