@@ -98,6 +98,7 @@ async def update_plan(plan_id: str, payload: PlanInput):
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Učební plán nebyl nalezen.")
         row = db.execute("SELECT * FROM learning_plans WHERE id=?", (plan_id,)).fetchone()
+        db.commit()
     return _decode(row)
 
 
