@@ -179,3 +179,10 @@ def test_home_page_exposes_czech_browser_voice_controls():
     assert 'id="voiceReply"' in response.text
     assert "SpeechRecognition" in response.text
     assert "SpeechSynthesisUtterance" in response.text
+
+
+def test_home_page_restores_and_clears_persisted_conversation():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "fetch('/v1/conversations?limit=100')" in response.text
+    assert "fetch('/v1/conversations',{method:'DELETE'})" in response.text
