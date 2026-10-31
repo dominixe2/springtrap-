@@ -287,3 +287,11 @@ def test_preferences_api_and_ui():
     assert client.get('/').status_code == 200
     assert 'preferenceForm' in client.get('/').text
     assert client.delete('/v1/preferences/' + str(created.json()['id'])).json()['deleted'] is True
+
+
+
+def test_task_queue_ui_is_available():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'id="taskForm"' in response.text
+    assert 'id="taskList"' in response.text
