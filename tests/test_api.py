@@ -69,3 +69,44 @@ def test_home_page_exposes_memory_controls_and_local_privacy_warning():
     assert 'id="memoryList"' in response.text
     assert "Neukládej sem hesla ani tajné klíče" in response.text
     assert "/v1/conversations" in response.text
+
+
+def test_chat_uses_local_memory_and_persists_successful_exchange(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"message": {"content": "Ahoj, jsem Mykla."}}
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, url, json):
+            captured["url"] = url
+            captured["payload"] = json
+            return FakeResponse()
+
+    client_memory = client.post(
+        "/v1/memories",
+        json={"content": "Uživatel chce odpovědi česky", "category": "preference"},
+    )
+    assert client_memory.status_code == 201
+    monkeypatch.setattr(api.httpx, "AsyncClient", FakeAsyncClient)
+
+    response = client.post("/v1/chat", json={"message": "Ahoj", "model": "llama3.2"})
+    assert response.status_code == 200
+    assert response.json()["reply"] == "Ahoj, jsem Mykla."
+    assert "Uživatel chce odpovědi česky" in captured["payload"]["messages"][0]["content"]
+    saved = client.get("/v1/conversations").json()["messages"]
+    assert [item["role"] for item in saved] == ["user", "assistant"]
+    assert saved[0]["content"] == "Ahoj"
