@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="cs">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1020"><meta name="mobile-web-app-capable" content="yes"><link rel="manifest" href="/static/manifest.webmanifest"><link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1020"><meta name="mobile-web-app-capable" content="yes"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml">
 <title>Micro Helper</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#141c30;--line:#263451;--accent:#73d7c2;--muted:#9aabc4}
@@ -113,7 +113,11 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   const save = data => localStorage.setItem(key, JSON.stringify(data));
   const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
   window.fetch = async (input, init={}) => {
-    try { return await nativeFetch(input, init); }
+    try {
+      const response = await nativeFetch(input, init);
+      if (response.ok || response.status !== 404) return response;
+      throw new Error("API endpoint is not hosted");
+    }
     catch (error) {
       const url = new URL(typeof input === "string" ? input : input.url, location.href);
       if (url.origin !== location.origin || !url.pathname.startsWith("/v1/")) throw error;
