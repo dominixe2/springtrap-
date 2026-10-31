@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,6 +59,20 @@ def database() -> Iterator[sqlite3.Connection]:
                 content TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                title TEXT NOT NULL,
+                input_text TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed','cancelled')),
+                result TEXT,
+                error TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at);
             """
         )
         connection.commit()
@@ -70,6 +85,12 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12000)
     model: str = Field(default="llama3.2", min_length=1, max_length=100)
     history: list[dict[str, str]] = Field(default_factory=list, max_length=20)
+
+
+class TaskRequest(BaseModel):
+    kind: str = Field(default="agent.draft", pattern="^agent\\.draft$", max_length=40)
+    title: str = Field(min_length=1, max_length=120)
+    input_text: str = Field(min_length=1, max_length=12000)
 
 
 class MemoryRequest(BaseModel):
@@ -116,12 +137,12 @@ async def status():
         "implemented": [
             "web_chat_ui", "health", "status", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
-            "persistent_conversation_history", "memory_crud", "conversation_clear",
+            "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue",
             "capability_catalog", "browser_voice_input", "browser_voice_output",
         ],
         "not_yet_implemented": [
             "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
-            "agent_messaging", "animated_mascot", "encrypted_cloud_sync",
+            "agent_messaging", "animated_mascot", "encrypted_cloud_sync", "cloud_deployment",
         ],
         "paid_api_required": False,
         "storage": {"type": "local_sqlite", "memories": memory_count, "messages": message_count},
@@ -231,6 +252,56 @@ async def execute_tool(tool_id: str, request: ToolExecuteRequest):
         return {"tool": tool_id, "result": dict(row)}
 
     raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+
+
+
+@app.post("/v1/tasks", status_code=201)
+async def create_task(request: TaskRequest):
+    """Queue a bounded, non-side-effecting AI draft task for the local worker."""
+    task_id = str(uuid.uuid4())
+    now = utc_now()
+    with database() as db:
+        db.execute(
+            "INSERT INTO tasks(id, kind, title, input_text, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?)",
+            (task_id, request.kind, request.title.strip(), request.input_text.strip(), now, now),
+        )
+        db.commit()
+        row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    return dict(row)
+
+
+@app.get("/v1/tasks")
+async def list_tasks(limit: int = 50):
+    limit = max(1, min(limit, 200))
+    with database() as db:
+        rows = db.execute("SELECT * FROM tasks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    return {"tasks": [dict(row) for row in rows]}
+
+
+@app.get("/v1/tasks/{task_id}")
+async def get_task(task_id: str):
+    with database() as db:
+        row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Úloha nebyla nalezena.")
+    return dict(row)
+
+
+@app.post("/v1/tasks/{task_id}/cancel")
+async def cancel_task(task_id: str):
+    now = utc_now()
+    with database() as db:
+        cursor = db.execute(
+            "UPDATE tasks SET status='cancelled', updated_at=?, finished_at=? WHERE id=? AND status IN ('queued','running')",
+            (now, now, task_id),
+        )
+        db.commit()
+        row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Úloha nebyla nalezena.")
+    if cursor.rowcount == 0 and row["status"] != "cancelled":
+        raise HTTPException(status_code=409, detail="Dokončenou nebo neúspěšnou úlohu už nelze zrušit.")
+    return dict(row)
 
 
 @app.get("/v1/profile")
