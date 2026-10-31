@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="cs">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1020"><meta name="mobile-web-app-capable" content="yes"><link rel="manifest" href="/static/manifest.webmanifest"><link rel="icon" href="/static/icon.svg" type="image/svg+xml">
 <title>Micro Helper</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#141c30;--line:#263451;--accent:#73d7c2;--muted:#9aabc4}
@@ -46,5 +46,13 @@ byId("save").onclick=async()=>{const name=byId("agentName").value.trim()||"Mykla
 async function restoreProfile(){try{const response=await fetch("/v1/profile");if(!response.ok)return;const data=await response.json();byId("agentName").value=data.agent_name;byId("title").textContent=data.agent_name+" · Micro Helper";byId("model").value=localStorage.getItem("mh_model")||"llama3.2"}catch(error){}}
 byId("exportMemory")?.addEventListener("click",async()=>{try{const response=await fetch("/v1/memories");if(!response.ok)throw new Error();const data=await response.json();const blob=new Blob([JSON.stringify({format:"micro-helper-memory",version:1,exportedAt:new Date().toISOString(),memories:data.memories},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="micro-helper-memory.json";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);byId("status").textContent="Poznámky exportovány"}catch(error){byId("status").textContent="Export se nepodařil"}});restoreProfile();renderMemories();loadSavedConversation();
 })();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {
+    const status = document.getElementById("status");
+    if (status) status.textContent = "Offline režim není dostupný";
+  }));
+}
 </script>
 </body></html>
