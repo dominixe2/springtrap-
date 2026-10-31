@@ -108,8 +108,8 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
         else {item={id:db.nextId++,category,preference,value,source:"user",updated_at:new Date().toISOString()};db.preferences.push(item);}
         save(db);return reply(item,201);
       }
-      const preferenceMatch=url.pathname.match(/^\\/v1\\/preferences\\/(\\d+)$/);
-      if(preferenceMatch&&method==="DELETE"){db.preferences=(db.preferences||[]).filter(x=>x.id!==Number(preferenceMatch[1]));save(db);return reply({deleted:true});}
+      const preferenceId = url.pathname.split("/").pop();
+      if (url.pathname.startsWith("/v1/preferences/") && method === "DELETE") { db.preferences=(db.preferences||[]).filter(x=>x.id!==Number(preferenceId)); save(db); return reply({deleted:true}); }
       if (url.pathname === "/v1/memories" && method === "POST") {
         const memory = {id:db.nextId++,content:String(body.content||"").trim(),category:body.category||"preference",created_at:new Date().toISOString()};
         if (!memory.content) return reply({detail:"Poznámka nesmí být prázdná."},422);
