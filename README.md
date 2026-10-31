@@ -8,10 +8,26 @@ Micro Helper is a free-first, local-first personal assistant foundation. The cur
 - Optional local LLM via Ollama. No paid API key is required; a compatible model must be downloaded locally.
 - Editable agent name, language, and communication style.
 - Local SQLite persistence for profile, user-managed memories, and successful chat messages.
-- Memory create/list/edit/delete API and UI controls, plus JSON export of saved notes.
+- Memory create/list/edit/delete API and UI controls, plus JSON export of saved notes.\n- Complete portable JSON backup/restore for profile, all saved memories, and full conversation history. Restore requires explicit confirmation and replaces the target device data.
 - Conversation history reload and explicit history deletion.
 - Ollama model discovery and graceful handling when Ollama is offline.
 - API validation and automated tests.
+
+## Android quick start (Termux)
+
+Install [Termux from F-Droid](https://f-droid.org/packages/com.termux/), open it, then run:
+
+```bash
+pkg update -y && pkg install -y git
+git clone --depth 1 --branch main https://github.com/dominixe2/springtrap-.git
+cd springtrap-
+bash termux-install.sh
+bash termux-start.sh
+```
+
+Open `http://127.0.0.1:8000` in Chrome on the same phone. Keep Termux running while using Micro Helper. Android may stop background work unless Termux is excluded from battery optimization.
+
+**Android limitation:** this starts the app, local database, profile, notes, and conversation storage on the phone. The current chat adapter talks to Ollama at `127.0.0.1:11434`; Ollama is not supplied by this Termux installer. Therefore AI replies are not yet available on Android until a compatible on-device inference runtime and adapter are added. No paid API is required.
 
 ## Windows quick start
 
