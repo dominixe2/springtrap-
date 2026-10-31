@@ -152,7 +152,7 @@ async def status():
         "implemented": [
             "web_chat_ui", "health", "status", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
-            "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue",
+            "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
             "capability_catalog", "browser_voice_input", "browser_voice_output",
         ],
         "not_yet_implemented": [
