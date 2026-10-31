@@ -154,3 +154,16 @@ def test_home_page_has_offline_local_fallback():
     assert response.status_code == 200
     assert "micro_helper_offline_v1" in response.text
     assert "offline-local" in response.text
+
+
+
+def test_capabilities_distinguish_available_from_planned_tools():
+    response = client.get("/v1/capabilities")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["policy"]["default"] == "deny"
+    assert body["policy"]["external_side_effects_require_confirmation"] is True
+    assert any(item["id"] == "ollama" for item in body["connectable"])
+    planned = {item["id"] for item in body["planned"]}
+    assert {"web.search", "windows.worker", "calendar", "device.sync"} <= planned
+    assert not any(item["id"] == "web.search" for item in body["available"])
