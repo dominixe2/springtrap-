@@ -126,3 +126,12 @@ def test_memory_can_be_corrected_and_deleted():
         f"/v1/memories/{memory_id + 9999}",
         json={"content": "missing", "category": "context"},
     ).status_code == 404
+
+
+def test_memory_ui_supports_edit_and_export():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'id="exportMemory"' in response.text
+    assert 'textContent="Upravit"' in response.text
+    assert 'method:"PUT"' in response.text
+    assert 'micro-helper-memory.json' in response.text
