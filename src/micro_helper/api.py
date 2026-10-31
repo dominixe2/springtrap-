@@ -208,7 +208,7 @@ async def models():
 @app.post("/v1/chat")
 async def chat(request: ChatRequest):
     model = request.model.strip()
-    if not MODEL_PATTERN.fullmatch(model):
+    if not MODEL_PATTERN.fullmatch(model) or ".." in model or model.startswith("/") or model.endswith("/") or "//" in model:
         raise HTTPException(status_code=422, detail="Název modelu obsahuje nepovolené znaky.")
 
     with database() as db:
