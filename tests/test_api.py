@@ -135,3 +135,22 @@ def test_memory_ui_supports_edit_and_export():
     assert 'textContent="Upravit"' in response.text
     assert 'method:"PUT"' in response.text
     assert 'micro-helper-memory.json' in response.text
+
+
+def test_pwa_manifest_icon_and_service_worker_are_served():
+    manifest = client.get("/static/manifest.webmanifest")
+    icon = client.get("/static/icon.svg")
+    worker = client.get("/sw.js")
+    assert manifest.status_code == 200
+    assert manifest.json()["name"] == "Micro Helper"
+    assert icon.status_code == 200
+    assert "<svg" in icon.text
+    assert worker.status_code == 200
+    assert "micro-helper-pwa-v1" in worker.text
+
+
+def test_home_page_has_offline_local_fallback():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "micro_helper_offline_v1" in response.text
+    assert "offline-local" in response.text
