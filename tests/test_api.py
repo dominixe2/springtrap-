@@ -60,3 +60,12 @@ def test_conversation_clear_endpoint():
 def test_chat_rejects_invalid_model_name_before_network_call():
     response = client.post("/v1/chat", json={"message": "Ahoj", "model": "../something"})
     assert response.status_code == 422
+
+
+def test_home_page_exposes_memory_controls_and_local_privacy_warning():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'id="memoryForm"' in response.text
+    assert 'id="memoryList"' in response.text
+    assert "Neukládej sem hesla ani tajné klíče" in response.text
+    assert "/v1/conversations" in response.text
