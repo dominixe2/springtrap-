@@ -51,3 +51,22 @@ The API binds to localhost by default. Keep it local unless you separately confi
 - Do not store passwords, API keys, or other secrets in memories.
 
 See `docs/ARCHITECTURE.md`, `docs/PRODUCT_SPEC.md`, and `docs/MOBILE_AND_SYNC_PLAN.md` for architecture and future sync requirements.
+
+
+## Background task worker (experimental)
+
+The branch now includes a persistent SQLite task queue for bounded `agent.draft` jobs. Start the API, then start a separate worker process against the same database:
+
+```powershell
+# Terminal 1
+uvicorn micro_helper.api:app --host 127.0.0.1 --port 8000
+
+# Terminal 2
+micro-helper-worker
+```
+
+The worker polls the queue and uses the configured Ollama endpoint (`OLLAMA_URL`, default `http://127.0.0.1:11434`) with the `llama3.2` model. It can also process one queued job and exit with `micro-helper-worker --once`. Tasks can be created and inspected through `POST /v1/tasks`, `GET /v1/tasks`, and `GET /v1/tasks/{id}`; queued or running work can be cancelled.
+
+This is an initial job runner, not yet an autonomous general-purpose agent. It only creates text drafts; it cannot run shell commands, browse the web, control devices, send messages, or perform external side effects. If Ollama is unavailable, the task is marked failed rather than pretending it completed.
+
+**Cloud warning:** the Google Cloud Always Free `e2-micro` VM has 1 GB RAM and is suitable only for a lightweight API/queue, not for hosting a useful local LLM. The current API also has no remote-user authentication, so do not expose it to the public internet or deploy it as a phone-accessible cloud service yet. A secure pairing/authentication layer and a genuinely free model-provider strategy are still required before cloud deployment.
