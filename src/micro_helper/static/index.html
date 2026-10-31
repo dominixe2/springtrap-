@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="cs">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1020"><meta name="mobile-web-app-capable" content="yes"><link rel="manifest" href="/static/manifest.webmanifest"><link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1020"><meta name="mobile-web-app-capable" content="yes"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg" type="image/svg+xml">
 <title>Micro Helper</title>
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#141c30;--line:#263451;--accent:#73d7c2;--muted:#9aabc4}
@@ -57,6 +57,20 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
   </form>
   <div id="preferenceList" class="muted" aria-live="polite">Načítám nastavení chování…</div>
 </section>
+
+<section class="settings" style="align-items:stretch;flex-direction:column" id="learningPanel">
+  <strong>📚 Učební plány</strong>
+  <small>Vytvářej si dlouhodobé plány, přidávej kroky a zdroje. Plán je zatím bezpečná struktura dat, sám nespouští příkazy ani nezískává nová oprávnění.</small>
+  <form id="learningForm" style="display:grid;gap:8px;margin:0">
+    <input id="learningTitle" maxlength="120" placeholder="Název plánu" required>
+    <input id="learningObjective" maxlength="4000" placeholder="Co se má Micro Helper naučit nebo čeho dosáhnout?" required>
+    <textarea id="learningSteps" rows="3" maxlength="4000" placeholder="Kroky, každý na samostatný řádek" style="font:inherit;color:inherit;background:#0c1425;border:1px solid var(--line);border-radius:11px;padding:11px"></textarea>
+    <textarea id="learningSources" rows="2" maxlength="4000" placeholder="Zdroje, každý na samostatný řádek (volitelné)" style="font:inherit;color:inherit;background:#0c1425;border:1px solid var(--line);border-radius:11px;padding:11px"></textarea>
+    <select id="learningStatus"><option value="draft">Koncept</option><option value="active">Aktivní</option><option value="paused">Pozastavený</option></select>
+    <button class="primary" type="submit">Vytvořit učební plán</button>
+  </form>
+  <div id="learningList" class="muted" aria-live="polite">Načítám učební plány…</div>
+</section>
 </main>
 <script>
 const $=id=>document.getElementById(id);let history=[];
@@ -99,7 +113,11 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   const save = data => localStorage.setItem(key, JSON.stringify(data));
   const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
   window.fetch = async (input, init={}) => {
-    try { return await nativeFetch(input, init); }
+    try {
+      const response = await nativeFetch(input, init);
+      if (response.ok || response.status !== 404) return response;
+      throw new Error("API endpoint is not hosted");
+    }
     catch (error) {
       const url = new URL(typeof input === "string" ? input : input.url, location.href);
       if (url.origin !== location.origin || !url.pathname.startsWith("/v1/")) throw error;
@@ -121,6 +139,38 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       }
       const preferenceId = url.pathname.split("/").pop();
       if (url.pathname.startsWith("/v1/preferences/") && method === "DELETE") { db.preferences=(db.preferences||[]).filter(x=>x.id!==Number(preferenceId)); save(db); return reply({deleted:true}); }
+      const planMatch = url.pathname.match(/^\/v1\/learning\/plans(?:\/([^/]+))?$/);
+      if (url.pathname === "/v1/learning/plans" && method === "GET") {
+        db.learningPlans = db.learningPlans || [];
+        return reply({plans:[...db.learningPlans].sort((a,b)=>b.updated_at.localeCompare(a.updated_at))});
+      }
+      if (url.pathname === "/v1/learning/plans" && method === "POST") {
+        db.learningPlans = db.learningPlans || [];
+        const title=String(body.title||"").trim(), objective=String(body.objective||"").trim();
+        const status=String(body.status||"draft"), steps=Array.isArray(body.steps)?body.steps:[], sources=Array.isArray(body.sources)?body.sources:[];
+        if(!title||title.length>120||!objective||objective.length>4000||!["draft","active","paused"].includes(status)||steps.length>40||sources.length>40)return reply({detail:"Neplatný učební plán."},422);
+        const stamp=new Date().toISOString(), plan={id:crypto.randomUUID(),title,objective,status,steps,sources,version:1,created_at:stamp,updated_at:stamp};
+        db.learningPlans.push(plan);save(db);return reply(plan,201);
+      }
+      if (planMatch && method === "GET") {
+        db.learningPlans = db.learningPlans || [];
+        const plan=db.learningPlans.find(x=>x.id===decodeURIComponent(planMatch[1]));
+        return plan?reply(plan):reply({detail:"Učební plán nebyl nalezen."},404);
+      }
+      if (planMatch && method === "PUT") {
+        db.learningPlans = db.learningPlans || [];
+        const plan=db.learningPlans.find(x=>x.id===decodeURIComponent(planMatch[1]));
+        if(!plan)return reply({detail:"Učební plán nebyl nalezen."},404);
+        const title=String(body.title||"").trim(), objective=String(body.objective||"").trim(), status=String(body.status||"draft");
+        const steps=Array.isArray(body.steps)?body.steps:[], sources=Array.isArray(body.sources)?body.sources:[];
+        if(!title||title.length>120||!objective||objective.length>4000||!["draft","active","paused"].includes(status)||steps.length>40||sources.length>40)return reply({detail:"Neplatný učební plán."},422);
+        Object.assign(plan,{title,objective,status,steps,sources,version:plan.version+1,updated_at:new Date().toISOString()});save(db);return reply(plan);
+      }
+      if (planMatch && method === "DELETE") {
+        db.learningPlans = db.learningPlans || [];
+        const before=db.learningPlans.length;db.learningPlans=db.learningPlans.filter(x=>x.id!==decodeURIComponent(planMatch[1]));save(db);
+        return before===db.learningPlans.length?reply({detail:"Učební plán nebyl nalezen."},404):reply({deleted:true,id:decodeURIComponent(planMatch[1])});
+      }
       if (url.pathname === "/v1/memories" && method === "POST") {
         const memory = {id:db.nextId++,content:String(body.content||"").trim(),category:body.category||"preference",created_at:new Date().toISOString()};
         if (!memory.content) return reply({detail:"Poznámka nesmí být prázdná."},422);
@@ -340,6 +390,45 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
  });
  refreshTasks();
  setInterval(refreshTasks,8000);
+})();
+</script>
+
+<script>
+(() => {
+ const $=id=>document.getElementById(id);
+ const list=$("learningList"), form=$("learningForm");
+ const lines=id=>$(id).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ async function refresh(){
+   try{
+     const r=await fetch("/v1/learning/plans"); if(!r.ok)throw Error();
+     const data=await r.json(); list.replaceChildren();
+     if(!data.plans.length){list.textContent="Zatím nemáš žádný učební plán.";return;}
+     for(const p of data.plans){
+       const card=document.createElement("div");card.style.cssText="padding:12px 0;border-top:1px solid var(--line);display:grid;gap:6px";
+       const title=document.createElement("strong");title.textContent=p.title+" · "+({draft:"Koncept",active:"Aktivní",paused:"Pozastavený"}[p.status]||p.status)+" · v"+p.version;
+       const objective=document.createElement("div");objective.textContent=p.objective;
+       const steps=document.createElement("small");steps.textContent=p.steps.length?"Kroky: "+p.steps.join(" → "):"Bez definovaných kroků";
+       const actions=document.createElement("div");actions.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
+       const edit=document.createElement("button");edit.textContent="Upravit";edit.onclick=async()=>{
+         const title=prompt("Název plánu",p.title);if(title===null)return;
+         const objective=prompt("Cíl plánu",p.objective);if(objective===null)return;
+         const steps=prompt("Kroky oddělené znakem |",p.steps.join(" | "));if(steps===null)return;
+         const status=prompt("Stav: draft, active, paused",p.status);if(status===null)return;
+         const r=await fetch("/v1/learning/plans/"+encodeURIComponent(p.id),{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,objective,status,steps:steps.split("|").map(x=>x.trim()).filter(Boolean),sources:p.sources})});
+         if(r.ok)refresh();else alert("Plán se nepodařilo uložit. Zkontroluj údaje.");
+       };
+       const remove=document.createElement("button");remove.textContent="Smazat";remove.onclick=async()=>{if(!confirm("Opravdu smazat tento učební plán?"))return;const r=await fetch("/v1/learning/plans/"+encodeURIComponent(p.id),{method:"DELETE"});if(r.ok)refresh();};
+       actions.append(edit,remove);card.append(title,objective,steps,actions);list.append(card);
+     }
+   }catch(e){list.textContent="Učební plány vyžadují spuštěné místní API.";}
+ }
+ form?.addEventListener("submit",async e=>{
+   e.preventDefault();
+   const payload={title:$("learningTitle").value.trim(),objective:$("learningObjective").value.trim(),status:$("learningStatus").value,steps:lines("learningSteps"),sources:lines("learningSources")};
+   const r=await fetch("/v1/learning/plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+   if(r.ok){form.reset();$("status").textContent="Učební plán vytvořen";refresh();}else $("status").textContent="Plán se nepodařilo vytvořit";
+ });
+ refresh();
 })();
 </script>
 </body></html>

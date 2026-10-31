@@ -2,7 +2,7 @@ name: Micro Helper checks
 
 on:
   push:
-    branches: ["main", "micro-helper"]
+    branches: ["main", "micro-helper", "micro-helper-learning-blueprint"]
   pull_request:
   workflow_dispatch:
 

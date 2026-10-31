@@ -73,6 +73,12 @@ def database() -> Iterator[sqlite3.Connection]:
                 finished_at TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at);
+            CREATE TABLE IF NOT EXISTS learning_plans (
+                id TEXT PRIMARY KEY, title TEXT NOT NULL, objective TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('draft','active','paused')),
+                steps_json TEXT NOT NULL, sources_json TEXT NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS preferences (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category TEXT NOT NULL,
@@ -145,6 +151,7 @@ async def status():
     with database() as db:
         memory_count = db.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
         message_count = db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        learning_plan_count = db.execute("SELECT COUNT(*) FROM learning_plans").fetchone()[0]
     return {
         "product": "Micro Helper",
         "version": app.version,
@@ -153,14 +160,14 @@ async def status():
             "web_chat_ui", "health", "status", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
-            "capability_catalog", "browser_voice_input", "browser_voice_output",
+            "capability_catalog", "browser_voice_input", "browser_voice_output", "learning_plan_crud",
         ],
         "not_yet_implemented": [
             "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
             "agent_messaging", "animated_mascot", "encrypted_cloud_sync", "cloud_deployment",
         ],
         "paid_api_required": False,
-        "storage": {"type": "local_sqlite", "memories": memory_count, "messages": message_count},
+        "storage": {"type": "local_sqlite", "memories": memory_count, "messages": message_count, "learning_plans": learning_plan_count},
     }
 
 
@@ -541,3 +548,8 @@ async def chat(request: ChatRequest):
         return {"error": f"Ollama vrátila chybu HTTP {exc.response.status_code}. Ověř název a stažení modelu."}
     except (httpx.HTTPError, ValueError):
         return {"error": "Nepodařilo se spojit s lokální Ollamou nebo přečíst její odpověď."}
+
+
+# Optional modular learning-plan API. Knowledge plans never grant execution permissions.
+from micro_helper.learning import router as learning_router
+app.include_router(learning_router)
