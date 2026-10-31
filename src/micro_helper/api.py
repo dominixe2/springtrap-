@@ -73,6 +73,12 @@ def database() -> Iterator[sqlite3.Connection]:
                 finished_at TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at);
+            CREATE TABLE IF NOT EXISTS learning_plans (
+                id TEXT PRIMARY KEY, title TEXT NOT NULL, objective TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('draft','active','paused')),
+                steps_json TEXT NOT NULL, sources_json TEXT NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS preferences (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category TEXT NOT NULL,
@@ -153,7 +159,7 @@ async def status():
             "web_chat_ui", "health", "status", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
-            "capability_catalog", "browser_voice_input", "browser_voice_output",
+            "capability_catalog", "browser_voice_input", "browser_voice_output", "learning_plan_crud",
         ],
         "not_yet_implemented": [
             "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
