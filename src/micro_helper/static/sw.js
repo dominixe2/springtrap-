@@ -1,5 +1,5 @@
 /* Micro Helper offline shell. API responses and personal data are never cached here. */
-const CACHE_NAME = "micro-helper-pwa-v1";
+const CACHE_NAME = "micro-helper-pwa-v2";
 const APP_SHELL = ["/", "/static/manifest.webmanifest", "/static/icon.svg"];
 
 self.addEventListener("install", event => {
