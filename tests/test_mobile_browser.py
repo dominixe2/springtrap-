@@ -17,6 +17,15 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def launch_chromium(playwright):
+    try:
+        return playwright.chromium.launch()
+    except Exception as exc:
+        if "Executable doesn't exist" in str(exc):
+            pytest.skip("Chromium is not installed; the dedicated mobile workflow installs it.")
+        raise
+
+
 @pytest.fixture(scope="module")
 def app_url(tmp_path_factory):
     temp = tmp_path_factory.mktemp("micro-helper-browser")
@@ -55,7 +64,7 @@ def app_url(tmp_path_factory):
 
 def test_mobile_layout_and_core_controls(app_url):
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = launch_chromium(p)
         page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
@@ -80,7 +89,7 @@ def test_mobile_layout_and_core_controls(app_url):
 
 def test_chat_interaction_with_mocked_local_model(app_url):
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = launch_chromium(p)
         page = browser.new_page(viewport={"width": 412, "height": 915}, device_scale_factor=1, is_mobile=True, has_touch=True)
         page.route("**/v1/chat", lambda route: route.fulfill(
             status=200, content_type="application/json",
