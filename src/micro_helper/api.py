@@ -88,6 +88,16 @@ class RestoreRequest(BaseModel):
     confirm_replace: bool = False
 
 
+@app.get("/service-worker.js")
+async def service_worker():
+    """Serve the PWA worker from the root so it can control the whole app."""
+    return FileResponse(
+        STATIC / "service-worker.js",
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"},
+    )
+
+
 @app.get("/")
 async def home():
     return FileResponse(STATIC / "index.html")
