@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 import pytest
 import micro_helper.api as api
@@ -137,7 +139,6 @@ def test_memory_ui_supports_edit_and_export():
     assert 'micro-helper-memory.json' in response.text
 
 
-
 def test_full_backup_round_trip_restores_profile_memories_and_messages():
     client.put("/v1/profile", json={"agent_name": "Mykla", "language": "cs-CZ", "style": "stručný"})
     client.post("/v1/memories", json={"content": "Testovací paměť", "category": "project"})
@@ -168,3 +169,10 @@ def test_restore_rejects_invalid_backup():
         "confirm_replace": True,
     })
     assert response.status_code == 422
+
+
+def test_launch_scripts_bind_only_to_loopback():
+    repo_root = Path(__file__).resolve().parents[1]
+    for script in ("run-windows.bat", "termux-start.sh"):
+        content = (repo_root / script).read_text(encoding="utf-8")
+        assert "--host 127.0.0.1" in content, f"{script} must not expose private APIs on the LAN"
