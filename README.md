@@ -8,7 +8,8 @@ Micro Helper is a free-first, local-first personal assistant foundation. The cur
 - Optional local LLM via Ollama. No paid API key is required; a compatible model must be downloaded locally.
 - Editable agent name, language, and communication style.
 - Local SQLite persistence for profile, user-managed memories, and successful chat messages.
-- Memory create/list/edit/delete API and UI controls, plus JSON export of saved notes.\n- Complete portable JSON backup/restore for profile, all saved memories, and full conversation history. Restore requires explicit confirmation and replaces the target device data.
+- Memory create/list/edit/delete API and UI controls, plus JSON export of saved notes.
+- Complete portable JSON backup/restore for profile, all saved memories, and full conversation history. Restore requires explicit confirmation and replaces the target device data.
 - Conversation history reload and explicit history deletion.
 - Ollama model discovery and graceful handling when Ollama is offline.
 - API validation and automated tests.
