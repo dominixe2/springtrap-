@@ -28,9 +28,9 @@ bash termux-start.sh
 
 Open `http://127.0.0.1:8000` in Chrome on the same phone. Keep Termux running while using Micro Helper. Android may stop background work unless Termux is excluded from battery optimization.
 
-**Android limitation:** this starts the app, local database, profile, notes, and conversation storage on the phone. The current chat adapter talks to Ollama at `127.0.0.1:11434`; Ollama is not supplied by this Termux installer. Therefore AI replies are not yet available on Android until a compatible on-device inference runtime and adapter are added. No paid API is required.
+**Android AI options:** Termux hosts the API and local SQLite database. Ollama is not included, so a phone-local model requires a separate compatible runtime. The app now also supports a server-side Google Gemini API key (selected models have a published free tier) and configurable OpenAI-compatible endpoints. Configure `MICRO_HELPER_PROVIDER`, `GEMINI_API_KEY`, and optionally `GEMINI_MODEL` in the Termux session before starting the server. API keys are read from environment variables and are never stored in the app database or sent to the browser. Cloud-provider requests leave the phone and are subject to that provider's privacy terms, quotas, and model availability. See the provider configuration section below.
 
-## Windows quick start
+## AI provider configuration\n\nFor Gemini, create a key in Google AI Studio and run in Termux before `bash termux-start.sh`:\n\n```bash\nexport MICRO_HELPER_PROVIDER=gemini\nexport GEMINI_API_KEY='YOUR_KEY'\nexport GEMINI_MODEL='gemini-2.5-flash'\n```\n\nFor other OpenAI-compatible services, set `MICRO_HELPER_PROVIDER=openai_compatible`, `OPENAI_COMPAT_BASE_URL`, `OPENAI_COMPAT_API_KEY`, and `OPENAI_COMPAT_MODEL`. The endpoint must implement Chat Completions. Check the provider's current free-tier limits before use; compatibility does not imply free usage.\n\n## Windows quick start
 
 Requires Python 3.11+ and, for AI chat, [Ollama](https://ollama.com/) with a model installed.
 
