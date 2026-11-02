@@ -2,7 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Micro Helper</title>
+<title>Micro Helper</title><meta name="theme-color" content="#0b1020"><link rel="manifest" href="/static/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes">
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#141c30;--line:#263451;--accent:#73d7c2;--muted:#9aabc4}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1a2940,#0b1020 65%);color:#edf4ff;font:16px system-ui;min-height:100vh}
@@ -27,6 +27,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 <section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><button id="exportMemory" type="button">Exportovat poznámky</button><button id="exportBackup" type="button">Záloha všeho</button><label style="display:inline-flex;gap:6px;align-items:center"><input id="importBackup" type="file" accept="application/json,.json" style="max-width:190px;flex:none">Obnovit zálohu</label></div><form id="memoryForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0"><input id="memoryText" maxlength="1000" placeholder="Např. Odpovídej mi stručně a česky…" aria-label="Nová poznámka do paměti" required><select id="memoryCategory" aria-label="Kategorie paměti"><option value="preference">Preference</option><option value="project">Projekt</option><option value="context">Kontext</option><option value="goal">Cíl</option></select><button class="primary" type="submit">Uložit poznámku</button></form><div id="memoryList" class="muted" aria-live="polite">Načítám paměť…</div><small>Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani tajné klíče.</small></section>
 </main>
 <script>
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("/service-worker.js").catch(() => {})); }
 (()=>{
 const byId=id=>document.getElementById(id);
 byId("check")?.addEventListener("click",async()=>{try{const response=await fetch("/v1/models");const data=await response.json();byId("modelState").textContent="Ollama: "+(data.available?(data.models.join(", ")||"běží, ale nemá stažený model"):"není dostupná")}catch(error){byId("modelState").textContent="Ollama: chyba spojení"}});
