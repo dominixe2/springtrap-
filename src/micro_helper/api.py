@@ -54,6 +54,14 @@ def database() -> Iterator[sqlite3.Connection]:
                 category TEXT NOT NULL DEFAULT 'preference',
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                due_at TEXT,
+                completed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
@@ -78,6 +86,12 @@ class ChatRequest(BaseModel):
 class MemoryRequest(BaseModel):
     content: str = Field(min_length=1, max_length=1000)
     category: str = Field(default="preference", min_length=1, max_length=40)
+
+
+class TaskRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=2000)
+    due_at: str | None = Field(default=None, max_length=40)
 
 
 class ProfileRequest(BaseModel):
@@ -123,11 +137,11 @@ async def status():
         "implemented": [
             "web_chat_ui", "health", "status", "pluggable_ai_providers", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
-            "persistent_conversation_history", "memory_crud", "conversation_clear",
+            "persistent_conversation_history", "memory_crud", "conversation_clear", "task_crud",
         ],
         "not_yet_implemented": [
             "voice", "android_integration", "windows_worker",
-            "agent_messaging", "animated_mascot", "encrypted_cloud_sync", "tool_execution",
+            "agent_messaging", "animated_mascot", "encrypted_cloud_sync", "tool_execution", "push_notifications",
         ],
         "paid_api_required": False,
         "storage": {"type": "local_sqlite", "memories": memory_count, "messages": message_count},
@@ -141,8 +155,8 @@ async def export_backup():
     with database() as db:
         profile = db.execute("SELECT agent_name, language, style, updated_at FROM profile WHERE id=1").fetchone()
         memories = db.execute("SELECT id, content, category, created_at FROM memories ORDER BY id").fetchall()
-        messages = db.execute("SELECT id, role, content, created_at FROM messages ORDER BY id").fetchall()
-    return {"format": "micro-helper-backup", "version": 1, "exported_at": utc_now(), "profile": dict(profile), "memories": [dict(row) for row in memories], "messages": [dict(row) for row in messages]}
+        messages = db.execute("SELECT id, role, content, created_at FROM messages ORDER BY id").fetchall()\n        tasks = db.execute("SELECT id, title, description, due_at, completed, created_at FROM tasks ORDER BY id").fetchall()
+    return {"format": "micro-helper-backup", "version": 1, "exported_at": utc_now(), "profile": dict(profile), "memories": [dict(row) for row in memories], "messages": [dict(row) for row in messages], "tasks": [dict(row) for row in tasks]}
 
 
 @app.post("/v1/backup/restore")
@@ -153,13 +167,13 @@ async def restore_backup(request: RestoreRequest):
         raise HTTPException(status_code=400, detail="Obnova vyžaduje confirm_replace=true.")
     if backup.get("format") != "micro-helper-backup" or backup.get("version") != 1:
         raise HTTPException(status_code=422, detail="Nepodporovaný nebo poškozený záložní soubor.")
-    profile, memories, messages = backup.get("profile"), backup.get("memories"), backup.get("messages")
-    if not isinstance(profile, dict) or not isinstance(memories, list) or not isinstance(messages, list):
+    profile, memories, messages = backup.get("profile"), backup.get("memories"), backup.get("messages")\n    tasks = backup.get("tasks", [])
+    if not isinstance(profile, dict) or not isinstance(memories, list) or not isinstance(messages, list) or not isinstance(tasks, list):
         raise HTTPException(status_code=422, detail="Záloha neobsahuje kompletní profil, paměti a historii.")
     keys = ("agent_name", "language", "style", "updated_at")
     if any(not isinstance(profile.get(key), str) for key in keys):
         raise HTTPException(status_code=422, detail="Profil v záloze není platný.")
-    if len(memories) > 10000 or len(messages) > 100000:
+    if len(memories) > 10000 or len(messages) > 100000 or len(tasks) > 10000:
         raise HTTPException(status_code=413, detail="Záloha je příliš velká.")
     try:
         memory_rows = [(int(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
@@ -177,7 +191,7 @@ async def restore_backup(request: RestoreRequest):
         db.executemany("INSERT INTO memories(id, content, category, created_at) VALUES (?, ?, ?, ?)", memory_rows)
         db.executemany("INSERT INTO messages(id, role, content, created_at) VALUES (?, ?, ?, ?)", message_rows)
         db.commit()
-    return {"restored": True, "memories": len(memory_rows), "messages": len(message_rows)}
+    return {"restored": True, "memories": len(memory_rows), "messages": len(message_rows), "tasks": len(task_rows)}
 
 @app.get("/v1/profile")
 async def get_profile():
@@ -255,6 +269,49 @@ async def delete_memory(memory_id: int):
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail="Tahle paměť už neexistuje.")
     return {"deleted": True, "id": memory_id}
+
+
+@app.get("/v1/tasks")
+async def list_tasks():
+    with database() as db:
+        rows = db.execute("SELECT id, title, description, due_at, completed, created_at FROM tasks ORDER BY completed, due_at IS NULL, due_at, id DESC").fetchall()
+    return {"tasks": [dict(row) for row in rows]}
+
+
+@app.post("/v1/tasks", status_code=201)
+async def create_task(request: TaskRequest):
+    title = request.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Úkol musí mít název.")
+    with database() as db:
+        cursor = db.execute(
+            "INSERT INTO tasks(title, description, due_at, created_at) VALUES (?, ?, ?, ?)",
+            (title, request.description.strip(), request.due_at, utc_now()),
+        )
+        db.commit()
+        row = db.execute("SELECT id, title, description, due_at, completed, created_at FROM tasks WHERE id=?", (cursor.lastrowid,)).fetchone()
+    return dict(row)
+
+
+@app.patch("/v1/tasks/{task_id}")
+async def update_task(task_id: int, completed: bool):
+    with database() as db:
+        cursor = db.execute("UPDATE tasks SET completed=? WHERE id=?", (int(completed), task_id))
+        db.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Úkol nebyl nalezen.")
+        row = db.execute("SELECT id, title, description, due_at, completed, created_at FROM tasks WHERE id=?", (task_id,)).fetchone()
+    return dict(row)
+
+
+@app.delete("/v1/tasks/{task_id}")
+async def delete_task(task_id: int):
+    with database() as db:
+        cursor = db.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+        db.commit()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Úkol nebyl nalezen.")
+    return {"deleted": True, "id": task_id}
 
 
 @app.get("/v1/conversations")
