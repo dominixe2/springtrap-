@@ -73,7 +73,7 @@ def test_mobile_layout_and_core_controls(app_url):
         worker = page.request.get(app_url + "/service-worker.js")
         assert manifest.status == 200
         assert worker.status == 200
-        assert "Service-Worker-Allowed" in worker.headers
+        assert "service-worker-allowed" in worker.headers
         assert not errors
         browser.close()
 
@@ -81,7 +81,7 @@ def test_mobile_layout_and_core_controls(app_url):
 def test_chat_interaction_with_mocked_local_model(app_url):
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 412, "height": 915}, is_mobile=True)
+        page = browser.new_page(viewport={"width": 412, "height": 915}, device_scale_factor=1, is_mobile=True, has_touch=True)
         page.route("**/v1/chat", lambda route: route.fulfill(
             status=200, content_type="application/json",
             body='{"reply":"Testovací odpověď Mykly"}',
