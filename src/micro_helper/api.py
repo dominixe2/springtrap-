@@ -155,7 +155,8 @@ async def export_backup():
     with database() as db:
         profile = db.execute("SELECT agent_name, language, style, updated_at FROM profile WHERE id=1").fetchone()
         memories = db.execute("SELECT id, content, category, created_at FROM memories ORDER BY id").fetchall()
-        messages = db.execute("SELECT id, role, content, created_at FROM messages ORDER BY id").fetchall()\n        tasks = db.execute("SELECT id, title, description, due_at, completed, created_at FROM tasks ORDER BY id").fetchall()
+        messages = db.execute("SELECT id, role, content, created_at FROM messages ORDER BY id").fetchall()
+        tasks = db.execute("SELECT id, title, description, due_at, completed, created_at FROM tasks ORDER BY id").fetchall()
     return {"format": "micro-helper-backup", "version": 1, "exported_at": utc_now(), "profile": dict(profile), "memories": [dict(row) for row in memories], "messages": [dict(row) for row in messages], "tasks": [dict(row) for row in tasks]}
 
 
@@ -167,7 +168,8 @@ async def restore_backup(request: RestoreRequest):
         raise HTTPException(status_code=400, detail="Obnova vyžaduje confirm_replace=true.")
     if backup.get("format") != "micro-helper-backup" or backup.get("version") != 1:
         raise HTTPException(status_code=422, detail="Nepodporovaný nebo poškozený záložní soubor.")
-    profile, memories, messages = backup.get("profile"), backup.get("memories"), backup.get("messages")\n    tasks = backup.get("tasks", [])
+    profile, memories, messages = backup.get("profile"), backup.get("memories"), backup.get("messages")
+    tasks = backup.get("tasks", [])
     if not isinstance(profile, dict) or not isinstance(memories, list) or not isinstance(messages, list) or not isinstance(tasks, list):
         raise HTTPException(status_code=422, detail="Záloha neobsahuje kompletní profil, paměti a historii.")
     keys = ("agent_name", "language", "style", "updated_at")
@@ -178,18 +180,21 @@ async def restore_backup(request: RestoreRequest):
     try:
         memory_rows = [(int(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
         message_rows = [(int(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
+        task_rows = [(int(x["id"]), str(x["title"]), str(x.get("description", "")), x.get("due_at"), int(bool(x.get("completed", 0))), str(x["created_at"])) for x in tasks]
         if any(row[1] not in ("user", "assistant") for row in message_rows):
             raise ValueError()
-        if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows):
+        if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows) or any(not row[1] for row in task_rows):
             raise ValueError()
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=422, detail="Záloha obsahuje neplatné záznamy.")
     with database() as db:
         db.execute("DELETE FROM memories")
         db.execute("DELETE FROM messages")
+        db.execute("DELETE FROM tasks")
         db.execute("UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1", tuple(profile[k] for k in keys))
         db.executemany("INSERT INTO memories(id, content, category, created_at) VALUES (?, ?, ?, ?)", memory_rows)
         db.executemany("INSERT INTO messages(id, role, content, created_at) VALUES (?, ?, ?, ?)", message_rows)
+        db.executemany("INSERT INTO tasks(id, title, description, due_at, completed, created_at) VALUES (?, ?, ?, ?, ?, ?)", task_rows)
         db.commit()
     return {"restored": True, "memories": len(memory_rows), "messages": len(message_rows), "tasks": len(task_rows)}
 
@@ -386,7 +391,7 @@ async def chat(request: ChatRequest):
             for row in reversed(saved_history)
         ]
 
-    memory_text = "\\n".join(f"- [{row['category']}] {row['content']}" for row in reversed(memories))
+    memory_text = "\n".join(f"- [{row['category']}] {row['content']}" for row in reversed(memories))
     system_prompt = (
         f"Jsi {profile['agent_name']}, osobní AI asistent. Odpovídej primárně česky "
         f"(jazyk: {profile['language']}), stylem {profile['style']}. Buď praktický a přiznej nejistotu. "
@@ -394,7 +399,7 @@ async def chat(request: ChatRequest):
         "Nemáš přístup k souborům, počítači ani internetu, pokud ti konkrétní nástroj není výslovně připojen."
     )
     if memory_text:
-        system_prompt += "\\nUložené poznámky o uživateli (používej jen jako kontext):\\n" + memory_text[:12000]
+        system_prompt += "\nUložené poznámky o uživateli (používej jen jako kontext):\n" + memory_text[:12000]
 
     messages = [{"role": "system", "content": system_prompt}, *safe_history]
     messages.append({"role": "user", "content": request.message})
