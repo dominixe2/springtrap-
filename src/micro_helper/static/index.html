@@ -32,7 +32,17 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 </div>
 
 <section class="settings" style="align-items:stretch;flex-direction:column">
-  <strong>⚙️ Úkoly na pozadí</strong>
+  <section class="settings" style="align-items:stretch;flex-direction:column">
+<strong>🎯 Moje učební plány</strong>
+<small>Rozděl si cíl na malé kroky. Plány se ukládají do místní databáze; offline režim je uchová v tomto prohlížeči.</small>
+<form id="learningPlanForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0">
+<input id="learningPlanTitle" maxlength="120" placeholder="Název plánu" required>
+<input id="learningPlanGoal" maxlength="2000" placeholder="Čeho chceš dosáhnout?" required>
+<textarea id="learningPlanSteps" maxlength="25000" rows="3" placeholder="Jeden krok na řádek" required style="width:100%;background:#0c1425;color:inherit;border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit"></textarea>
+<button class="primary" type="submit">Vytvořit plán</button></form>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label for="learningPlanFilter">Zobrazit:</label><select id="learningPlanFilter"><option value="">Všechny</option><option value="active">Aktivní</option><option value="paused">Pozastavené</option><option value="completed">Dokončené</option></select><button type="button" id="refreshLearningPlans">Obnovit</button></div>
+<div id="learningPlanList" class="muted" aria-live="polite">Načítám plány…</div></section>
+\n<strong>⚙️ Úkoly na pozadí</strong>
   <small>Fronta bezpečně zpracuje textové návrhy přes lokální Ollamu. Zatím neumí sama ovládat zařízení ani posílat zprávy.</small>
   <form id="taskForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0">
     <input id="taskTitle" maxlength="120" placeholder="Název úkolu" required>
@@ -95,7 +105,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 (() => {
   const nativeFetch = window.fetch.bind(window);
   const key = "micro_helper_offline_v1";
-  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],messages:[],nextId:1}; } };
+  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } };
   const save = data => localStorage.setItem(key, JSON.stringify(data));
   const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
   window.fetch = async (input, init={}) => {
@@ -106,7 +116,12 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       const method = (init.method || (typeof input !== "string" && input.method) || "GET").toUpperCase();
       let body = {}; try { body = JSON.parse(init.body || "{}"); } catch {}
       const db = load();
-      if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);
+      if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);\n      db.plans = db.plans || [];
+      if (url.pathname === "/v1/learning-plans" && method === "GET") { const status=url.searchParams.get("status"); if(status&&!["active","paused","completed"].includes(status))return reply({detail:"Neplatný stav plánu."},422); return reply({plans:[...db.plans].filter(p=>!status||p.status===status).sort((a,b)=>b.updated_at.localeCompare(a.updated_at))}); }
+      if (url.pathname === "/v1/learning-plans" && method === "POST") { const title=String(body.title||"").trim(),goal=String(body.goal||"").trim(),steps=Array.isArray(body.steps)?body.steps.map(x=>String(x).trim()).filter(Boolean):[]; if(!title||!goal||!steps.length||title.length>120||goal.length>2000||steps.some(x=>x.length>500))return reply({detail:"Vyplň název, cíl a platné kroky."},422); const plan={id:crypto.randomUUID(),title,goal,steps,status:"active",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};db.plans.push(plan);save(db);return reply(plan,201); }
+      const planMatch=url.pathname.match(/^\/v1\/learning-plans\/([^/]+)(?:\/(status))?$/);
+      if(planMatch){const index=db.plans.findIndex(p=>p.id===decodeURIComponent(planMatch[1]));if(method==="GET")return index<0?reply({detail:"Učební plán nebyl nalezen."},404):reply(db.plans[index]);if(method==="PATCH"&&planMatch[2]==="status"){if(index<0)return reply({detail:"Učební plán nebyl nalezen."},404);if(!["active","paused","completed"].includes(body.status))return reply({detail:"Neplatný stav plánu."},422);db.plans[index].status=body.status;db.plans[index].updated_at=new Date().toISOString();save(db);return reply(db.plans[index]);}if(method==="DELETE"&&!planMatch[2]){if(index<0)return reply({detail:"Učební plán nebyl nalezen."},404);db.plans.splice(index,1);save(db);return reply({deleted:true,id:planMatch[1]});}}
+
       if (url.pathname === "/v1/profile" && method === "PUT") { db.profile = {...db.profile,...body}; save(db); return reply(db.profile); }
       if (url.pathname === "/v1/memories" && method === "GET") return reply({memories:[...db.memories].reverse()});
       if (url.pathname === "/v1/preferences" && method === "GET") return reply({preferences:db.preferences||[]});
@@ -341,5 +356,17 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
  refreshTasks();
  setInterval(refreshTasks,8000);
 })();
+</script>
+<script>
+/* Learning plans UI */
+(()=>{const $=id=>document.getElementById(id),root=$("learningPlanList");if(!root)return;
+async function render(){root.replaceChildren();try{const filter=$("learningPlanFilter").value,response=await fetch("/v1/learning-plans"+(filter?"?status="+encodeURIComponent(filter):""));if(!response.ok)throw Error();const data=await response.json();if(!data.plans?.length){root.textContent="Žádné plány v této kategorii. Vytvoř si první malý cíl.";return}
+for(const plan of data.plans){const card=document.createElement("article");card.style.cssText="padding:12px 0;border-top:1px solid var(--line);display:grid;gap:8px";const title=document.createElement("strong");title.textContent=plan.title+" · "+({active:"Aktivní",paused:"Pozastavený",completed:"Dokončený"}[plan.status]||plan.status);const goal=document.createElement("div");goal.textContent=plan.goal;const steps=document.createElement("ol");steps.style.cssText="margin:0;padding-left:24px;display:grid;gap:5px";for(const step of plan.steps||[]){const li=document.createElement("li");li.textContent=step;steps.append(li)}const actions=document.createElement("div");actions.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
+const next=plan.status==="active"?"paused":"active";const toggle=document.createElement("button");toggle.type="button";toggle.textContent=plan.status==="active"?"Pozastavit":plan.status==="paused"?"Pokračovat":"Znovu otevřít";toggle.onclick=async()=>{const r=await fetch("/v1/learning-plans/"+encodeURIComponent(plan.id)+"/status",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:next})});if(r.ok)render();else $("status").textContent="Stav plánu se nepodařilo změnit"};
+const done=document.createElement("button");done.type="button";done.textContent="Označit dokončený";done.disabled=plan.status==="completed";done.onclick=async()=>{const r=await fetch("/v1/learning-plans/"+encodeURIComponent(plan.id)+"/status",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:"completed"})});if(r.ok)render()};
+const remove=document.createElement("button");remove.type="button";remove.textContent="Smazat";remove.onclick=async()=>{if(!confirm("Opravdu smazat tento učební plán?"))return;const r=await fetch("/v1/learning-plans/"+encodeURIComponent(plan.id),{method:"DELETE"});if(r.ok)render()};actions.append(toggle,done,remove);card.append(title,goal,steps,actions);root.append(card)}
+}catch(e){root.textContent="Plány nelze načíst. Zkontroluj připojení k aplikaci."}}
+$("learningPlanForm").addEventListener("submit",async e=>{e.preventDefault();const title=$("learningPlanTitle").value.trim(),goal=$("learningPlanGoal").value.trim(),steps=$("learningPlanSteps").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!title||!goal||!steps.length){$("status").textContent="Vyplň název, cíl a alespoň jeden krok.";return}const r=await fetch("/v1/learning-plans",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({title,goal,steps})});if(r.ok){$("learningPlanTitle").value="";$("learningPlanGoal").value="";$("learningPlanSteps").value="";$("learningPlanFilter").value="";$("status").textContent="Učební plán uložen";render()}else $("status").textContent="Plán se nepodařilo uložit"});
+$("learningPlanFilter").addEventListener("change",render);$("refreshLearningPlans").addEventListener("click",render);render()})();
 </script>
 </body></html>
