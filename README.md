@@ -87,3 +87,9 @@ The worker uses the profile name, communication style, and explicitly saved pref
 ## Android today
 
 The current deliverable is an installable PWA, not an APK. The API must run on a device that can run Python; the PWA alone is only the interface. The service worker caches the app shell, not the AI model or private API data. Cross-device live sync and authenticated pairing are not implemented, so do not expose the API publicly. Use the backup/export facilities for data portability where available; do not assume phone and notebook data are automatically shared.
+
+## Hosted phone-first app (separate deployment)
+
+A separate hosted version is currently available at https://micro-helper-ygeuyn.v2.appdeploy.ai/. It has account-backed private cloud data, cloud AI chat, local browser storage when signed out, an explicit opt-in import for local notes/preferences/plans/tasks, learning plans, background draft tasks, daily review reports, and a browser install prompt when supported. The local browser copy is retained after import; chat history is intentionally not imported by that action.
+
+This hosted app is maintained as a separate AppDeploy source snapshot and is **not automatically built from this GitHub branch**. The FastAPI code documented above still has the limitations listed in this README, and this repository does not yet produce a native Android APK. The hosted app's local mode does not provide real AI generation without signing in, and local data remains device-specific until the user explicitly imports it into an account.
