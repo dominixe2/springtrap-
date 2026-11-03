@@ -328,3 +328,15 @@ def test_learning_plan_requires_nonempty_steps():
         "title": "Test", "goal": "Něco se naučit", "steps": ["  "]
     })
     assert response.status_code == 422
+
+
+
+def test_home_page_exposes_learning_plan_ui_and_offline_support():
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert 'id="learningPlanForm"' in html
+    assert 'id="learningPlanList"' in html
+    assert 'id="learningPlanFilter"' in html
+    assert "Learning plans UI" in html
+    assert 'url.pathname === "/v1/learning-plans" && method === "POST"' in html
