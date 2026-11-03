@@ -116,7 +116,8 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       const method = (init.method || (typeof input !== "string" && input.method) || "GET").toUpperCase();
       let body = {}; try { body = JSON.parse(init.body || "{}"); } catch {}
       const db = load();
-      if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);\n      db.plans = db.plans || [];
+      if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);
+      db.plans = db.plans || [];
       if (url.pathname === "/v1/learning-plans" && method === "GET") { const status=url.searchParams.get("status"); if(status&&!["active","paused","completed"].includes(status))return reply({detail:"Neplatný stav plánu."},422); return reply({plans:[...db.plans].filter(p=>!status||p.status===status).sort((a,b)=>b.updated_at.localeCompare(a.updated_at))}); }
       if (url.pathname === "/v1/learning-plans" && method === "POST") { const title=String(body.title||"").trim(),goal=String(body.goal||"").trim(),steps=Array.isArray(body.steps)?body.steps.map(x=>String(x).trim()).filter(Boolean):[]; if(!title||!goal||!steps.length||title.length>120||goal.length>2000||steps.some(x=>x.length>500))return reply({detail:"Vyplň název, cíl a platné kroky."},422); const plan={id:crypto.randomUUID(),title,goal,steps,status:"active",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};db.plans.push(plan);save(db);return reply(plan,201); }
       const planMatch=url.pathname.match(/^\/v1\/learning-plans\/([^/]+)(?:\/(status))?$/);
