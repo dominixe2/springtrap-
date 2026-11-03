@@ -73,6 +73,16 @@ def database() -> Iterator[sqlite3.Connection]:
                 finished_at TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_tasks_status_created ON tasks(status, created_at);
+            CREATE TABLE IF NOT EXISTS learning_plans (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                goal TEXT NOT NULL,
+                steps_json TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('active','paused','completed')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_learning_plans_status_updated ON learning_plans(status, updated_at);
             CREATE TABLE IF NOT EXISTS preferences (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category TEXT NOT NULL,
@@ -100,6 +110,16 @@ class TaskRequest(BaseModel):
     kind: str = Field(default="agent.draft", pattern="^agent\\.draft$", max_length=40)
     title: str = Field(min_length=1, max_length=120)
     input_text: str = Field(min_length=1, max_length=12000)
+
+
+class LearningPlanRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    goal: str = Field(min_length=1, max_length=2000)
+    steps: list[str] = Field(min_length=1, max_length=50)
+
+
+class LearningPlanStatusRequest(BaseModel):
+    status: str = Field(pattern="^(active|paused|completed)$")
 
 
 class PreferenceRequest(BaseModel):
@@ -317,6 +337,80 @@ async def cancel_task(task_id: str):
     if cursor.rowcount == 0 and row["status"] != "cancelled":
         raise HTTPException(status_code=409, detail="Dokončenou nebo neúspěšnou úlohu už nelze zrušit.")
     return dict(row)
+
+
+@app.get("/v1/learning-plans")
+async def list_learning_plans(status: str | None = None):
+    if status is not None and status not in {"active", "paused", "completed"}:
+        raise HTTPException(status_code=422, detail="Neplatný stav plánu.")
+    with database() as db:
+        if status:
+            rows = db.execute(
+                "SELECT * FROM learning_plans WHERE status=? ORDER BY updated_at DESC", (status,)
+            ).fetchall()
+        else:
+            rows = db.execute("SELECT * FROM learning_plans ORDER BY updated_at DESC").fetchall()
+    return {"plans": [_learning_plan_dict(row) for row in rows]}
+
+
+def _learning_plan_dict(row: sqlite3.Row) -> dict[str, object]:
+    import json
+    result = dict(row)
+    result["steps"] = json.loads(result.pop("steps_json"))
+    return result
+
+
+@app.post("/v1/learning-plans", status_code=201)
+async def create_learning_plan(request: LearningPlanRequest):
+    import json
+    title, goal = request.title.strip(), request.goal.strip()
+    steps = [step.strip() for step in request.steps if step.strip()]
+    if not title or not goal or not steps:
+        raise HTTPException(status_code=422, detail="Název, cíl i alespoň jeden krok jsou povinné.")
+    if any(len(step) > 500 for step in steps):
+        raise HTTPException(status_code=422, detail="Jeden krok plánu může mít nejvýše 500 znaků.")
+    now, plan_id = utc_now(), str(uuid.uuid4())
+    with database() as db:
+        db.execute(
+            "INSERT INTO learning_plans(id,title,goal,steps_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+            (plan_id, title, goal, json.dumps(steps, ensure_ascii=False), "active", now, now),
+        )
+        db.commit()
+        row = db.execute("SELECT * FROM learning_plans WHERE id=?", (plan_id,)).fetchone()
+    return _learning_plan_dict(row)
+
+
+@app.get("/v1/learning-plans/{plan_id}")
+async def get_learning_plan(plan_id: str):
+    with database() as db:
+        row = db.execute("SELECT * FROM learning_plans WHERE id=?", (plan_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Učební plán nebyl nalezen.")
+    return _learning_plan_dict(row)
+
+
+@app.patch("/v1/learning-plans/{plan_id}/status")
+async def update_learning_plan_status(plan_id: str, request: LearningPlanStatusRequest):
+    with database() as db:
+        cursor = db.execute(
+            "UPDATE learning_plans SET status=?, updated_at=? WHERE id=?",
+            (request.status, utc_now(), plan_id),
+        )
+        db.commit()
+        row = db.execute("SELECT * FROM learning_plans WHERE id=?", (plan_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Učební plán nebyl nalezen.")
+    return _learning_plan_dict(row)
+
+
+@app.delete("/v1/learning-plans/{plan_id}")
+async def delete_learning_plan(plan_id: str):
+    with database() as db:
+        cursor = db.execute("DELETE FROM learning_plans WHERE id=?", (plan_id,))
+        db.commit()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Učební plán nebyl nalezen.")
+    return {"deleted": True, "id": plan_id}
 
 
 @app.get("/v1/profile")
