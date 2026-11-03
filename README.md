@@ -6,10 +6,11 @@ Micro Helper is a free-first, local-first personal assistant foundation. The cur
 
 - Responsive browser UI intended to be shared between phone and notebook.
 - PWA manifest, app icon, and service worker for caching the static app shell after a successful online visit.
-- Browser-local fallback for profile, notes, and conversation history when the API cannot be reached. This fallback uses localStorage on that device and is not automatically synchronized with the server or another device.
+- Browser-local fallback for profile, notes, preferences, learning plans, and conversation history when the API cannot be reached. This fallback uses localStorage on that device and is not automatically synchronized with the server or another device.
 - FastAPI backend with SQLite persistence for profile, user-managed memories, and successful AI chat exchanges.
 - Optional local LLM via Ollama. No paid API key is required; a compatible model must be downloaded locally.
 - Memory create/list/edit/delete controls and JSON export of saved notes.
+- Learning-plan CRUD with active/paused/completed states, validated steps, API tests, and mobile-friendly controls.
 - Conversation history reload and explicit history deletion.
 - An explicit backend tool registry: profile read, memory list, and confirmation-gated local memory creation. Arbitrary shell commands and code execution are not exposed.
 - Basic Czech browser voice input (SpeechRecognition where supported) and spoken replies (browser speech synthesis), with a stop control. This is a first voice layer, not a live duplex conversation.
@@ -36,7 +37,7 @@ The API binds to localhost by default. Keep it local unless you separately confi
 ## Offline and cross-device limits
 
 - The service worker caches the app shell, not private API responses.
-- If the API is unreachable, profile, notes, and a basic conversation log can use browser-local storage on that device. Browser-local fallback data is separate from the server's SQLite database.
+- If the API is unreachable, profile, notes, preferences, learning plans, and a basic conversation log can use browser-local storage on that device. Browser-local fallback data is separate from the server's SQLite database.
 - **Offline AI generation is not implemented.** The app needs a model running locally and reachable by the API. A cached web page alone is not an AI model.
 - **Cross-device sign-in and synchronization are not implemented yet.** The browser-local fallback does not sync to a notebook or phone.
 - A native Android APK and Microsoft Store package are not produced by this branch yet.
