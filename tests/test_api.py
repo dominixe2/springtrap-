@@ -296,3 +296,35 @@ def test_task_queue_ui_is_available():
     assert response.status_code == 200
     assert 'id="taskForm"' in response.text
     assert 'id="taskList"' in response.text
+
+
+
+def test_learning_plans_crud_filtering_and_validation():
+    created = client.post("/v1/learning-plans", json={
+        "title": "Základy Pythonu",
+        "goal": "Naučit se základy programování",
+        "steps": ["Proměnné", "Podmínky", "Smyčky"]
+    })
+    assert created.status_code == 201
+    plan = created.json()
+    assert plan["status"] == "active"
+    assert plan["steps"] == ["Proměnné", "Podmínky", "Smyčky"]
+    assert client.get("/v1/learning-plans").json()["plans"][0]["id"] == plan["id"]
+    assert client.get("/v1/learning-plans?status=active").json()["plans"][0]["id"] == plan["id"]
+    assert client.get("/v1/learning-plans?status=invalid").status_code == 422
+    paused = client.patch(f"/v1/learning-plans/{plan['id']}/status", json={"status": "paused"})
+    assert paused.status_code == 200
+    assert paused.json()["status"] == "paused"
+    assert client.get("/v1/learning-plans?status=active").json()["plans"] == []
+    assert client.get(f"/v1/learning-plans/{plan['id']}").json()["goal"] == "Naučit se základy programování"
+    assert client.patch(f"/v1/learning-plans/{plan['id']}/status", json={"status": "unknown"}).status_code == 422
+    assert client.delete(f"/v1/learning-plans/{plan['id']}").json()["deleted"] is True
+    assert client.get(f"/v1/learning-plans/{plan['id']}").status_code == 404
+    assert client.delete(f"/v1/learning-plans/{plan['id']}").status_code == 404
+
+
+def test_learning_plan_requires_nonempty_steps():
+    response = client.post("/v1/learning-plans", json={
+        "title": "Test", "goal": "Něco se naučit", "steps": ["  "]
+    })
+    assert response.status_code == 422
