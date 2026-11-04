@@ -1,6 +1,6 @@
 # Hosted Micro Helper source mirror
 
-This directory mirrors the hosted AppDeploy snapshot `micro-helper-ygeuyn` (snapshot `1793767519998`, 2026-11-04).
+This directory tracks the hosted AppDeploy app `micro-helper-ygeuyn`. The live deployment remains on snapshot `1793767519998`; the branch now contains a newer candidate source snapshot `1793769353100`.
 
 - Live app: https://micro-helper-ygeuyn.v2.appdeploy.ai/
 - Backend routes and scheduled job: `backend/index.ts` and `cron.json`.
@@ -13,4 +13,4 @@ The root project remains a separate local Python/Ollama edition. Do not copy the
 
 ## Source validation
 
-The repository workflow `.github/workflows/hosted-app-checks.yml` checks the mirrored JSON configuration, Czech PWA manifest, API authentication declarations, scheduled review handler, and inline browser JavaScript syntax. It is a static consistency check, not a live authenticated end-to-end test. Live search, image generation, account sync and browser speech still need verification in a signed-in browser session.
+The repository workflow `.github/workflows/hosted-app-checks.yml` checks the mirrored JSON configuration, Czech PWA manifest, API authentication declarations, scheduled review handler, and inline browser JavaScript syntax. It is a static consistency check, not a live authenticated end-to-end test. Live search, image generation, account sync and browser speech still need verification in a signed-in browser session. The candidate's inline scripts are syntax-checked by CI before a future deployment.
