@@ -24,7 +24,7 @@ Or run `run-companion.bat` from this folder.
 
 - Binds only to `127.0.0.1:8765`, not Wi-Fi or the public internet.
 - Accepts browser POST requests only from the official Micro Helper origin.
-- Uses a random one-time pairing code and random session token. Both reset when the process restarts.
+- Uses a random one-time pairing code and random session token. The pairing code rotates immediately after a successful pair, so the printed code cannot be reused. Restart the Companion to obtain a fresh code for a new pairing.
 - Rejects repeated invalid pairing attempts.
 - Allows only lock, Explorer, Notepad and Calculator.
 - Does not expose arbitrary shell/PowerShell commands, arbitrary file browsing or remote desktop.
