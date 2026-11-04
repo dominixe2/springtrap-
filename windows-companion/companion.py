@@ -43,6 +43,8 @@ class Handler(BaseHTTPRequestHandler):
             length=int(self.headers.get("Content-Length","0"))
             if length<2 or length>4096: self._send(413,{"detail":"Neplatná velikost požadavku."}); return
             payload=json.loads(self.rfile.read(length).decode("utf-8"))
+            if not isinstance(payload, dict):
+                self._send(400,{"detail":"JSON požadavek musí být objekt."}); return
         except Exception: self._send(400,{"detail":"Neplatný JSON požadavek."}); return
         if self.path=="/pair":
             with PAIR_LOCK:
