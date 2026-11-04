@@ -12,7 +12,7 @@ The repository also retains a separate local Python/FastAPI edition in `src/micr
 - Account-backed cloud chat and private per-user state.
 - Notes, preferences, learning plans, conversation history, draft tasks and daily review reports.
 - Browser voice input/output, optional hands-free continuation and a foreground-only wake phrase where supported by the browser.
-- Authenticated web search, AI image generation, image analysis and OCR.
+- Authenticated web search, AI image generation, image analysis and OCR. The newer candidate wires the image-studio controls to these routes and compresses photos before upload.
 - Realtime notifications between clients signed into the same account.
 - Optional Windows Companion with loopback-only pairing and a small fixed command allowlist.
 - Android debug APK wrapper that opens the hosted app.
@@ -27,6 +27,10 @@ The repository also retains a separate local Python/FastAPI edition in `src/micr
 - Realtime events notify clients to reload account state; they do not broadcast private state payloads.
 - Local browser fallback data remains specific to that browser/device until explicitly imported into the signed-in account.
 - The Windows Companion is intentionally limited to lock, Explorer, Notepad and Calculator. It does not expose a shell, arbitrary file access or remote desktop.
+
+## Deployment status
+
+The live AppDeploy deployment remains on snapshot `1793767519998`. Candidate snapshot `1793769353100` adds working image-studio handlers, AI task execution and a quick/deep response setting, but its publish was blocked by the AppDeploy usage limit. Do not treat those candidate changes as live until a future deployment reaches `ready` and QA reports no frontend errors.
 
 ## Build and validation
 
