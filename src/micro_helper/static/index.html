@@ -16,7 +16,7 @@ input{min-width:0;flex:1}button{cursor:pointer;background:#1b3447}button.primary
 #messages{flex:1;min-height:340px;max-height:60vh;overflow:auto;padding:10px 2px}
 .msg{max-width:82%;padding:12px 15px;margin:10px 0;border-radius:15px;white-space:pre-wrap;line-height:1.45}.user{margin-left:auto;background:#21483f}.agent{background:#18263b;border:1px solid #2a3b56}
 form{display:flex;gap:9px;margin-top:12px}form input{flex:1}#chat{min-width:0;flex-wrap:wrap}#chat input{flex:1 1 120px}.settings{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
-@media(max-width:600px){main{padding:14px}.msg{max-width:94%}#messages{max-height:none}}
+@media(max-width:600px){main{padding:14px;min-width:0}#setup{align-items:stretch}#setup label{display:flex;flex:1 1 100%;flex-direction:column;min-width:0;gap:5px}#setup label input,#setup label select{width:100%;min-width:0}#setup button{width:100%}.settings{min-width:0}.settings>*{min-width:0;max-width:100%}.settings label{min-width:0}.settings input,.settings select{max-width:100%}#chat{width:100%}#chat input{min-width:0;flex:1 1 100%}#chat button{flex:1 1 auto}.msg{max-width:94%}#messages{max-height:none;min-width:0;overflow-wrap:anywhere}}
 </style></head>
 <body><main>
 <header><div class="orb"></div><div><h1 id="title">Micro Helper</h1><small>Tvůj osobní lokální AI agent</small></div><span class="status" id="status">Připraven</span></header>
