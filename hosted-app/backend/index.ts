@@ -4,7 +4,7 @@ type Memory = { id: number; content: string; category: string; created_at: strin
 type Preference = { id: number; category: string; preference: string; value: string; source: string; updated_at: string };
 type Plan = { id: string; title: string; objective: string; status: string; steps: string[]; sources: string[]; version: number; created_at: string; updated_at: string };
 type Message = { id: number; role: "user" | "assistant"; content: string; created_at: string };
-type Task = { id: string; title: string; input_text: string; kind: string; status: string; result?: string; error?: string; created_at: string };
+type Task = { id: string; title: string; input_text: string; kind: string; status: string; result?: string; error?: string; created_at: string; completed_at?: string };
 type Report = { id: string; created_at: string; summary: string; task_count: number; active_plan_count: number };
 type Subscription = { connection_id: string; user_id: string; entity_type: string; entity_id: string; created_at: string };
 type State = {
@@ -216,8 +216,9 @@ export const handler = router({
       ...state.memories.slice(-20).map(x => x.content)
     ].join("\n").slice(0, 7000);
     const system = "Jsi " + state.profile.agent_name + ", osobní AI pomocník uživatele. Odpovídej česky, přirozeně, prakticky a přátelsky. Respektuj uživatelovy preference. Nepředstírej, že něco provádíš na pozadí nebo že máš přístup k zařízení, pokud to není výslovně dostupné. Uložené preference a poznámky uživatele:\n" + (memoryContext || "Zatím žádné.");
+    const thinkingMode = data.thinkingMode === "DEEP" ? "DEEP" : "FAST";
     try {
-      const result = await ai.generate({ system, messages: [...history, { role: "user", content: message }], maxTokens: 800, thinkingMode: "FAST" });
+      const result = await ai.generate({ system, messages: [...history, { role: "user", content: message }], maxTokens: thinkingMode === "DEEP" ? 1400 : 800, thinkingMode });
       const reply = String(result.text || "").trim();
       if (!reply) return error("AI nevrátila odpověď. Zkus to znovu.", 503);
       state.messages.push(
@@ -269,10 +270,50 @@ export const handler = router({
   "POST /api/v1/tasks": [requireAuth(), async ({ user, body }) => {
     const state = await readState(user!.userId), data = bodyOf(body);
     const title = String(data.title || "").trim(), input_text = String(data.input_text || "").trim();
-    if (!title || !input_text) return error("Úkol potřebuje název i zadání.", 422);
-    const task: Task = { id: crypto.randomUUID(), title: title.slice(0, 120), input_text: input_text.slice(0, 4000), kind: String(data.kind || "agent.draft"), status: "draft", created_at: stamp() };
+    if (!title || title.length > 120 || !input_text || input_text.length > 4000) return error("Úkol potřebuje název do 120 znaků a zadání do 4000 znaků.", 422);
+    const task: Task = { id: crypto.randomUUID(), title, input_text, kind: String(data.kind || "agent.draft"), status: "draft", created_at: stamp() };
     state.tasks.push(task); state.tasks = state.tasks.slice(-50);
     await writeState(user!.userId, state); return json(task, 201);
+  }],
+  "POST /api/v1/tasks/:id/run": [requireAuth(), async ({ user, params }) => {
+    const state = await readState(user!.userId);
+    const task = state.tasks.find(item => item.id === params.id);
+    if (!task) return error("Úkol nebyl nalezen.", 404);
+    if (task.status === "running") return error("Úkol se už zpracovává.", 409);
+    if (task.status === "cancelled") return error("Zrušený úkol nelze spustit.", 409);
+    if (task.status === "completed" && task.result) return json(task);
+
+    task.status = "running";
+    task.error = undefined;
+    await writeState(user!.userId, state);
+
+    try {
+      const preferences = state.preferences
+        .map(item => item.preference + ": " + item.value)
+        .join("\n")
+        .slice(0, 3500);
+      const memories = state.memories.slice(-12).map(item => item.content).join("\n").slice(0, 2500);
+      const generated = await ai.generate({
+        system: "Jsi vykonavatel textových úkolů v Micro Helperu. Vždy vytvoř konkrétní použitelný výstup v češtině. Dodrž zadání, strukturu a omezení. Pokud chybí zásadní informace, stručně uveď předpoklady nebo polož cílenou otázku. Nikdy netvrď, že jsi provedl akci mimo aplikaci, neposlal zprávu, změnil soubor nebo ovládal zařízení, pokud jsi to skutečně neudělal. Uživatelské preference: " + (preferences || "neuvedeny") + "\nUživatelské poznámky: " + (memories || "neuvedeny"),
+        prompt: "Název úkolu: " + task.title + "\n\nZadání:\n" + task.input_text + "\n\nVrať hotový výsledek, ne pouze plán postupu.",
+        maxTokens: 1800,
+        thinkingMode: "DEEP"
+      });
+      const output = String(generated.text || "").trim();
+      if (!output) throw new Error("AI nevrátila žádný výsledek.");
+      task.status = "completed";
+      task.result = output.slice(0, 12000);
+      task.error = undefined;
+      task.completed_at = stamp();
+      await writeState(user!.userId, state);
+      return json(task);
+    } catch (err) {
+      console.error("Micro Helper task execution failed", err);
+      task.status = "error";
+      task.error = "Úkol se nepodařilo dokončit. Zkontroluj dostupný AI limit a zkus to znovu.";
+      await writeState(user!.userId, state);
+      return error(task.error, 503);
+    }
   }],
   "POST /api/v1/tasks/:id/cancel": [requireAuth(), async ({ user, params }) => {
     const state = await readState(user!.userId), task = state.tasks.find(x => x.id === params.id);
