@@ -98,5 +98,6 @@ def test_chat_interaction_with_mocked_local_model(app_url):
         page.goto(app_url, wait_until="networkidle")
         page.locator("#prompt").fill("Otestuj chat")
         page.locator("#chat button.primary").click()
+        page.get_by_text("Testovací odpověď Mykly").wait_for(state="visible", timeout=5000)
         assert page.get_by_text("Testovací odpověď Mykly").is_visible()
         browser.close()
