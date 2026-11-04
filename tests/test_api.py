@@ -28,7 +28,8 @@ def test_status_is_honest_about_scope():
     assert body["paid_api_required"] is False
     assert "ollama_chat_adapter" in body["implemented"]
     assert "persistent_local_memory" in body["implemented"]
-    assert "voice" in body["not_yet_implemented"]
+    assert "browser_voice_input_output" in body["implemented"]
+    assert "realtime_voice_streaming" in body["not_yet_implemented"]
     assert body["storage"]["type"] == "local_sqlite"
 
 
