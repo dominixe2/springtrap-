@@ -157,7 +157,7 @@ def test_full_backup_round_trip_restores_profile_memories_and_messages():
 
     restored = client.post("/v1/backup/restore", json={"backup": backup, "confirm_replace": True})
     assert restored.status_code == 200
-    assert restored.json() == {"restored": True, "memories": 1, "messages": 2}
+    assert restored.json() == {"restored": True, "memories": 1, "messages": 2, "tasks": 0}
     assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
     assert [m["content"] for m in client.get("/v1/memories").json()["memories"]] == ["Testovací paměť"]
     assert [m["content"] for m in client.get("/v1/conversations").json()["messages"]] == ["Ahoj", "Čau"]
