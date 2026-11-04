@@ -53,10 +53,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200,{"paired":True,"token":SESSION_TOKEN})
                 print("[Micro Helper] Nové párování dokončeno.")
             return
-        if self.path!="/command": self._send(404,{"detail":"Neznámá akce."}); return
+        if self.path not in ("/command", "/unpair"): self._send(404,{"detail":"Neznámá akce."}); return
         supplied=self.headers.get("Authorization","")
         if not SESSION_TOKEN or not secrets.compare_digest(supplied,"Bearer "+SESSION_TOKEN):
             self._send(401,{"detail":"Relace vypršela. Spáruj notebook znovu."}); return
+        if self.path == "/unpair":
+            SESSION_TOKEN = ""
+            self._send(200, {"unpaired": True, "message": "Relace notebooku byla zrušena."})
+            return
         action=str(payload.get("action",""))
         if action not in ALLOWED: self._send(403,{"detail":"Tento příkaz není povolen."}); return
         try:
