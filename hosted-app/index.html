@@ -1,0 +1,1791 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>Micro Helper</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --panel: #141c30;
+        --line: #263451;
+        --accent: #73d7c2;
+        --muted: #9aabc4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: radial-gradient(ellipse at top, #1a2940, #0b1020 65%);
+        color: #edf4ff;
+        font: 16px system-ui;
+        min-height: 100vh;
+      }
+      main {
+        max-width: 900px;
+        margin: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 0 22px;
+      }
+      .orb {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 35% 30%,
+          #d8fff6,
+          #49bca9 35%,
+          #205b72 70%
+        );
+        box-shadow: 0 0 28px #4bc7b477;
+      }
+      h1 {
+        font-size: 21px;
+        margin: 0;
+      }
+      small,
+      .muted {
+        color: var(--muted);
+      }
+      .status {
+        margin-left: auto;
+        font-size: 12px;
+      }
+      #setup,
+      .chatbox,
+      .settings {
+        background: #121b2e;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 16px;
+      }
+      #setup {
+        margin-bottom: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        color: inherit;
+        background: #0c1425;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        padding: 11px;
+      }
+      input {
+        min-width: 0;
+        flex: 1;
+      }
+      button {
+        cursor: pointer;
+        background: #1b3447;
+      }
+      button.primary {
+        background: #23695f;
+        border-color: #328e80;
+      }
+      #messages {
+        flex: 1;
+        min-height: 340px;
+        max-height: 60vh;
+        overflow: auto;
+        padding: 10px 2px;
+      }
+      .msg {
+        max-width: 82%;
+        padding: 12px 15px;
+        margin: 10px 0;
+        border-radius: 15px;
+        white-space: pre-wrap;
+        line-height: 1.45;
+      }
+      .user {
+        margin-left: auto;
+        background: #21483f;
+      }
+      .agent {
+        background: #18263b;
+        border: 1px solid #2a3b56;
+      }
+      form {
+        display: flex;
+        gap: 9px;
+        margin-top: 12px;
+      }
+      form input {
+        flex: 1;
+      }
+      .settings {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 13px;
+      }
+      @media (max-width: 600px) {
+        main {
+          padding: 14px;
+        }
+        .msg {
+          max-width: 94%;
+        }
+        #messages {
+          max-height: none;
+        }
+      }
+    </style>
+    <script type="module" src="./src/main.ts"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="orb"></div>
+        <div>
+          <h1 id="title">Micro Helper</h1>
+          <small>Tvůj osobní AI pomocník · cloud i místní režim</small>
+        </div>
+        <span class="status" id="status">Připraven</span>
+      </header>
+      <section id="setup">
+        <label
+          >Jméno agenta
+          <input id="agentName" value="Mykla" maxlength="30" /></label
+        ><label
+          >Model <input id="model" value="llama3.2" maxlength="80" /></label
+        ><button class="primary" id="save">Uložit nastavení</button>
+        <button type="button" id="signIn" class="primary">Přihlásit a synchronizovat</button>
+        <button type="button" id="signOut" hidden>Odhlásit</button>
+        <button type="button" id="installApp" hidden>Nainstalovat na telefon</button>
+        <small><a href="https://github.com/dominixe2/springtrap-/actions/workflows/android-apk.yml?query=branch%3Amicro-helper" target="_blank" rel="noopener">Stáhnout Android APK</a> · APK je testovací sestavení z GitHub Actions</small>
+        <small id="accountState">Místní režim · přihlas se pro AI a synchronizaci</small>
+        <button type="button" id="importLocalData" hidden>Importovat místní data do účtu</button>
+        <small id="importHint" hidden>Import přenese poznámky, preference, plány, úkoly a jméno agenta. Místní kopie zůstane zachovaná; historie chatu se nepřenáší.</small>
+      </section>
+      <section id="messages">
+        <div class="msg agent">
+          Ahoj! Jsem Micro Helper. Bez přihlášení funguji místně v tomto telefonu. Přihlas se a zapni cloudové AI odpovědi i synchronizaci mezi zařízeními.
+        </div>
+      </section>
+      <form id="chat">
+        <input
+          id="prompt"
+          autocomplete="off"
+          placeholder="Napiš, co potřebuješ…"
+          required
+        /><button class="primary">Odeslat</button>
+      </form>
+      <div class="settings" id="voicePanel" aria-label="Hlasové ovládání">
+        <button type="button" class="primary" id="voiceStart">🎙️ Mluvit</button>
+        <button type="button" id="voiceStop">■ Zastavit hlas</button>
+        <label
+          ><input
+            type="checkbox"
+            id="voiceReply"
+            checked
+            style="min-width: auto; flex: 0"
+          />
+          Číst odpovědi nahlas</label
+        >
+        <label
+          ><input
+            type="checkbox"
+            id="voiceHandsFree"
+            checked
+            style="min-width: auto; flex: 0"
+          />
+          Pokračovat v rozhovoru bez mačkání</label
+        >
+        <label><input type="checkbox" id="voiceWakeWord" style="min-width:auto;flex:0" /> Probudit slovem „Myklo“ (jen při otevřené aplikaci)</label>
+        <small id="voiceStatus">Hlasový režim: čeká na spuštění. Naslouchání na pozadí není podporováno prohlížečem.</small>
+      </div>
+
+      <section class="settings" id="webSearchPanel" style="align-items:stretch;flex-direction:column">
+        <strong>🌐 Vyhledávání na webu</strong>
+        <small>Hledá veřejné webové stránky, vrací dostupné odkazy a stručné shrnutí. Výsledky závisí na dostupnosti vyhledávače.</small>
+        <form id="webSearchForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0">
+          <input id="webSearchQuery" maxlength="240" placeholder="Co mám najít na internetu?" required />
+          <button class="primary" type="submit">Hledat na webu</button>
+        </form>
+        <small id="webSearchStatus" aria-live="polite">Připraveno k vyhledávání.</small>
+        <div id="webSearchResults" style="display:grid;gap:10px"></div>
+      </section>
+
+      <section class="settings" id="windowsPanel" style="align-items:stretch;flex-direction:column">
+        <strong>🖥️ Windows Companion</strong>
+        <small>Bezpečné místní propojení s notebookem. Spusť doprovodný program ve Windows a zadej jednorázový párovací kód. Povolené akce: uzamčení počítače a spuštění Průzkumníka, Poznámkového bloku nebo Kalkulačky. Libovolné shell příkazy nejsou povolené.</small>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="desktopPairCode" type="password" autocomplete="off" maxlength="100" placeholder="Jednorázový párovací kód z Windows" />
+          <button class="primary" type="button" id="desktopPair">Spárovat notebook</button>
+          <button type="button" id="desktopDisconnect" disabled>Odpojit</button>
+        </div>
+        <small id="desktopStatus" aria-live="polite">Notebook není připojen.</small>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" data-desktop-action="lock" disabled>🔒 Uzamknout Windows</button>
+          <button type="button" data-desktop-action="explorer" disabled>📁 Průzkumník</button>
+          <button type="button" data-desktop-action="notepad" disabled>📝 Poznámkový blok</button>
+          <button type="button" data-desktop-action="calculator" disabled>🧮 Kalkulačka</button>
+        </div>
+        <small><a href="https://github.com/dominixe2/springtrap-/actions/workflows/windows-companion.yml?query=branch%3Amicro-helper" target="_blank" rel="noopener">Stáhnout Windows EXE (GitHub Actions)</a> · <a href="https://raw.githubusercontent.com/dominixe2/springtrap-/micro-helper/windows-companion/companion.py" target="_blank" rel="noopener">Zdrojový skript</a> · <a href="https://github.com/dominixe2/springtrap-/blob/micro-helper/windows-companion/README.md" target="_blank" rel="noopener">Návod</a></small>
+      </section>
+
+      <section class="settings" id="imageStudio" style="align-items:stretch;flex-direction:column">
+        <strong>🎨 AI studio obrázků</strong>
+        <small>Vytvářej obrázky z textu, upravuj je pomocí referenční fotografie, nech si obrázek popsat nebo z něj vytáhni text. AI obrazové funkce vyžadují přihlášení a dostupný limit cloudové AI. V místním režimu zůstává práce s obrázky vypnutá.</small>
+        <textarea id="imagePrompt" rows="3" maxlength="4000" placeholder="Popiš obrázek nebo napiš, co mám na fotografii upravit…" style="width:100%;font:inherit;color:inherit;background:#0c1425;border:1px solid var(--line);border-radius:11px;padding:11px"></textarea>
+        <label>Referenční obrázek (volitelné pro generování, povinné pro analýzu)
+          <input id="imageFile" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" style="display:block;width:100%;margin-top:8px" />
+        </label>
+        <img id="imagePreview" alt="Náhled nahraného obrázku" hidden style="max-width:100%;max-height:260px;object-fit:contain;border-radius:12px" />
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="primary" type="button" id="generateImage">✨ Vygenerovat obrázek</button>
+          <button type="button" id="analyzeImage">🔎 Analyzovat obrázek</button>
+          <button type="button" id="readImageText">📝 Přečíst text z obrázku</button>
+        </div>
+        <small id="imageStatus" aria-live="polite">Připraveno. Obrázky se neposílají nikam, dokud nespustíš některou AI akci.</small>
+        <div id="imageResult" style="display:grid;gap:10px"></div>
+      </section>
+
+      <section
+        class="settings"
+        style="align-items: stretch; flex-direction: column"
+      >
+        <strong>⚙️ Úkoly na pozadí</strong>
+        <small
+          >Úkoly se ukládají do tvého účtu a synchronizují mezi zařízeními. Zatím jde o bezpečnou frontu návrhů, ne o automatické ovládání telefonu nebo notebooku.</small
+        >
+        <form
+          id="taskForm"
+          style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0"
+        >
+          <input
+            id="taskTitle"
+            maxlength="120"
+            placeholder="Název úkolu"
+            required
+          />
+          <input
+            id="taskInput"
+            maxlength="12000"
+            placeholder="Co má připravit?"
+            required
+          />
+          <button class="primary" type="submit">Zařadit úkol</button>
+        </form>
+        <div id="taskList" class="muted" aria-live="polite">Načítám úkoly…</div>
+      </section>
+      <section class="settings" style="align-items:stretch;flex-direction:column">
+        <strong>📊 Denní přehledy</strong>
+        <small>Jednou denně v 20:00 (Europe/Prague) Micro Helper vyhodnotí uložené úkoly a aktivní plány a připraví souhrn. Přehledy se zobrazí po přihlášení a synchronizují mezi zařízeními.</small>
+        <div id="reportList" aria-live="polite">Načítám přehledy…</div>
+      </section>
+      <section class="settings">
+        <span id="modeLabel">Režim: lokální</span><span id="modelState">Model: neověřen</span
+        ><button id="check">Ověřit Ollamu</button
+        ><button id="clear">Vymazat konverzaci</button>
+      </section>
+      <section
+        class="settings"
+        style="align-items: stretch; flex-direction: column"
+      >
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+          "
+        >
+          <strong>🧠 Moje soukromá paměť</strong
+          ><button id="exportMemory" type="button">Exportovat poznámky</button>
+        </div>
+        <form
+          id="memoryForm"
+          style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0"
+        >
+          <input
+            id="memoryText"
+            maxlength="1000"
+            placeholder="Např. Odpovídej mi stručně a česky…"
+            aria-label="Nová poznámka do paměti"
+            required
+          /><select id="memoryCategory" aria-label="Kategorie paměti">
+            <option value="preference">Preference</option>
+            <option value="project">Projekt</option>
+            <option value="context">Kontext</option>
+            <option value="goal">Cíl</option></select
+          ><button class="primary" type="submit">Uložit poznámku</button>
+        </form>
+        <div id="memoryList" class="muted" aria-live="polite">
+          Načítám paměť…
+        </div>
+        <small
+          >Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani
+          tajné klíče.</small
+        >
+      </section>
+
+      <section
+        class="settings"
+        style="align-items: stretch; flex-direction: column"
+      >
+        <strong>🎛️ Jak se mám přizpůsobit</strong>
+        <small
+          >Micro Helper si ukládá výslovně řečené preference z konverzace (např. „preferuji…“ nebo „mám rád…“). Najdeš je níže jako naučené preference a můžeš je upravit nebo smazat. Ostatní věci neodhaduje.</small
+        >
+        <form
+          id="preferenceForm"
+          style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0"
+        >
+          <select id="preferenceCategory" aria-label="Oblast preference">
+            <option value="communication">Komunikace</option>
+            <option value="work">Práce a úkoly</option>
+            <option value="interests">Zájmy</option>
+            <option value="boundaries">Co nedělat</option>
+            <option value="other">Ostatní</option>
+          </select>
+          <input
+            id="preferenceName"
+            maxlength="80"
+            placeholder="Co si mám zapamatovat? (např. délka odpovědí)"
+            required
+          />
+          <input
+            id="preferenceValue"
+            maxlength="500"
+            placeholder="Jak to má být? (např. stručně a rovnou k věci)"
+            required
+          />
+          <button class="primary" type="submit">Uložit pravidlo</button>
+        </form>
+        <div id="preferenceList" class="muted" aria-live="polite">
+          Načítám nastavení chování…
+        </div>
+      </section>
+
+      <section
+        class="settings"
+        style="align-items: stretch; flex-direction: column"
+        id="learningPanel"
+      >
+        <strong>📚 Učební plány</strong>
+        <small
+          >Vytvářej si dlouhodobé plány, přidávej kroky a zdroje. Plán je zatím
+          bezpečná struktura dat, sám nespouští příkazy ani nezískává nová
+          oprávnění.</small
+        >
+        <form id="learningForm" style="display: grid; gap: 8px; margin: 0">
+          <input
+            id="learningTitle"
+            maxlength="120"
+            placeholder="Název plánu"
+            required
+          />
+          <input
+            id="learningObjective"
+            maxlength="4000"
+            placeholder="Co se má Micro Helper naučit nebo čeho dosáhnout?"
+            required
+          />
+          <textarea
+            id="learningSteps"
+            rows="3"
+            maxlength="4000"
+            placeholder="Kroky, každý na samostatný řádek"
+            style="
+              font: inherit;
+              color: inherit;
+              background: #0c1425;
+              border: 1px solid var(--line);
+              border-radius: 11px;
+              padding: 11px;
+            "
+          ></textarea>
+          <textarea
+            id="learningSources"
+            rows="2"
+            maxlength="4000"
+            placeholder="Zdroje, každý na samostatný řádek (volitelné)"
+            style="
+              font: inherit;
+              color: inherit;
+              background: #0c1425;
+              border: 1px solid var(--line);
+              border-radius: 11px;
+              padding: 11px;
+            "
+          ></textarea>
+          <select id="learningStatus">
+            <option value="draft">Koncept</option>
+            <option value="active">Aktivní</option>
+            <option value="paused">Pozastavený</option>
+          </select>
+          <button class="primary" type="submit">Vytvořit učební plán</button>
+        </form>
+        <div id="learningList" class="muted" aria-live="polite">
+          Načítám učební plány…
+        </div>
+      </section>
+    </main>
+    <script>
+      let signedInUser = null;
+      const appClientReady = new Promise(resolve => {
+        const ready = () => resolve(window.appClientReady || null);
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once: true });
+        else ready();
+      });
+      appClientReady.then(client => {
+        signedInUser = client?.user || null;
+        const accountState = document.getElementById('accountState');
+        const signIn = document.getElementById('signIn');
+        const signOut = document.getElementById('signOut');
+        if (signedInUser) {
+          if (accountState) accountState.textContent = 'Synchronizace zapnuta · ' + (signedInUser.email || signedInUser.name || 'přihlášený účet');
+          if (signIn) signIn.hidden = true;
+          if (signOut) signOut.hidden = false;
+          document.getElementById('status').textContent = 'Cloud AI připravena';
+          const modeLabel = document.getElementById('modeLabel');
+          if (modeLabel) modeLabel.textContent = 'Režim: cloud · synchronizace zapnuta';
+        } else {
+          if (accountState) accountState.textContent = 'Místní režim · přihlas se pro AI a synchronizaci';
+          if (signIn) signIn.hidden = false;
+          if (signOut) signOut.hidden = true;
+          const modeLabel = document.getElementById('modeLabel');
+          if (modeLabel) modeLabel.textContent = 'Režim: místní · data jen v tomto zařízení';
+        }
+      });
+      let deferredInstallPrompt = null;
+      const installButton = document.getElementById('installApp');
+      window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        if (installButton) installButton.hidden = false;
+      });
+      if (installButton) installButton.addEventListener('click', async () => {
+        if (!deferredInstallPrompt) return;
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        installButton.hidden = true;
+      });
+      window.addEventListener('appinstalled', () => {
+        if (installButton) installButton.hidden = true;
+        document.getElementById('status').textContent = 'Micro Helper nainstalován';
+      });
+      document.getElementById('signIn').addEventListener('click', async () => {
+        try {
+          const client = await appClientReady;
+          if (!client) throw new Error('Přihlašovací služba není dostupná.');
+          await client.auth.signInWithRedirect();
+        } catch (err) {
+          document.getElementById('accountState').textContent = 'Přihlášení se nezdařilo: ' + (err.message || 'zkus to znovu');
+        }
+      });
+      document.getElementById('signOut').addEventListener('click', async () => {
+        const client = await appClientReady;
+        if (client) await client.auth.signOut();
+        location.reload();
+      });
+      const localKey = 'micro_helper_local_v1';
+      const localDefaults = () => ({
+        profile: { agent_name: 'Mykla', language: 'cs-CZ', style: 'friendly' },
+        memories: [], preferences: [], messages: [], learningPlans: [], tasks: [], reports: [], nextId: 1
+      });
+      const readLocal = () => {
+        try {
+          const saved = JSON.parse(localStorage.getItem(localKey) || 'null');
+          return saved && typeof saved === 'object' ? { ...localDefaults(), ...saved } : localDefaults();
+        } catch { return localDefaults(); }
+      };
+      const writeLocal = state => {
+        try { localStorage.setItem(localKey, JSON.stringify(state)); return true; }
+        catch { return false; }
+      };
+      const localReply = (data, status = 200) =>
+        new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+      const localApi = async (path, init = {}) => {
+        const url = new URL(path, location.origin);
+        const method = String(init.method || 'GET').toUpperCase();
+        let body = {};
+        try { body = JSON.parse(init.body || '{}'); } catch {}
+        const state = readLocal();
+        const fail = (detail, status = 422) => localReply({ detail }, status);
+        if (url.pathname === '/v1/status' && method === 'GET')
+          return localReply({ product: 'Micro Helper', mode: 'local-only', authenticated: false, sync: false, storage: 'browser-localStorage' });
+        if (url.pathname === '/v1/models' && method === 'GET')
+          return localReply({ available: false, models: [], note: 'V místním režimu není připojen AI model. Přihlas se pro cloudové AI odpovědi.' });
+        if (url.pathname === '/v1/profile' && method === 'GET') return localReply(state.profile);
+        if (url.pathname === '/v1/profile' && method === 'PUT') {
+          state.profile = { ...state.profile, agent_name: String(body.agent_name || 'Mykla').trim().slice(0, 30) || 'Mykla', language: 'cs-CZ' };
+          if (!writeLocal(state)) return fail('V zařízení není dost místa pro uložení.', 507);
+          return localReply(state.profile);
+        }
+        if (url.pathname === '/v1/memories' && method === 'GET') return localReply({ memories: [...state.memories].reverse() });
+        if (url.pathname === '/v1/memories' && method === 'POST') {
+          const content = String(body.content || '').trim();
+          if (!content) return fail('Poznámka nesmí být prázdná.');
+          const item = { id: state.nextId++, content: content.slice(0, 4000), category: String(body.category || 'preference'), created_at: new Date().toISOString() };
+          state.memories.push(item); state.memories = state.memories.slice(-200);
+          if (!writeLocal(state)) return fail('Poznámku se nepodařilo uložit do tohoto zařízení.', 507);
+          return localReply(item, 201);
+        }
+        const memoryMatch = url.pathname.match(/^\/v1\/memories\/(\d+)$/);
+        if (memoryMatch) {
+          const id = Number(memoryMatch[1]), item = state.memories.find(x => x.id === id);
+          if (!item) return fail('Poznámka nebyla nalezena.', 404);
+          if (method === 'PUT') {
+            const content = String(body.content || '').trim();
+            if (!content) return fail('Poznámka nesmí být prázdná.');
+            item.content = content.slice(0, 4000); item.category = String(body.category || item.category);
+            if (!writeLocal(state)) return fail('Změnu se nepodařilo uložit.', 507);
+            return localReply(item);
+          }
+          if (method === 'DELETE') {
+            state.memories = state.memories.filter(x => x.id !== id);
+            if (!writeLocal(state)) return fail('Poznámku se nepodařilo smazat.', 507);
+            return localReply({ deleted: true });
+          }
+        }
+        if (url.pathname === '/v1/preferences' && method === 'GET') return localReply({ preferences: state.preferences });
+        if (url.pathname === '/v1/preferences' && method === 'POST') {
+          const category = String(body.category || 'other'), preference = String(body.preference || '').trim(), value = String(body.value || '').trim();
+          if (!preference || !value) return fail('Vyplň oblast i pravidlo.');
+          let item = state.preferences.find(x => x.category === category && x.preference === preference);
+          if (item) { item.value = value; item.updated_at = new Date().toISOString(); }
+          else { item = { id: state.nextId++, category, preference, value, source: 'user', updated_at: new Date().toISOString() }; state.preferences.push(item); }
+          if (!writeLocal(state)) return fail('Pravidlo se nepodařilo uložit.', 507);
+          return localReply(item, 201);
+        }
+        const preferenceMatch = url.pathname.match(/^\/v1\/preferences\/(\d+)$/);
+        if (preferenceMatch && method === 'DELETE') {
+          state.preferences = state.preferences.filter(x => x.id !== Number(preferenceMatch[1]));
+          if (!writeLocal(state)) return fail('Pravidlo se nepodařilo smazat.', 507);
+          return localReply({ deleted: true });
+        }
+        if (url.pathname === '/v1/conversations' && method === 'GET')
+          return localReply({ messages: state.messages.slice(-Math.min(100, Number(url.searchParams.get('limit') || 100))) });
+        if (url.pathname === '/v1/conversations' && method === 'DELETE') {
+          state.messages = [];
+          if (!writeLocal(state)) return fail('Konverzaci se nepodařilo vymazat.', 507);
+          return localReply({ deleted: true });
+        }
+        if (url.pathname === '/v1/chat' && method === 'POST') {
+          const message = String(body.message || '').trim();
+          if (!message) return fail('Napiš zprávu.');
+          const answer = 'Jsem v místním režimu. Tvoje zpráva se ukládá jen do tohoto zařízení, ale bez přihlášení není dostupná skutečná AI odpověď ani synchronizace. Přihlas se, pokud chceš zapnout cloudové AI.';
+          state.messages.push(
+            { id: state.nextId++, role: 'user', content: message.slice(0, 4000), created_at: new Date().toISOString() },
+            { id: state.nextId++, role: 'assistant', content: answer, created_at: new Date().toISOString() }
+          );
+          state.messages = state.messages.slice(-100);
+          if (!writeLocal(state)) return fail('Konverzaci se nepodařilo uložit.', 507);
+          return localReply({ reply: answer, mode: 'local-only' });
+        }
+        if (url.pathname === '/v1/tasks' && method === 'GET')
+          return localReply({ tasks: [...state.tasks].reverse().slice(0, Math.min(50, Math.max(1, Number(url.searchParams.get('limit') || 30)))) });
+        if (url.pathname === '/v1/tasks' && method === 'POST') {
+          const title = String(body.title || '').trim(), input_text = String(body.input_text || '').trim();
+          if (!title || !input_text) return fail('Úkol potřebuje název i zadání.');
+          const item = { id: crypto.randomUUID(), title: title.slice(0, 120), input_text: input_text.slice(0, 4000), kind: String(body.kind || 'agent.draft'), status: 'draft', created_at: new Date().toISOString() };
+          state.tasks.push(item); state.tasks = state.tasks.slice(-50);
+          if (!writeLocal(state)) return fail('Úkol se nepodařilo uložit.', 507);
+          return localReply(item, 201);
+        }
+        const cancelMatch = url.pathname.match(/^\/v1\/tasks\/([^/]+)\/cancel$/);
+        if (cancelMatch && method === 'POST') {
+          const item = state.tasks.find(x => x.id === decodeURIComponent(cancelMatch[1]));
+          if (!item) return fail('Úkol nebyl nalezen.', 404);
+          item.status = 'cancelled';
+          if (!writeLocal(state)) return fail('Změnu úkolu se nepodařilo uložit.', 507);
+          return localReply({ cancelled: true });
+        }
+        if (url.pathname === '/v1/reports' && method === 'GET') return localReply({ reports: state.reports });
+        if (url.pathname === '/v1/learning/plans' && method === 'GET')
+          return localReply({ plans: [...state.learningPlans].sort((a, b) => b.updated_at.localeCompare(a.updated_at)) });
+        if (url.pathname === '/v1/learning/plans' && method === 'POST') {
+          const title = String(body.title || '').trim(), objective = String(body.objective || '').trim(), status = String(body.status || 'draft');
+          if (!title || title.length > 120 || !objective || objective.length > 4000 || !['draft', 'active', 'paused'].includes(status)) return fail('Vyplň název, cíl a platný stav plánu.');
+          const now = new Date().toISOString();
+          const item = { id: crypto.randomUUID(), title, objective, status, steps: Array.isArray(body.steps) ? body.steps.map(String).slice(0, 40) : [], sources: Array.isArray(body.sources) ? body.sources.map(String).slice(0, 40) : [], version: 1, created_at: now, updated_at: now };
+          state.learningPlans.push(item); state.learningPlans = state.learningPlans.slice(-50);
+          if (!writeLocal(state)) return fail('Plán se nepodařilo uložit.', 507);
+          return localReply(item, 201);
+        }
+        const planMatch = url.pathname.match(/^\/v1\/learning\/plans\/([^/]+)$/);
+        if (planMatch) {
+          const item = state.learningPlans.find(x => x.id === decodeURIComponent(planMatch[1]));
+          if (!item) return fail('Učební plán nebyl nalezen.', 404);
+          if (method === 'PUT') {
+            const title = String(body.title || '').trim(), objective = String(body.objective || '').trim(), status = String(body.status || 'draft');
+            if (!title || title.length > 120 || !objective || objective.length > 4000 || !['draft', 'active', 'paused'].includes(status)) return fail('Neplatný učební plán.');
+            item.title = title; item.objective = objective; item.status = status;
+            item.steps = Array.isArray(body.steps) ? body.steps.map(String).slice(0, 40) : [];
+            item.sources = Array.isArray(body.sources) ? body.sources.map(String).slice(0, 40) : [];
+            item.version++; item.updated_at = new Date().toISOString();
+            if (!writeLocal(state)) return fail('Změnu plánu se nepodařilo uložit.', 507);
+            return localReply(item);
+          }
+          if (method === 'DELETE') {
+            state.learningPlans = state.learningPlans.filter(x => x.id !== item.id);
+            if (!writeLocal(state)) return fail('Plán se nepodařilo smazat.', 507);
+            return localReply({ deleted: true });
+          }
+        }
+        return fail('Tato funkce není dostupná v místním režimu.', 404);
+      };
+      const apiFetch = async (path, init = {}) => {
+        const client = await appClientReady;
+        if (!client || !signedInUser) return localApi(path, init);
+        const method = String(init.method || 'GET').toLowerCase();
+        const route = path.replace(/^\/v1\//, '/api/v1/');
+        let payload;
+        if (init.body) { try { payload = JSON.parse(init.body); } catch { payload = init.body; } }
+        try {
+          const result = await client.api[method](route, payload);
+          return new Response(JSON.stringify(result.data), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } catch (err) {
+          const status = Number(err.statusCode || err.status || 500);
+          const detail = err.responseText || err.message || 'Požadavek se nepodařilo dokončit.';
+          return new Response(JSON.stringify({ detail }), { status, headers: { 'Content-Type': 'application/json' } });
+        }
+      };
+      const $ = id => document.getElementById(id);
+      const importButton = $('importLocalData');
+      const importHint = $('importHint');
+      const localImportMarker = user => 'mh_local_imported_' + String(user?.userId || user?.id || user?.email || 'account').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const refreshImportButton = async () => {
+        const client = await appClientReady;
+        const user = client?.user;
+        const local = readLocal();
+        const hasLocalData = (local.profile?.agent_name && local.profile.agent_name !== 'Mykla') ||
+          local.memories.length || local.preferences.length || local.learningPlans.length || local.tasks.length;
+        const alreadyImported = user && localStorage.getItem(localImportMarker(user)) === '1';
+        importButton.hidden = !user || !hasLocalData || alreadyImported;
+        importHint.hidden = importButton.hidden;
+      };
+      refreshImportButton();
+      importButton.addEventListener('click', async () => {
+        importButton.disabled = true;
+        $('status').textContent = 'Připravuji bezpečný import';
+        try {
+          const client = await appClientReady;
+          if (!client?.user || !signedInUser) throw new Error('Nejdřív se přihlas ke svému účtu.');
+          const local = readLocal();
+          const request = async (path, method = 'GET', body) => {
+            const response = await apiFetch(path, { method, ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'Import se nepodařil.');
+            return data;
+          };
+          let imported = 0, skipped = 0;
+          if (local.profile?.agent_name && local.profile.agent_name !== 'Mykla') {
+            await request('/v1/profile', 'PUT', local.profile); imported++;
+          }
+          const cloudMemories = (await request('/v1/memories')).memories || [];
+          for (const item of local.memories) {
+            if (cloudMemories.some(x => x.content === item.content && x.category === item.category)) { skipped++; continue; }
+            await request('/v1/memories', 'POST', { content: item.content, category: item.category }); imported++;
+          }
+          const cloudPreferences = (await request('/v1/preferences')).preferences || [];
+          for (const item of local.preferences) {
+            if (cloudPreferences.some(x => x.category === item.category && x.preference === item.preference && x.value === item.value)) { skipped++; continue; }
+            await request('/v1/preferences', 'POST', { category: item.category, preference: item.preference, value: item.value }); imported++;
+          }
+          const cloudPlans = (await request('/v1/learning/plans')).plans || [];
+          for (const item of local.learningPlans) {
+            if (cloudPlans.some(x => x.title === item.title && x.objective === item.objective)) { skipped++; continue; }
+            await request('/v1/learning/plans', 'POST', { title: item.title, objective: item.objective, status: ['draft', 'active', 'paused'].includes(item.status) ? item.status : 'draft', steps: item.steps || [], sources: item.sources || [] }); imported++;
+          }
+          const cloudTasks = (await request('/v1/tasks?limit=50')).tasks || [];
+          for (const item of local.tasks) {
+            if (cloudTasks.some(x => x.title === item.title && x.input_text === item.input_text)) { skipped++; continue; }
+            await request('/v1/tasks', 'POST', { title: item.title, input_text: item.input_text, kind: item.kind || 'agent.draft' }); imported++;
+          }
+          localStorage.setItem(localImportMarker(client.user), '1');
+          importButton.hidden = true; importHint.hidden = true;
+          $('accountState').textContent = 'Import dokončen · ' + imported + ' přeneseno, ' + skipped + ' duplicit přeskočeno. Místní kopie zůstala zachována.';
+          $('status').textContent = 'Data bezpečně přenesena';
+          location.reload();
+        } catch (err) {
+          $('accountState').textContent = 'Import nebyl dokončen: ' + (err.message || 'zkus to znovu');
+          $('status').textContent = 'Import se nepodařil';
+          importButton.disabled = false;
+        }
+      });
+      let history = [];
+      function add(text, who) {
+        const d = document.createElement('div');
+        d.className = 'msg ' + who;
+        d.textContent = text;
+        $('messages').append(d);
+        $('messages').scrollTop = $('messages').scrollHeight;
+        return d;
+      }
+      $('save').onclick = () => {
+        localStorage.setItem('mh_name', $('agentName').value);
+        localStorage.setItem('mh_model', $('model').value);
+        $('title').textContent = $('agentName').value + ' · Micro Helper';
+        $('status').textContent = 'Nastavení uloženo';
+      };
+      $('agentName').value = localStorage.getItem('mh_name') || 'Mykla';
+      $('model').value = localStorage.getItem('mh_model') || 'llama3.2';
+      $('save').click();
+      $('check').onclick = async () => {
+        try {
+          const r = await apiFetch('/v1/models');
+          const j = await r.json();
+          $('modelState').textContent =
+            'Ollama: ' + (j.available ? j.models.join(', ') : 'není dostupná');
+        } catch (e) {
+          $('modelState').textContent = 'Ollama: chyba spojení';
+        }
+      };
+      $('clear').onclick = async () => {
+        try {
+          await apiFetch('/v1/conversations', { method: 'DELETE' });
+        } catch (e) {}
+        $('messages').innerHTML = '';
+        history = [];
+        add('Konverzace vymazána.', 'agent');
+      };
+      (async () => {
+        try {
+          const response = await apiFetch('/v1/conversations?limit=100');
+          if (!response.ok) return;
+          const data = await response.json();
+          if (!Array.isArray(data.messages) || !data.messages.length) return;
+          $('messages').replaceChildren();
+          history = [];
+          for (const message of data.messages) {
+            if (
+              !['user', 'assistant'].includes(message.role) ||
+              typeof message.content !== 'string'
+            )
+              continue;
+            add(message.content, message.role === 'user' ? 'user' : 'agent');
+            history.push({ role: message.role, content: message.content });
+          }
+          history = history.slice(-20);
+        } catch (e) {
+          /* Keep the welcome message if the API is unavailable. */
+        }
+      })();
+      $('chat').onsubmit = async e => {
+        e.preventDefault();
+        const q = $('prompt').value.trim();
+        if (!q) return;
+        $('prompt').value = '';
+        add(q, 'user');
+        const wait = add('Přemýšlím…', 'agent');
+        $('status').textContent = 'Pracuji';
+        try {
+          const r = await apiFetch('/v1/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: q,
+              model: $('model').value,
+              history,
+            }),
+          });
+          const j = await r.json();
+          wait.textContent =
+            j.reply || j.error || 'Nepodařilo se získat odpověď.';
+          if (j.reply) {
+            history.push(
+              { role: 'user', content: q },
+              { role: 'assistant', content: j.reply }
+            );
+            history = history.slice(-20);
+          }
+        } catch (err) {
+          wait.textContent =
+            'Backend není dostupný. Zkontroluj, že běží lokální server.';
+        }
+        $('status').textContent = 'Připraven';
+      };
+    </script>
+    <script>
+      (() => {
+        const byId = id => document.getElementById(id);
+        async function renderMemories() {
+          const root = byId('memoryList');
+          if (!root) return;
+          try {
+            const response = await apiFetch('/v1/memories');
+            const data = await response.json();
+            root.replaceChildren();
+            if (!data.memories.length) {
+              root.textContent = 'Zatím nemáš uložené žádné poznámky.';
+              return;
+            }
+            for (const memory of data.memories) {
+              const row = document.createElement('div');
+              row.style.cssText =
+                'display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)';
+              const content = document.createElement('span');
+              content.style.flex = '1';
+              content.textContent =
+                '[' + memory.category + '] ' + memory.content;
+              const edit = document.createElement('button');
+              edit.type = 'button';
+              edit.textContent = 'Upravit';
+              edit.onclick = async () => {
+                const next = window.prompt(
+                  'Uprav uloženou poznámku:',
+                  memory.content
+                );
+                if (next === null || !next.trim()) return;
+                const response = await apiFetch('/v1/memories/' + memory.id, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    content: next.trim(),
+                    category: memory.category,
+                  }),
+                });
+                if (response.ok) renderMemories();
+              };
+              const button = document.createElement('button');
+              button.type = 'button';
+              button.textContent = 'Smazat';
+              button.onclick = async () => {
+                if (!window.confirm('Smazat tuto poznámku z paměti?')) return;
+                const result = await apiFetch('/v1/memories/' + memory.id, {
+                  method: 'DELETE',
+                });
+                if (result.ok) renderMemories();
+              };
+              row.append(content, edit, button);
+              root.append(row);
+            }
+          } catch (error) {
+            root.textContent = 'Místní API není dostupné.';
+          }
+        }
+        byId('memoryForm')?.addEventListener('submit', async event => {
+          event.preventDefault();
+          const content = byId('memoryText').value.trim();
+          if (!content) return;
+          const response = await apiFetch('/v1/memories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content,
+              category: byId('memoryCategory').value,
+            }),
+          });
+          if (response.ok) {
+            byId('memoryText').value = '';
+            await renderMemories();
+            byId('status').textContent = 'Poznámka uložena';
+          } else byId('status').textContent = 'Poznámku se nepodařilo uložit';
+        });
+        const originalChat = byId('chat');
+        if (originalChat) {
+          originalChat.onsubmit = async event => {
+            event.preventDefault();
+            const field = byId('prompt'),
+              message = field.value.trim();
+            if (!message) return;
+            field.value = '';
+            const user = document.createElement('div');
+            user.className = 'msg user';
+            user.textContent = message;
+            byId('messages').append(user);
+            const pending = document.createElement('div');
+            pending.className = 'msg agent';
+            pending.textContent = 'Přemýšlím…';
+            byId('messages').append(pending);
+            byId('messages').scrollTop = byId('messages').scrollHeight;
+            byId('status').textContent = 'Pracuji';
+            const submit = originalChat.querySelector('button');
+            submit.disabled = true;
+            try {
+              const response = await apiFetch('/v1/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  message,
+                  model: byId('model').value,
+                  history,
+                }),
+              });
+              const data = await response.json();
+              pending.textContent =
+                data.reply ||
+                data.error ||
+                data.detail ||
+                'Nepodařilo se získat odpověď.';
+              if (data.reply) {
+                history.push(
+                  { role: 'user', content: message },
+                  { role: 'assistant', content: data.reply }
+                );
+                history = history.slice(-20);
+              }
+            } catch (error) {
+              pending.textContent =
+                'Backend není dostupný. Zkontroluj, že běží místní server.';
+            } finally {
+              submit.disabled = false;
+              byId('status').textContent = 'Připraven';
+            }
+          };
+        }
+        const clear = byId('clear');
+        if (clear)
+          clear.onclick = async () => {
+            if (!window.confirm('Smazat uloženou historii konverzace?')) return;
+            const response = await apiFetch('/v1/conversations', {
+              method: 'DELETE',
+            });
+            if (response.ok) {
+              byId('messages').replaceChildren();
+              const message = document.createElement('div');
+              message.className = 'msg agent';
+              message.textContent =
+                'Historie konverzace smazána. Uložené poznámky zůstaly.';
+              byId('messages').append(message);
+            }
+          };
+        async function loadSavedConversation() {
+          try {
+            const response = await apiFetch('/v1/conversations');
+            const data = await response.json();
+            if (!data.messages.length) return;
+            byId('messages').replaceChildren();
+            for (const item of data.messages) {
+              const message = document.createElement('div');
+              message.className =
+                'msg ' + (item.role === 'user' ? 'user' : 'agent');
+              message.textContent = item.content;
+              byId('messages').append(message);
+            }
+            byId('messages').scrollTop = byId('messages').scrollHeight;
+          } catch (error) {}
+        }
+        byId('save').onclick = async () => {
+          const name = byId('agentName').value.trim() || 'Mykla';
+          try {
+            const response = await apiFetch('/v1/profile', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agent_name: name,
+                language: 'cs-CZ',
+                style: 'friendly',
+              }),
+            });
+            if (!response.ok) throw new Error();
+            byId('title').textContent = name + ' · Micro Helper';
+            localStorage.setItem('mh_name', name);
+            localStorage.setItem('mh_model', byId('model').value);
+            byId('status').textContent = 'Nastavení uloženo';
+          } catch (error) {
+            byId('status').textContent = 'Nastavení se nepodařilo uložit';
+          }
+        };
+        async function restoreProfile() {
+          try {
+            const response = await apiFetch('/v1/profile');
+            if (!response.ok) return;
+            const data = await response.json();
+            byId('agentName').value = data.agent_name;
+            byId('title').textContent = data.agent_name + ' · Micro Helper';
+            byId('model').value =
+              localStorage.getItem('mh_model') || 'llama3.2';
+          } catch (error) {}
+        }
+        byId('exportMemory')?.addEventListener('click', async () => {
+          try {
+            const response = await apiFetch('/v1/memories');
+            if (!response.ok) throw new Error();
+            const data = await response.json();
+            const blob = new Blob(
+              [
+                JSON.stringify(
+                  {
+                    format: 'micro-helper-memory',
+                    version: 1,
+                    exportedAt: new Date().toISOString(),
+                    memories: data.memories,
+                  },
+                  null,
+                  2
+                ),
+              ],
+              { type: 'application/json' }
+            );
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'micro-helper-memory.json';
+            document.body.append(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            byId('status').textContent = 'Poznámky exportovány';
+          } catch (error) {
+            byId('status').textContent = 'Export se nepodařil';
+          }
+        });
+        restoreProfile();
+        renderMemories();
+        loadSavedConversation();
+        window.addEventListener('mh-cloud-update', () => {
+          restoreProfile();
+          renderMemories();
+        });
+      })();
+    </script>
+    <script>
+      if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+        window.addEventListener('load', () =>
+          navigator.serviceWorker.register('/sw.js').catch(() => {
+            const status = document.getElementById('status');
+            if (status) status.textContent = 'Offline režim není dostupný';
+          })
+        );
+      }
+    </script>
+
+    <script>
+      /* Offline-first local fallback: keeps notes/profile/history on this device when the API is unreachable.
+   AI replies are not fabricated offline; the user is told when no local model is available. */
+      (() => {
+        const nativeFetch = window.fetch.bind(window);
+        const key = 'micro_helper_offline_v1';
+        const load = () => {
+          try {
+            return (
+              JSON.parse(localStorage.getItem(key)) || {
+                profile: {
+                  agent_name: 'Mykla',
+                  language: 'cs-CZ',
+                  style: 'friendly',
+                },
+                memories: [],
+                preferences: [],
+                messages: [],
+                nextId: 1,
+              }
+            );
+          } catch {
+            return {
+              profile: {
+                agent_name: 'Mykla',
+                language: 'cs-CZ',
+                style: 'friendly',
+              },
+              memories: [],
+              messages: [],
+              nextId: 1,
+            };
+          }
+        };
+        const save = data => localStorage.setItem(key, JSON.stringify(data));
+        const reply = (data, status = 200) =>
+          new Response(JSON.stringify(data), {
+            status,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        window.fetch = async (input, init = {}) => {
+          try {
+            const response = await nativeFetch(input, init);
+            if (response.ok || response.status !== 404) return response;
+            throw new Error('API endpoint is not hosted');
+          } catch (error) {
+            const url = new URL(
+              typeof input === 'string' ? input : input.url,
+              location.href
+            );
+            if (
+              url.origin !== location.origin ||
+              !url.pathname.startsWith('/v1/')
+            )
+              throw error;
+            const method = (
+              init.method ||
+              (typeof input !== 'string' && input.method) ||
+              'GET'
+            ).toUpperCase();
+            let body = {};
+            try {
+              body = JSON.parse(init.body || '{}');
+            } catch {}
+            const db = load();
+            if (url.pathname === '/v1/profile' && method === 'GET')
+              return reply(db.profile);
+            if (url.pathname === '/v1/profile' && method === 'PUT') {
+              db.profile = { ...db.profile, ...body };
+              save(db);
+              return reply(db.profile);
+            }
+            if (url.pathname === '/v1/memories' && method === 'GET')
+              return reply({ memories: [...db.memories].reverse() });
+            if (url.pathname === '/v1/preferences' && method === 'GET')
+              return reply({ preferences: db.preferences || [] });
+            if (url.pathname === '/v1/preferences' && method === 'POST') {
+              db.preferences = db.preferences || [];
+              const category = String(body.category || 'other'),
+                preference = String(body.preference || '').trim(),
+                value = String(body.value || '').trim();
+              if (!preference || !value)
+                return reply({ detail: 'Preference nesmí být prázdná.' }, 422);
+              let item = db.preferences.find(
+                x => x.category === category && x.preference === preference
+              );
+              if (item) item.value = value;
+              else {
+                item = {
+                  id: db.nextId++,
+                  category,
+                  preference,
+                  value,
+                  source: 'user',
+                  updated_at: new Date().toISOString(),
+                };
+                db.preferences.push(item);
+              }
+              save(db);
+              return reply(item, 201);
+            }
+            const preferenceId = url.pathname.split('/').pop();
+            if (
+              url.pathname.startsWith('/v1/preferences/') &&
+              method === 'DELETE'
+            ) {
+              db.preferences = (db.preferences || []).filter(
+                x => x.id !== Number(preferenceId)
+              );
+              save(db);
+              return reply({ deleted: true });
+            }
+            const planMatch = url.pathname.match(
+              /^\/v1\/learning\/plans(?:\/([^/]+))?$/
+            );
+            if (url.pathname === '/v1/learning/plans' && method === 'GET') {
+              db.learningPlans = db.learningPlans || [];
+              return reply({
+                plans: [...db.learningPlans].sort((a, b) =>
+                  b.updated_at.localeCompare(a.updated_at)
+                ),
+              });
+            }
+            if (url.pathname === '/v1/learning/plans' && method === 'POST') {
+              db.learningPlans = db.learningPlans || [];
+              const title = String(body.title || '').trim(),
+                objective = String(body.objective || '').trim();
+              const status = String(body.status || 'draft'),
+                steps = Array.isArray(body.steps) ? body.steps : [],
+                sources = Array.isArray(body.sources) ? body.sources : [];
+              if (
+                !title ||
+                title.length > 120 ||
+                !objective ||
+                objective.length > 4000 ||
+                !['draft', 'active', 'paused'].includes(status) ||
+                steps.length > 40 ||
+                sources.length > 40
+              )
+                return reply({ detail: 'Neplatný učební plán.' }, 422);
+              const stamp = new Date().toISOString(),
+                plan = {
+                  id: crypto.randomUUID(),
+                  title,
+                  objective,
+                  status,
+                  steps,
+                  sources,
+                  version: 1,
+                  created_at: stamp,
+                  updated_at: stamp,
+                };
+              db.learningPlans.push(plan);
+              save(db);
+              return reply(plan, 201);
+            }
+            if (planMatch && method === 'GET') {
+              db.learningPlans = db.learningPlans || [];
+              const plan = db.learningPlans.find(
+                x => x.id === decodeURIComponent(planMatch[1])
+              );
+              return plan
+                ? reply(plan)
+                : reply({ detail: 'Učební plán nebyl nalezen.' }, 404);
+            }
+            if (planMatch && method === 'PUT') {
+              db.learningPlans = db.learningPlans || [];
+              const plan = db.learningPlans.find(
+                x => x.id === decodeURIComponent(planMatch[1])
+              );
+              if (!plan)
+                return reply({ detail: 'Učební plán nebyl nalezen.' }, 404);
+              const title = String(body.title || '').trim(),
+                objective = String(body.objective || '').trim(),
+                status = String(body.status || 'draft');
+              const steps = Array.isArray(body.steps) ? body.steps : [],
+                sources = Array.isArray(body.sources) ? body.sources : [];
+              if (
+                !title ||
+                title.length > 120 ||
+                !objective ||
+                objective.length > 4000 ||
+                !['draft', 'active', 'paused'].includes(status) ||
+                steps.length > 40 ||
+                sources.length > 40
+              )
+                return reply({ detail: 'Neplatný učební plán.' }, 422);
+              Object.assign(plan, {
+                title,
+                objective,
+                status,
+                steps,
+                sources,
+                version: plan.version + 1,
+                updated_at: new Date().toISOString(),
+              });
+              save(db);
+              return reply(plan);
+            }
+            if (planMatch && method === 'DELETE') {
+              db.learningPlans = db.learningPlans || [];
+              const before = db.learningPlans.length;
+              db.learningPlans = db.learningPlans.filter(
+                x => x.id !== decodeURIComponent(planMatch[1])
+              );
+              save(db);
+              return before === db.learningPlans.length
+                ? reply({ detail: 'Učební plán nebyl nalezen.' }, 404)
+                : reply({
+                    deleted: true,
+                    id: decodeURIComponent(planMatch[1]),
+                  });
+            }
+            if (url.pathname === '/v1/memories' && method === 'POST') {
+              const memory = {
+                id: db.nextId++,
+                content: String(body.content || '').trim(),
+                category: body.category || 'preference',
+                created_at: new Date().toISOString(),
+              };
+              if (!memory.content)
+                return reply({ detail: 'Poznámka nesmí být prázdná.' }, 422);
+              db.memories.push(memory);
+              save(db);
+              return reply(memory, 201);
+            }
+            const memoryMatch = url.pathname.match(/^\/v1\/memories\/(\d+)$/);
+            if (memoryMatch && method === 'PUT') {
+              const m = db.memories.find(x => x.id === Number(memoryMatch[1]));
+              if (!m) return reply({ detail: 'Poznámka nenalezena' }, 404);
+              m.content = String(body.content || '').trim();
+              m.category = body.category || m.category;
+              save(db);
+              return reply(m);
+            }
+            if (memoryMatch && method === 'DELETE') {
+              db.memories = db.memories.filter(
+                x => x.id !== Number(memoryMatch[1])
+              );
+              save(db);
+              return reply({ deleted: true });
+            }
+            if (url.pathname === '/v1/conversations' && method === 'GET')
+              return reply({ messages: db.messages });
+            if (url.pathname === '/v1/conversations' && method === 'DELETE') {
+              db.messages = [];
+              save(db);
+              return reply({ deleted: true });
+            }
+            if (url.pathname === '/v1/models')
+              return reply({ available: false, models: [] });
+            if (url.pathname === '/v1/status')
+              return reply({
+                product: 'Micro Helper',
+                mode: 'offline-local',
+                paid_api_required: false,
+                storage: {
+                  type: 'browser-localStorage',
+                  memories: db.memories.length,
+                  messages: db.messages.length,
+                },
+              });
+            if (url.pathname === '/v1/chat' && method === 'POST') {
+              const message = String(body.message || '').trim();
+              if (message) {
+                db.messages.push({
+                  id: db.nextId++,
+                  role: 'user',
+                  content: message,
+                  created_at: new Date().toISOString(),
+                });
+                save(db);
+              }
+              return reply({
+                reply:
+                  'Jsem v místním režimu. Poznámky a nastavení fungují v tomto zařízení. Přihlas se tlačítkem nahoře a zapni skutečné AI odpovědi i synchronizaci.',
+              });
+            }
+            throw error;
+          }
+        };
+        window.addEventListener('online', () => {
+          const status = document.getElementById('status');
+          if (status) status.textContent = 'Síť dostupná · ověřuji připojení';
+        });
+        window.addEventListener('offline', () => {
+          const status = document.getElementById('status');
+          if (status) status.textContent = 'Offline · místní režim';
+        });
+      })();
+    </script>
+
+    <script>
+      /* Czech browser voice; optional wake phrase only after manual activation in foreground. */
+      (() => {
+        const startButton=document.getElementById('voiceStart'), stopButton=document.getElementById('voiceStop');
+        const status=document.getElementById('voiceStatus'), prompt=document.getElementById('prompt'), form=document.getElementById('chat');
+        const speakToggle=document.getElementById('voiceReply'), handsFreeToggle=document.getElementById('voiceHandsFree');
+        const wakeToggle=document.getElementById('voiceWakeWord');
+        const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+        let recognition=null, handsFree=false, restarting=false, awaitingWakeCommand=false;
+        const setStatus=text=>{status.textContent=text;};
+        const beginListening=()=>{
+          if(!recognition||!handsFree||restarting||document.hidden)return;
+          restarting=true;
+          try{window.speechSynthesis?.cancel();recognition.start();}
+          catch(error){setStatus('Čekám na dokončení hlasového režimu…');}
+          window.setTimeout(()=>{restarting=false;},900);
+        };
+        const speak=text=>{
+          if(!speakToggle.checked||!('speechSynthesis' in window)){if(handsFree)window.setTimeout(beginListening,500);return;}
+          window.speechSynthesis.cancel();
+          const utterance=new SpeechSynthesisUtterance(text);utterance.lang='cs-CZ';utterance.rate=1;utterance.pitch=1;
+          utterance.onstart=()=>setStatus('Odpovídám hlasem…');
+          utterance.onend=()=>{if(handsFree){setStatus(wakeToggle.checked?'Čekám na oslovení „Myklo“…':'Poslouchám dál…');window.setTimeout(beginListening,450);}};
+          utterance.onerror=()=>{if(handsFree)window.setTimeout(beginListening,700);};
+          window.speechSynthesis.speak(utterance);
+        };
+        if(!SpeechRecognition){startButton.disabled=true;setStatus('Rozpoznávání řeči není dostupné. Zkus Chrome nebo hlas zadej textem.');}
+        else{
+          recognition=new SpeechRecognition();recognition.lang='cs-CZ';recognition.continuous=false;recognition.interimResults=true;
+          recognition.onstart=()=>{restarting=false;startButton.disabled=true;setStatus(wakeToggle.checked&&!awaitingWakeCommand?'Čekám na oslovení „Myklo“…':'Poslouchám…');};
+          recognition.onresult=event=>{
+            let finalText='',interimText='';
+            for(let i=event.resultIndex;i<event.results.length;i++){const transcript=event.results[i][0].transcript;if(event.results[i].isFinal)finalText+=transcript;else interimText+=transcript;}
+            if(!finalText.trim()){if(interimText)prompt.value=interimText;return;}
+            let command=finalText.trim();
+            if(wakeToggle.checked&&handsFree){
+              if(!awaitingWakeCommand){
+                const match=command.match(/(?:hej\s+)?myklo[\s,.:!?-]*(.*)$/i);
+                if(!match){prompt.value='';setStatus('Čekám na oslovení „Myklo“…');recognition.stop();return;}
+                command=match[1].trim();
+                if(!command){awaitingWakeCommand=true;setStatus('Jsem vzhůru. Řekni příkaz…');recognition.stop();return;}
+              }
+              awaitingWakeCommand=false;
+            }
+            if(!command){recognition.stop();return;}
+            prompt.value=command;setStatus('Rozpoznáno. Zpracovávám…');recognition.stop();form.requestSubmit();
+          };
+          recognition.onerror=event=>{
+            setStatus('Mikrofon: '+event.error);
+            if(event.error==='not-allowed'||event.error==='service-not-allowed'){handsFree=false;startButton.disabled=false;}
+          };
+          recognition.onend=()=>{
+            startButton.disabled=false;
+            if(handsFree&&!document.hidden&&!window.speechSynthesis?.speaking){
+              setStatus(wakeToggle.checked&&!awaitingWakeCommand?'Čekám na oslovení „Myklo“…':'Čekám na příkaz…');
+              window.setTimeout(beginListening,650);
+            }
+          };
+          startButton.addEventListener('click',()=>{handsFree=handsFreeToggle.checked||wakeToggle.checked;awaitingWakeCommand=false;try{recognition.start();}catch(error){setStatus('Mikrofon už je aktivní.');}});
+        }
+        stopButton.addEventListener('click',()=>{handsFree=false;awaitingWakeCommand=false;try{recognition?.stop();}catch(error){}window.speechSynthesis?.cancel();startButton.disabled=false;setStatus('Hlasový rozhovor zastaven.');});
+        handsFreeToggle.addEventListener('change',()=>{if(!handsFreeToggle.checked&&!wakeToggle.checked){handsFree=false;setStatus('Automatické pokračování vypnuto.');}});
+        wakeToggle.addEventListener('change',()=>{if(wakeToggle.checked){handsFreeToggle.checked=true;setStatus('Slovo „Myklo“ funguje jen po ručním spuštění a při otevřené aplikaci.');}else{awaitingWakeCommand=false;setStatus('Probuzení slovem vypnuto.');}});
+        document.addEventListener('visibilitychange',()=>{if(document.hidden){try{recognition?.stop();}catch(error){}if(handsFree)setStatus('Aplikace je na pozadí. Hlasové naslouchání je pozastavené.');}else if(handsFree){setStatus('Aplikace je zpět. Obnovuji poslech…');window.setTimeout(beginListening,400);}});
+        const messages=document.getElementById('messages');let lastSpoken='';
+        new MutationObserver(()=>{const items=messages.querySelectorAll('.msg.agent'),last=items[items.length-1];if(!last)return;const text=last.textContent.trim();if(!text||text==='Přemýšlím…'||text===lastSpoken)return;lastSpoken=text;speak(text);}).observe(messages,{childList:true,subtree:true,characterData:true});
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const $ = id => document.getElementById(id);
+        async function renderPreferences() {
+          const root = $('preferenceList');
+          if (!root) return;
+          try {
+            const response = await apiFetch('/v1/preferences');
+            const data = await response.json();
+            root.replaceChildren();
+            if (!data.preferences.length) {
+              root.textContent =
+                'Zatím žádná pravidla. Přidej třeba styl odpovědí, oblíbená témata nebo věci, kterým se mám vyhnout.';
+              return;
+            }
+            for (const item of data.preferences) {
+              const row = document.createElement('div');
+              row.style.cssText =
+                'display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)';
+              const text = document.createElement('span');
+              text.style.flex = '1';
+              text.textContent =
+                item.category + ' · ' + item.preference + ': ' + item.value;
+              const edit = document.createElement('button');
+              edit.type = 'button';
+              edit.textContent = 'Upravit';
+              edit.onclick = async () => {
+                const value = window.prompt('Uprav pravidlo:', item.value);
+                if (value === null || !value.trim()) return;
+                const response = await apiFetch('/v1/preferences', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    category: item.category,
+                    preference: item.preference,
+                    value: value.trim(),
+                  }),
+                });
+                if (response.ok) renderPreferences();
+              };
+              const remove = document.createElement('button');
+              remove.type = 'button';
+              remove.textContent = 'Smazat';
+              remove.onclick = async () => {
+                if (!window.confirm('Smazat toto pravidlo přizpůsobení?'))
+                  return;
+                const response = await apiFetch('/v1/preferences/' + item.id, {
+                  method: 'DELETE',
+                });
+                if (response.ok) renderPreferences();
+              };
+              row.append(text, edit, remove);
+              root.append(row);
+            }
+          } catch (error) {
+            root.textContent = 'Místní API není dostupné.';
+          }
+        }
+        $('preferenceForm')?.addEventListener('submit', async event => {
+          event.preventDefault();
+          const payload = {
+            category: $('preferenceCategory').value,
+            preference: $('preferenceName').value.trim(),
+            value: $('preferenceValue').value.trim(),
+          };
+          if (!payload.preference || !payload.value) return;
+          const response = await apiFetch('/v1/preferences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (response.ok) {
+            $('preferenceName').value = '';
+            $('preferenceValue').value = '';
+            await renderPreferences();
+            $('status').textContent = 'Pravidlo přizpůsobení uloženo';
+          } else $('status').textContent = 'Pravidlo se nepodařilo uložit';
+        });
+        renderPreferences();
+        window.addEventListener('mh-cloud-update', renderPreferences);
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const $ = id => document.getElementById(id);
+        async function refreshTasks() {
+          const root = $('taskList');
+          if (!root) return;
+          try {
+            const response = await apiFetch('/v1/tasks?limit=30');
+            if (!response.ok) throw new Error();
+            const data = await response.json();
+            root.replaceChildren();
+            if (!data.tasks.length) {
+              root.textContent = 'Zatím tu nejsou žádné úkoly.';
+              return;
+            }
+            for (const task of data.tasks) {
+              const row = document.createElement('div');
+              row.style.cssText =
+                'padding:10px 0;border-top:1px solid var(--line);display:grid;gap:5px';
+              const title = document.createElement('strong');
+              title.textContent = task.title + ' · ' + task.status;
+              row.append(title);
+              if (task.result) {
+                const result = document.createElement('div');
+                result.textContent = task.result;
+                row.append(result);
+              }
+              if (task.error) {
+                const error = document.createElement('small');
+                error.textContent = task.error;
+                row.append(error);
+              }
+              if (task.status === 'queued' || task.status === 'running') {
+                const cancel = document.createElement('button');
+                cancel.type = 'button';
+                cancel.textContent = 'Zrušit úkol';
+                cancel.onclick = async () => {
+                  await apiFetch(
+                    '/v1/tasks/' + encodeURIComponent(task.id) + '/cancel',
+                    { method: 'POST' }
+                  );
+                  refreshTasks();
+                };
+                row.append(cancel);
+              }
+              root.append(row);
+            }
+          } catch (error) {
+            root.textContent =
+              'Seznam úkolů je dostupný při připojení k místnímu API.';
+          }
+        }
+        $('taskForm')?.addEventListener('submit', async event => {
+          event.preventDefault();
+          const title = $('taskTitle').value.trim(),
+            input_text = $('taskInput').value.trim();
+          if (!title || !input_text) return;
+          const response = await apiFetch('/v1/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ kind: 'agent.draft', title, input_text }),
+          });
+          if (response.ok) {
+            $('taskTitle').value = '';
+            $('taskInput').value = '';
+            $('status').textContent = 'Úkol zařazen';
+            refreshTasks();
+          } else $('status').textContent = 'Úkol se nepodařilo zařadit';
+        });
+        refreshTasks();
+        window.addEventListener('mh-cloud-update', refreshTasks);
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const root = document.getElementById('reportList');
+        async function loadReports() {
+          if (!root) return;
+          try {
+            const response = await apiFetch('/v1/reports');
+            if (!response.ok) throw new Error('reports unavailable');
+            const data = await response.json();
+            root.replaceChildren();
+            if (!data.reports.length) { root.textContent = 'První automatický přehled se vytvoří při nejbližším denním běhu.'; return; }
+            for (const report of data.reports) {
+              const card = document.createElement('article');
+              card.style.cssText = 'padding:10px 0;border-top:1px solid var(--line);display:grid;gap:6px';
+              const date = document.createElement('strong');
+              date.textContent = new Date(report.created_at).toLocaleString('cs-CZ');
+              const summary = document.createElement('div');
+              summary.style.whiteSpace = 'pre-wrap';
+              summary.textContent = report.summary;
+              const meta = document.createElement('small');
+              meta.textContent = `Aktivní plány: ${report.active_plan_count} · otevřené úkoly: ${report.task_count}`;
+              card.append(date, summary, meta);
+              root.append(card);
+            }
+          } catch (error) { root.textContent = 'Denní přehledy jsou dostupné po přihlášení.'; }
+        }
+        loadReports();
+        window.addEventListener('mh-cloud-update', loadReports);
+      })();
+    </script>
+    <script>
+      (() => {
+        const $ = id => document.getElementById(id);
+        const list = $('learningList'),
+          form = $('learningForm');
+        const lines = id =>
+          $(id)
+            .value.split(/\r?\n/)
+            .map(x => x.trim())
+            .filter(Boolean);
+        async function refresh() {
+          try {
+            const r = await apiFetch('/v1/learning/plans');
+            if (!r.ok) throw Error();
+            const data = await r.json();
+            list.replaceChildren();
+            if (!data.plans.length) {
+              list.textContent = 'Zatím nemáš žádný učební plán.';
+              return;
+            }
+            for (const p of data.plans) {
+              const card = document.createElement('div');
+              card.style.cssText =
+                'padding:12px 0;border-top:1px solid var(--line);display:grid;gap:6px';
+              const title = document.createElement('strong');
+              title.textContent =
+                p.title +
+                ' · ' +
+                ({ draft: 'Koncept', active: 'Aktivní', paused: 'Pozastavený' }[
+                  p.status
+                ] || p.status) +
+                ' · v' +
+                p.version;
+              const objective = document.createElement('div');
+              objective.textContent = p.objective;
+              const steps = document.createElement('small');
+              steps.textContent = p.steps.length
+                ? 'Kroky: ' + p.steps.join(' → ')
+                : 'Bez definovaných kroků';
+              const actions = document.createElement('div');
+              actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
+              const edit = document.createElement('button');
+              edit.textContent = 'Upravit';
+              edit.onclick = async () => {
+                const title = prompt('Název plánu', p.title);
+                if (title === null) return;
+                const objective = prompt('Cíl plánu', p.objective);
+                if (objective === null) return;
+                const steps = prompt(
+                  'Kroky oddělené znakem |',
+                  p.steps.join(' | ')
+                );
+                if (steps === null) return;
+                const status = prompt('Stav: draft, active, paused', p.status);
+                if (status === null) return;
+                const r = await apiFetch(
+                  '/v1/learning/plans/' + encodeURIComponent(p.id),
+                  {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      title,
+                      objective,
+                      status,
+                      steps: steps
+                        .split('|')
+                        .map(x => x.trim())
+                        .filter(Boolean),
+                      sources: p.sources,
+                    }),
+                  }
+                );
+                if (r.ok) refresh();
+                else alert('Plán se nepodařilo uložit. Zkontroluj údaje.');
+              };
+              const remove = document.createElement('button');
+              remove.textContent = 'Smazat';
+              remove.onclick = async () => {
+                if (!confirm('Opravdu smazat tento učební plán?')) return;
+                const r = await apiFetch(
+                  '/v1/learning/plans/' + encodeURIComponent(p.id),
+                  { method: 'DELETE' }
+                );
+                if (r.ok) refresh();
+              };
+              actions.append(edit, remove);
+              card.append(title, objective, steps, actions);
+              list.append(card);
+            }
+          } catch (e) {
+            list.textContent = 'Učební plány vyžadují spuštěné místní API.';
+          }
+        }
+        form?.addEventListener('submit', async e => {
+          e.preventDefault();
+          const payload = {
+            title: $('learningTitle').value.trim(),
+            objective: $('learningObjective').value.trim(),
+            status: $('learningStatus').value,
+            steps: lines('learningSteps'),
+            sources: lines('learningSources'),
+          };
+          const r = await apiFetch('/v1/learning/plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (r.ok) {
+            form.reset();
+            $('status').textContent = 'Učební plán vytvořen';
+            refresh();
+          } else $('status').textContent = 'Plán se nepodařilo vytvořit';
+        });
+        refresh();
+        window.addEventListener('mh-cloud-update', refresh);
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const form=document.getElementById('webSearchForm'),field=document.getElementById('webSearchQuery');
+        const status=document.getElementById('webSearchStatus'),results=document.getElementById('webSearchResults');
+        form?.addEventListener('submit',async event=>{
+          event.preventDefault();const query=field.value.trim();if(query.length<2)return;
+          const button=form.querySelector('button');button.disabled=true;status.textContent='Prohledávám web…';results.replaceChildren();
+          try{
+            const response=await apiFetch('/v1/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query})});
+            const data=await response.json();if(!response.ok)throw new Error(data.detail||data.error||'Vyhledávání selhalo.');
+            const summary=document.createElement('p');summary.style.whiteSpace='pre-wrap';summary.textContent=data.summary||'Shrnutí není dostupné.';results.append(summary);
+            for(const item of(Array.isArray(data.results)?data.results:[])){
+              const link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
+              link.textContent=item.title||item.url;link.style.cssText='padding:10px;border:1px solid var(--line);border-radius:10px;overflow-wrap:anywhere';results.append(link);
+            }
+            status.textContent='Hotovo · '+(data.results?.length||0)+' odkazů · '+(data.source||'web');
+          }catch(error){status.textContent=error.message||'Webové vyhledávání není dostupné.';}
+          finally{button.disabled=false;}
+        });
+      })();
+    </script>
+    <script>
+      (() => {
+        const base='http://127.0.0.1:8765',pairButton=document.getElementById('desktopPair');
+        const disconnectButton=document.getElementById('desktopDisconnect'),codeInput=document.getElementById('desktopPairCode');
+        const status=document.getElementById('desktopStatus'),buttons=[...document.querySelectorAll('[data-desktop-action]')];
+        let token=sessionStorage.getItem('mh_windows_session')||'';
+        const setConnected=connected=>{buttons.forEach(button=>button.disabled=!connected);disconnectButton.disabled=!connected;};
+        const request=async(path,body,sessionToken='')=>{
+          const headers={'Content-Type':'application/json'};if(sessionToken)headers.Authorization='Bearer '+sessionToken;
+          const response=await fetch(base+path,{method:'POST',mode:'cors',credentials:'omit',cache:'no-store',headers,body:JSON.stringify(body||{})});
+          const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||'Windows Companion odmítl požadavek.');return data;
+        };
+        setConnected(Boolean(token));
+        pairButton.addEventListener('click',async()=>{
+          pairButton.disabled=true;status.textContent='Páruji notebook…';
+          try{const data=await request('/pair',{code:codeInput.value.trim()});token=data.token;sessionStorage.setItem('mh_windows_session',token);codeInput.value='';setConnected(true);status.textContent='Notebook je spárován. Relace platí do restartu doprovodného programu.';}
+          catch(error){token='';sessionStorage.removeItem('mh_windows_session');setConnected(false);status.textContent=error.message+' Ověř, že program běží a prohlížeč povolil místní síť.';}
+          finally{pairButton.disabled=false;}
+        });
+        disconnectButton.addEventListener('click',async()=>{const oldToken=token;try{if(oldToken)await request('/unpair',{},oldToken);}catch(error){}token='';sessionStorage.removeItem('mh_windows_session');setConnected(false);status.textContent='Notebook odpojen a relace zrušena.';});
+        buttons.forEach(button=>button.addEventListener('click',async()=>{
+          if(!token)return;button.disabled=true;status.textContent='Posílám bezpečný příkaz…';
+          try{const data=await request('/command',{action:button.dataset.desktopAction},token);status.textContent=data.message||'Příkaz přijat notebookem.';}
+          catch(error){token='';sessionStorage.removeItem('mh_windows_session');setConnected(false);status.textContent=error.message+' Připoj notebook znovu.';}
+          finally{setConnected(Boolean(token));}
+        }));
+      })();
+    </script>
+  </body>
+</html>
