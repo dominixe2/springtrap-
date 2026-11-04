@@ -1,0 +1,58 @@
+name: Build Micro Helper Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [micro-helper]
+    paths:
+      - "android-wrapper/**"
+      - ".github/workflows/android-apk.yml"
+permissions:
+  contents: read
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android-wrapper
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Capacitor
+        run: npm install
+      - name: Create Android project
+        run: npx cap add android
+      - name: Sync web wrapper
+        run: npx cap sync android
+      - name: Add microphone permission
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          text = p.read_text()
+          permission = '    <uses-permission android:name="android.permission.RECORD_AUDIO" />'
+          if "android.permission.RECORD_AUDIO" not in text:
+              text = text.replace("<application", permission + "\n    <application", 1)
+          p.write_text(text)
+          PY
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleDebug
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: micro-helper-android-debug-apk
+          path: android-wrapper/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
