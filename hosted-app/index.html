@@ -173,7 +173,7 @@
           >Jméno agenta
           <input id="agentName" value="Mykla" maxlength="30" /></label
         ><label
-          >Model <input id="model" value="llama3.2" maxlength="80" /></label
+          >Hloubka AI <select id="model" aria-label="Hloubka odpovědi"><option value="FAST">Rychlá</option><option value="DEEP">Důkladná</option></select></label
         ><button class="primary" id="save">Uložit nastavení</button>
         <button type="button" id="signIn" class="primary">Přihlásit a synchronizovat</button>
         <button type="button" id="signOut" hidden>Odhlásit</button>
@@ -273,7 +273,7 @@
       >
         <strong>⚙️ Úkoly na pozadí</strong>
         <small
-          >Úkoly se ukládají do tvého účtu a synchronizují mezi zařízeními. Zatím jde o bezpečnou frontu návrhů, ne o automatické ovládání telefonu nebo notebooku.</small
+          >Zadání můžeš nechat zpracovat cloudovou AI. Výsledek se uloží do účtu a synchronizuje mezi telefonem a notebookem. Spuštění úkolu vyžaduje přihlášení a dostupný AI limit.</small
         >
         <form
           id="taskForm"
@@ -287,7 +287,7 @@
           />
           <input
             id="taskInput"
-            maxlength="12000"
+            maxlength="4000"
             placeholder="Co má připravit?"
             required
           />
@@ -301,8 +301,8 @@
         <div id="reportList" aria-live="polite">Načítám přehledy…</div>
       </section>
       <section class="settings">
-        <span id="modeLabel">Režim: lokální</span><span id="modelState">Model: neověřen</span
-        ><button id="check">Ověřit Ollamu</button
+        <span id="modeLabel">Režim: lokální</span><span id="modelState">Cloud AI: vyžaduje přihlášení</span
+        ><button id="check">Ověřit účet</button
         ><button id="clear">Vymazat konverzaci</button>
       </section>
       <section
@@ -750,16 +750,22 @@
         $('status').textContent = 'Nastavení uloženo';
       };
       $('agentName').value = localStorage.getItem('mh_name') || 'Mykla';
-      $('model').value = localStorage.getItem('mh_model') || 'llama3.2';
+      $('model').value = localStorage.getItem('mh_model') === 'DEEP' ? 'DEEP' : 'FAST';
       $('save').click();
       $('check').onclick = async () => {
+        $('check').disabled = true;
+        $('modelState').textContent = 'Ověřuji přihlášení…';
         try {
-          const r = await apiFetch('/v1/models');
-          const j = await r.json();
-          $('modelState').textContent =
-            'Ollama: ' + (j.available ? j.models.join(', ') : 'není dostupná');
-        } catch (e) {
-          $('modelState').textContent = 'Ollama: chyba spojení';
+          const response = await apiFetch('/v1/status');
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || 'Stav není dostupný.');
+          $('modelState').textContent = data.authenticated
+            ? 'Cloud účet připojen · AI se ověří při dotazu'
+            : 'Přihlas se pro cloudové AI';
+        } catch (error) {
+          $('modelState').textContent = error.message || 'Stav cloudové AI není dostupný';
+        } finally {
+          $('check').disabled = false;
         }
       };
       $('clear').onclick = async () => {
@@ -806,7 +812,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               message: q,
-              model: $('model').value,
+              thinkingMode: $('model').value,
               history,
             }),
           });
@@ -929,7 +935,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   message,
-                  model: byId('model').value,
+                  thinkingMode: byId('model').value,
                   history,
                 }),
               });
@@ -1016,7 +1022,7 @@
             byId('agentName').value = data.agent_name;
             byId('title').textContent = data.agent_name + ' · Micro Helper';
             byId('model').value =
-              localStorage.getItem('mh_model') || 'llama3.2';
+              localStorage.getItem('mh_model') === 'DEEP' ? 'DEEP' : 'FAST';
           } catch (error) {}
         }
         byId('exportMemory')?.addEventListener('click', async () => {
@@ -1548,18 +1554,37 @@
                 error.textContent = task.error;
                 row.append(error);
               }
-              if (task.status === 'queued' || task.status === 'running') {
-                const cancel = document.createElement('button');
-                cancel.type = 'button';
-                cancel.textContent = 'Zrušit úkol';
-                cancel.onclick = async () => {
-                  await apiFetch(
-                    '/v1/tasks/' + encodeURIComponent(task.id) + '/cancel',
-                    { method: 'POST' }
-                  );
-                  refreshTasks();
+              if (task.status === 'draft' || task.status === 'error') {
+                const run = document.createElement('button');
+                run.type = 'button';
+                run.textContent = signedInUser
+                  ? (task.status === 'error' ? 'Zkusit znovu' : 'Spustit AI')
+                  : 'Přihlásit pro AI';
+                run.disabled = !signedInUser;
+                if (!signedInUser) run.title = 'Pro zpracování úkolu se přihlas ke cloudové AI.';
+                run.onclick = async () => {
+                  run.disabled = true;
+                  run.textContent = 'Zpracovávám…';
+                  $('status').textContent = 'AI zpracovává úkol';
+                  try {
+                    const response = await apiFetch(
+                      '/v1/tasks/' + encodeURIComponent(task.id) + '/run',
+                      { method: 'POST' }
+                    );
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.detail || 'Úkol se nepodařilo dokončit.');
+                    $('status').textContent = 'Úkol dokončen';
+                  } catch (error) {
+                    $('status').textContent = error.message || 'Úkol se nepodařilo dokončit';
+                  } finally {
+                    await refreshTasks();
+                  }
                 };
-                row.append(cancel);
+                row.append(run);
+              } else if (task.status === 'running') {
+                const progress = document.createElement('small');
+                progress.textContent = 'AI právě připravuje výsledek…';
+                row.append(progress);
               }
               root.append(row);
             }
@@ -1785,6 +1810,147 @@
           catch(error){token='';sessionStorage.removeItem('mh_windows_session');setConnected(false);status.textContent=error.message+' Připoj notebook znovu.';}
           finally{setConnected(Boolean(token));}
         }));
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const fileInput = document.getElementById('imageFile');
+        const preview = document.getElementById('imagePreview');
+        const prompt = document.getElementById('imagePrompt');
+        const status = document.getElementById('imageStatus');
+        const result = document.getElementById('imageResult');
+        const buttons = [
+          document.getElementById('generateImage'),
+          document.getElementById('analyzeImage'),
+          document.getElementById('readImageText')
+        ];
+        let previewUrl = '';
+
+        fileInput.addEventListener('change', () => {
+          if (previewUrl) URL.revokeObjectURL(previewUrl);
+          const file = fileInput.files?.[0];
+          result.replaceChildren();
+          if (!file) {
+            preview.hidden = true;
+            preview.removeAttribute('src');
+            status.textContent = 'Referenční obrázek odebrán.';
+            return;
+          }
+          if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+            fileInput.value = '';
+            preview.hidden = true;
+            status.textContent = 'Podporuji pouze JPEG, PNG a WebP.';
+            return;
+          }
+          previewUrl = URL.createObjectURL(file);
+          preview.src = previewUrl;
+          preview.hidden = false;
+          status.textContent = 'Náhled připraven. Obrázek se odešle až po spuštění AI akce.';
+        });
+
+        const prepareImage = async () => {
+          const file = fileInput.files?.[0];
+          if (!file) return null;
+          const client = await appClientReady;
+          if (!client?.user || !signedInUser) {
+            throw new Error('Nejdřív se přihlas ke cloudové AI.');
+          }
+          if (!client.image?.resizeIfNeeded) {
+            throw new Error('Příprava obrázků není v této verzi dostupná. Obnov aplikaci a zkus to znovu.');
+          }
+          const prepared = await client.image.resizeIfNeeded(file, {
+            maxDimension: 1600,
+            maxPixels: 2000000,
+            quality: 0.82,
+            mimeType: 'image/jpeg'
+          });
+          if (!prepared?.data || prepared.bytes > 6 * 1024 * 1024) {
+            throw new Error('Obrázek je příliš velký i po zmenšení.');
+          }
+          return { data: prepared.data, mimeType: prepared.mimeType };
+        };
+
+        const setBusy = busy => buttons.forEach(button => { button.disabled = busy; });
+
+        const runImageAction = async kind => {
+          const text = prompt.value.trim();
+          if (kind === 'generate' && !text) {
+            status.textContent = 'Nejdřív popiš, jaký obrázek chceš vytvořit.';
+            prompt.focus();
+            return;
+          }
+          if (kind !== 'generate' && !fileInput.files?.[0]) {
+            status.textContent = 'Nejdřív vyber nebo vyfoť obrázek.';
+            fileInput.click();
+            return;
+          }
+          setBusy(true);
+          result.replaceChildren();
+          status.textContent = 'Připravuji obrázek a odesílám bezpečný požadavek…';
+          try {
+            const client = await appClientReady;
+            if (!client?.user || !signedInUser) {
+              throw new Error('Pro AI studio se nejdřív přihlas ke svému účtu.');
+            }
+            const reference = await prepareImage();
+            const route = kind === 'generate'
+              ? '/v1/images/generate'
+              : kind === 'analyze' ? '/v1/images/analyze' : '/v1/images/ocr';
+            const payload = kind === 'generate'
+              ? { prompt: text, images: reference ? [reference] : [] }
+              : {
+                  prompt: text || undefined,
+                  image: reference
+                };
+            const response = await apiFetch(route, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.detail || data.error || 'AI akce se nepodařila.');
+            }
+
+            if (kind === 'generate') {
+              if (!data.image?.data || !data.image?.mimeType) {
+                throw new Error('AI nevrátila platný obrázek. Zkus to znovu.');
+              }
+              const source = 'data:' + data.image.mimeType + ';base64,' + data.image.data;
+              const output = document.createElement('img');
+              output.src = source;
+              output.alt = 'Obrázek vygenerovaný Micro Helperem';
+              output.loading = 'lazy';
+              output.style.cssText = 'max-width:100%;max-height:520px;object-fit:contain;border-radius:14px;border:1px solid var(--line)';
+              const download = document.createElement('a');
+              const extension = data.image.mimeType === 'image/webp' ? 'webp'
+                : data.image.mimeType === 'image/jpeg' ? 'jpg' : 'png';
+              download.href = source;
+              download.download = 'micro-helper-' + new Date().toISOString().slice(0, 10) + '.' + extension;
+              download.textContent = 'Stáhnout vygenerovaný obrázek';
+              download.style.cssText = 'padding:10px;border:1px solid var(--line);border-radius:10px;width:max-content';
+              result.append(output, download);
+              status.textContent = 'Obrázek je hotový. Můžeš si ho prohlédnout nebo stáhnout.';
+            } else {
+              const output = document.createElement('pre');
+              output.textContent = data.text || 'AI nenašla žádný čitelný obsah.';
+              output.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;background:#0c1425;padding:12px;border-radius:12px';
+              result.append(output);
+              status.textContent = kind === 'analyze'
+                ? 'Analýza obrázku dokončena.'
+                : 'Rozpoznávání textu dokončeno.';
+            }
+          } catch (error) {
+            status.textContent = error.message || 'AI akce se nepodařila. Zkus to znovu.';
+          } finally {
+            setBusy(false);
+          }
+        };
+
+        buttons[0].addEventListener('click', () => runImageAction('generate'));
+        buttons[1].addEventListener('click', () => runImageAction('analyze'));
+        buttons[2].addEventListener('click', () => runImageAction('ocr'));
       })();
     </script>
   </body>
