@@ -74,3 +74,15 @@ The web client must remain usable on a Windows PC without installing the compani
 - Revoking a device prevents subsequent sync and companion commands from that device.
 - Czech voice button works on supported Android and Windows browsers; stop/interruption controls work.
 - Wake-word operation is tested only in the supported local companion runtime; the PWA clearly reports when background activation is unavailable.
+
+
+## ChatGPT-style Android ↔ Windows experience
+
+The intended user experience is account-based, not cable/Bluetooth pairing:
+- Sign in to the same Micro Helper account on Android and Windows; conversations and account-level preferences appear on both devices automatically through cloud sync.
+- Starting a conversation on one device and opening it on the other must restore the same conversation, including message order and supported attachments.
+- Sync should feel continuous, with visible pending/synced/offline status and automatic retry. It must not require the user to export/import backups or manually pair devices for ordinary chat/history sync.
+- Device pairing is required only for privileged local capabilities, such as allowing the Windows Companion to execute approved tasks on that particular PC. This is separate from normal account sync and must be revocable.
+- Keep device-local data and permissions local unless the user explicitly shares them. Never sync Windows files, local model data, microphone access, or credentials just because the account is signed in.
+- If cloud sync is unavailable, the app remains usable locally and clearly marks unsynced changes; it must not pretend another device has received them.
+- Acceptance test: sign in with one account on Android Chrome and Windows Edge/Chrome, send a message on either device, and verify that it appears on the other without manual refresh/export, with correct ordering and no duplicates after reconnect.
