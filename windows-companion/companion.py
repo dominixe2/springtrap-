@@ -35,7 +35,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/health": self._send(404,{"detail":"Not found"}); return
         self._send(200,{"ready":True,"name":"Micro Helper Windows Companion"})
     def do_POST(self):
-        global SESSION_TOKEN, FAILED_PAIRS
+        global PAIRING_CODE, SESSION_TOKEN, FAILED_PAIRS
         if not self._origin_ok(): self._send(403,{"detail":"Původ požadavku není povolen."}); return
         if self.client_address[0] not in ("127.0.0.1","::1"):
             self._send(403,{"detail":"Přístup je povolen pouze z tohoto počítače."}); return
@@ -49,7 +49,7 @@ class Handler(BaseHTTPRequestHandler):
                 if FAILED_PAIRS>=8: self._send(429,{"detail":"Příliš mnoho pokusů. Restartuj doprovodný program."}); return
                 if not secrets.compare_digest(str(payload.get("code","")),PAIRING_CODE):
                     FAILED_PAIRS+=1; self._send(401,{"detail":"Párovací kód nesouhlasí."}); return
-                SESSION_TOKEN=secrets.token_urlsafe(32); FAILED_PAIRS=0
+                SESSION_TOKEN=secrets.token_urlsafe(32); PAIRING_CODE=secrets.token_urlsafe(8); FAILED_PAIRS=0
                 self._send(200,{"paired":True,"token":SESSION_TOKEN})
                 print("[Micro Helper] Nové párování dokončeno.")
             return
