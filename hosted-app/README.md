@@ -1,13 +1,15 @@
 # Hosted Micro Helper source mirror
 
-This directory tracks the hosted AppDeploy app `micro-helper-ygeuyn`. The live deployment remains on snapshot `1793767519998`; the branch now contains a newer candidate source snapshot `1793769353100`.
+This directory tracks the hosted AppDeploy app `micro-helper-ygeuyn`. The active deployment snapshot is `1793769353100`; the GitHub branch contains the corrected candidate source.
 
 - Live app: https://micro-helper-ygeuyn.v2.appdeploy.ai/
 - Backend routes and scheduled job: `backend/index.ts` and `cron.json`.
 - Main UI: `index.html`; `src/main.ts` initializes the AppDeploy client and realtime connection.
 - QA scenarios: `tests/tests.json`.
 
-**Deployment boundary:** AppDeploy runs its own stored source snapshot. This GitHub copy is a reviewable, version-controlled candidate and CI validates it, but a GitHub commit does not automatically publish to AppDeploy. The latest candidate activates the image studio, adds executable AI tasks and selectable response depth. Its AppDeploy publish attempt was blocked by the account usage limit, so the live URL still serves the earlier deployment until credits are available and the candidate is redeployed.
+**Deployment status:** The active AppDeploy snapshot currently reports a frontend JavaScript syntax error in the task-list script. The corrected GitHub candidate fixes that error, activates the image-studio controls, adds executable AI tasks and selectable response depth. Publishing the correction is blocked by the AppDeploy account usage limit. Do not treat the corrected candidate as live until a redeployment reaches `ready` with no frontend errors.
+
+GitHub commits do not automatically publish to AppDeploy. Keep this candidate and the deployed snapshot aligned after the deployment limit is resolved.
 
 The root project remains a separate local Python/Ollama edition. Do not copy the hosted HTML/backend over the root Python package.
 
