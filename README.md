@@ -9,17 +9,17 @@ Micro Helper is a Czech-first personal assistant project with two deliberately s
 - **Install on Android:** use the hosted PWA from Chrome, or download the debug APK from [GitHub Actions](https://github.com/dominixe2/springtrap-/actions/workflows/android-apk.yml?query=branch%3Amicro-helper).
 - **Windows Companion:** build/download it from [GitHub Actions](https://github.com/dominixe2/springtrap-/actions/workflows/windows-companion.yml?query=branch%3Amicro-helper).
 
-The hosted edition includes account-backed cloud chat and sync, private notes and preferences, learning plans, draft tasks, daily review reports, browser voice, web search, image generation, image analysis and OCR. Feature availability depends on the signed-in account and platform AI quotas.
+The hosted edition includes account-backed cloud chat and sync, private notes and preferences, learning plans, tasks, daily review reports, browser voice, web search, image generation, image analysis and OCR. Feature availability depends on the signed-in account and platform AI quotas. The GitHub candidate adds executable AI tasks, working image-studio controls and quick/deep chat depth; these changes are pending AppDeploy redeployment because the current usage limit blocks publishing.
 
 ### Honest platform limits
 
 - The Android APK is currently a debug-signed WebView wrapper. It loads the hosted app and needs internet for cloud AI and synchronization. It is not a Play Store release.
 - The PWA caches its public shell, not AI models or private API responses. There is no offline AI.
 - Browser voice and wake phrase support depend on the browser and work only while the app is open and voice mode is active.
-- Background tasks create bounded text drafts; they are not a general autonomous agent.
+- Background AI tasks generate bounded text outputs when explicitly run; they are not a general autonomous agent.
 - The Windows Companion permits only lock, Explorer, Notepad and Calculator. It does not expose arbitrary shell commands or remote desktop.
 - The Windows EXE is not code-signed; SmartScreen may warn.
-- The GitHub `hosted-app/` directory is a version-controlled mirror of the AppDeploy source snapshot. GitHub commits do not automatically publish to AppDeploy, so update both when changing the hosted product.
+- The GitHub `hosted-app/` directory is a version-controlled candidate source mirror. GitHub commits do not automatically publish to AppDeploy; the live deployment remains on the earlier snapshot until the candidate can be redeployed.
 
 See [hosted app architecture](docs/HOSTED_APP.md) and [security notes](docs/SECURITY.md).
 
@@ -33,7 +33,7 @@ Requires Python 3.11+.
 
 ```powershell
 py -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.\\.venv\\Scripts\\Activate.ps1
 python -m pip install -e ".[dev]"
 # Optional local AI: install Ollama, then e.g. ollama pull llama3.2
 uvicorn micro_helper.api:app --host 127.0.0.1 --port 8000
