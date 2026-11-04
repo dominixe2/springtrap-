@@ -1,0 +1,103 @@
+[
+  {
+    "name": "Use Czech voice, web search and AI image studio on mobile",
+    "sanity": true,
+    "viewport": "mobile",
+    "covers": [
+      "Czech speech input and spoken responses",
+      "foreground wake phrase and background limitation",
+      "authenticated web search",
+      "search source links",
+      "AI image generation",
+      "image analysis",
+      "image OCR",
+      "visible retryable errors"
+    ],
+    "description": "Verifies the main AI workflows work on a phone and unavailable browser or AI capabilities are reported honestly.",
+    "steps": [
+      "Sign in to Micro Helper",
+      "Open the voice panel and verify Czech speech controls and the foreground-only Myklo explanation",
+      "Search for a public topic and verify a summary and source links appear",
+      "Generate an image from a short prompt and verify the result and download action",
+      "Upload a reference image, run analysis and extract readable text"
+    ],
+    "expected": "Voice controls report actual browser support and foreground-only limits; web search shows a summary and source links; image generation, analysis and OCR return visible results or a clear retryable error."
+  },
+  {
+    "name": "Synchronize account data between two signed-in devices",
+    "viewport": "mobile",
+    "covers": [
+      "authenticated cross-device synchronization",
+      "live WebSocket subscription",
+      "server-authorized user data isolation",
+      "learning-plan create and update"
+    ],
+    "description": "Verifies learning plan changes propagate live between two clients belonging to the same account.",
+    "steps": [
+      "Sign in as Actor A on the mobile client",
+      "Sign in as Actor B in a second client using the same account",
+      "Create a plan named Live sync check as Actor A",
+      "Verify the plan appears for Actor B without refreshing the second client",
+      "Change the plan objective as Actor B",
+      "Verify the updated objective appears for Actor A"
+    ],
+    "expected": "Both clients show the latest plan data without manual refresh, and a signed-out client cannot access account data."
+  },
+  {
+    "name": "Pair Windows Companion and reject unauthorized desktop commands",
+    "viewport": "desktop",
+    "covers": [
+      "Windows loopback companion pairing",
+      "one-time pairing code",
+      "session-token authorization",
+      "fixed allowlisted Windows commands",
+      "invalid pairing and permission denial"
+    ],
+    "description": "Verifies the Windows bridge requires local pairing and only exposes a small allowlist of safe desktop actions.",
+    "steps": [
+      "Open the Windows Companion panel without a local companion running",
+      "Attempt pairing with an invalid code and verify a visible failure",
+      "Verify desktop command buttons remain disabled until pairing succeeds",
+      "Review companion instructions and confirm supported actions are lock, Explorer, Notepad and Calculator"
+    ],
+    "expected": "Invalid pairing is rejected, commands remain disabled without a valid local session, and arbitrary shell execution is not exposed."
+  },
+  {
+    "name": "Manage private notes and preferences",
+    "viewport": "desktop",
+    "covers": [
+      "private memory create read update delete",
+      "preference create update delete",
+      "cross-device refresh after writes"
+    ],
+    "description": "Verifies users can create, edit and delete personal notes and preferences.",
+    "steps": [
+      "Sign in",
+      "Create a private note and verify it appears",
+      "Edit the note and verify the changed text",
+      "Delete the note and verify it disappears",
+      "Create a preference and verify it appears in the preference list"
+    ],
+    "expected": "Note and preference changes persist in the signed-in account and are reflected in visible lists."
+  },
+  {
+    "name": "Keep offline mode honest and install the Android app",
+    "viewport": "mobile",
+    "covers": [
+      "PWA manifest and service worker",
+      "mobile install flow",
+      "Android APK build workflow",
+      "offline local persistence",
+      "anonymous AI access denial",
+      "no fabricated offline AI output"
+    ],
+    "description": "Verifies local data remains usable offline, cloud features are not faked, and the Android install path is available.",
+    "steps": [
+      "Remain signed out and verify cloud-only actions explain that sign-in is required",
+      "Create a local note and reload the page to verify local persistence",
+      "Open the browser install option when supported or use Chrome's Install app menu",
+      "Open the GitHub Android build workflow and verify a successful run produces an installable debug APK artifact"
+    ],
+    "expected": "Local data persists, cloud AI and remote commands are not fabricated offline, PWA installation is available where supported, and the Android workflow builds an APK artifact."
+  }
+]
