@@ -6,22 +6,21 @@ The phone-first hosted app is deployed at https://micro-helper-ygeuyn.v2.appdepl
 
 The repository also retains a separate local Python/FastAPI edition in `src/micro_helper`. That edition is useful for local development with Ollama. It is not the backend used by the hosted URL.
 
-## Current capabilities
+## Capabilities in the corrected GitHub candidate
 
 - Czech-first responsive interface and PWA install support.
 - Account-backed cloud chat and private per-user state.
 - Notes, preferences, learning plans, conversation history, draft tasks and daily review reports.
 - Browser voice input/output, optional hands-free continuation and a foreground-only wake phrase where supported by the browser.
-- Authenticated web search, AI image generation, image analysis and OCR.
+- Authenticated web search, AI image generation, image analysis and OCR, with client-side image resizing.
+- Explicit AI task execution with saved text results and quick/deep chat response settings.
 - Realtime notifications between clients signed into the same account.
 - Optional Windows Companion with loopback-only pairing and a small fixed command allowlist.
 - Android debug APK wrapper that opens the hosted app.
 
-## Candidate improvements pending deployment
+## Deployment status
 
-Candidate snapshot `1793769353100` wires the image-studio controls to the existing generation, analysis and OCR endpoints, compresses selected photos before upload, adds explicit AI task execution with saved results, and lets users choose quick or deep chat responses.
-
-The live AppDeploy deployment remains on snapshot `1793767519998`. Publishing the candidate was blocked by the AppDeploy account usage limit. Do not treat these candidate improvements as live until a future deployment reaches `ready` and QA reports no frontend errors.
+The active AppDeploy snapshot is `1793769353100`. QA currently reports `Uncaught SyntaxError: Unexpected token ';'` in the task-list script. The corrected GitHub candidate fixes the syntax and passes the hosted-source CI checks. AppDeploy rejected the redeployment attempt because the account usage limit was reached. Do not rely on AI task execution in the live app until the correction is published and QA reports zero frontend errors.
 
 ## Important limits
 
