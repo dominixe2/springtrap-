@@ -1,0 +1,9 @@
+[
+  {
+    "name": "daily-user-review",
+    "cron": "0 20 * * *",
+    "handler": "dailyReviewHandler",
+    "timezone": "Europe/Prague",
+    "payload": {}
+  }
+]
