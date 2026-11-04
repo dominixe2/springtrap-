@@ -56,7 +56,7 @@ def main() -> None:
     if not required_coverage.issubset(covered):
         raise SystemExit(f"Missing QA coverage: {sorted(required_coverage - covered)}")
 
-    routes = re.findall(r'"(?:GET|POST|PUT|PATCH|DELETE) /api/[^"]+"\\s*:\\s*\\[([^\\]]{0,240})', backend)
+    routes = re.findall(r'"(?:GET|POST|PUT|PATCH|DELETE) /api/[^"]+"\s*:\s*\[([^\]]{0,240})', backend)
     if not routes:
         raise SystemExit("No API routes found in hosted backend")
     unprotected = [route for route in routes if "requireAuth()" not in route]
