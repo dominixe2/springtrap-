@@ -10,3 +10,7 @@ This directory mirrors the hosted AppDeploy snapshot `micro-helper-ygeuyn` (snap
 **Deployment boundary:** AppDeploy runs its own stored source snapshot. This GitHub copy is a reviewable, version-controlled mirror and CI validates it, but a GitHub commit does not automatically publish to AppDeploy. When changing hosted behavior, update this mirror and the AppDeploy snapshot together, then verify the live deployment.
 
 The root project remains a separate local Python/Ollama edition. Do not copy the hosted HTML/backend over the root Python package.
+
+## Source validation
+
+The repository workflow `.github/workflows/hosted-app-checks.yml` checks the mirrored JSON configuration, Czech PWA manifest, API authentication declarations, scheduled review handler, and inline browser JavaScript syntax. It is a static consistency check, not a live authenticated end-to-end test. Live search, image generation, account sync and browser speech still need verification in a signed-in browser session.
