@@ -14,6 +14,17 @@ Micro Helper is a free-first, local-first personal assistant foundation. The cur
 - Ollama model discovery and graceful handling when Ollama is offline.
 - API validation and automated tests.
 
+
+## Czech browser voice (new)
+
+The browser UI includes optional Czech speech input and spoken replies:
+- Tap **Mikrofon** and grant microphone permission to dictate with browser Web Speech recognition support (cs-CZ).
+- Review the recognized text and press **Odeslat**; dictation does not silently submit a message.
+- Enable **Předčítat odpovědi česky** to use browser speech synthesis for assistant replies.
+- **Zastavit hlas** cancels current speech playback and stops dictation.
+- Availability and voice quality depend on the browser, operating system, and installed speech services. Browser speech recognition may use the browser vendor's online service; it is not guaranteed to run offline or privately on-device.
+- This is push-to-talk/dictation plus speech playback, not full-duplex streaming voice. Wake word, background listening, and ChatGPT Voice/Gemini Live parity are not implemented.
+
 ## Android quick start (Termux)
 
 Install [Termux from F-Droid](https://f-droid.org/packages/com.termux/), open it, then run:
