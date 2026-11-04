@@ -10,11 +10,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "hosted-app"
 
+
 def read(path: str) -> str:
     file = ROOT / path
     if not file.is_file():
         raise SystemExit(f"Missing hosted source file: {path}")
     return file.read_text(encoding="utf-8")
+
 
 def main() -> None:
     package = json.loads(read("package.json"))
@@ -34,19 +36,27 @@ def main() -> None:
     assert '<link rel="manifest" href="/manifest.webmanifest"' in html
     assert "https://html.duckduckgo.com/html/?q=" in backend, "Search must use a fixed upstream URL"
     assert "new URL(data.url" not in backend, "Backend must not fetch arbitrary client-provided URLs"
-    assert "client.image.resizeIfNeeded" in html, "Image studio must resize/compress uploads before AI calls"
+    assert "client.image.resizeIfNeeded" in html, "Image uploads must be resized before AI calls"
     assert "POST /api/v1/tasks/:id/run" in backend, "Saved AI tasks need an executable backend route"
     assert "thinkingMode = data.thinkingMode" in backend, "Chat must honor the selected response depth"
+
     for control in ("generateImage", "analyzeImage", "readImageText"):
         assert f"getElementById('{control}')" in html, f"Missing image studio control: {control}"
     for route in ("/v1/images/generate", "/v1/images/analyze", "/v1/images/ocr", "/v1/tasks/"):
         assert route in html, f"Missing user-facing workflow for {route}"
-    required_coverage = {"AI image generation", "image analysis", "image OCR", "AI task execution endpoint"}
+
+    required_coverage = {
+        "AI image generation",
+        "image analysis",
+        "image OCR",
+        "AI task execution endpoint",
+        "persisted task result",
+    }
     covered = {name for item in tests for name in item.get("covers", [])}
     if not required_coverage.issubset(covered):
         raise SystemExit(f"Missing QA coverage: {sorted(required_coverage - covered)}")
 
-    routes = re.findall(r'"(?:GET|POST|PUT|PATCH|DELETE) /api/[^"]+"\s*:\s*\[([^\]]{0,240})', backend)
+    routes = re.findall(r'"(?:GET|POST|PUT|PATCH|DELETE) /api/[^"]+"\\s*:\\s*\\[([^\\]]{0,240})', backend)
     if not routes:
         raise SystemExit("No API routes found in hosted backend")
     unprotected = [route for route in routes if "requireAuth()" not in route]
@@ -73,6 +83,7 @@ def main() -> None:
             subprocess.run(["node", "--check", str(path)], check=True)
 
     print(f"Hosted source checks passed: {len(tests)} QA scenarios, {len(routes)} authenticated API routes, {len(scripts)} inline scripts.")
+
 
 if __name__ == "__main__":
     main()
