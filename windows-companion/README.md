@@ -1,16 +1,33 @@
 # Micro Helper Windows Companion
 
-1. Install Python 3 for Windows from https://www.python.org/downloads/windows/ and enable **Add Python to PATH**.
-2. Keep `companion.py` and `run-companion.bat` in the same folder.
-3. Run `run-companion.bat` and keep its window open.
-4. Copy the one-time pairing code shown in the terminal into the Windows Companion panel in Micro Helper.
+## Run the prebuilt executable
+
+1. Download the latest `micro-helper-windows-companion` artifact from [GitHub Actions](https://github.com/dominixe2/springtrap-/actions/workflows/windows-companion.yml?query=branch%3Amicro-helper).
+2. Extract the ZIP archive.
+3. Run `MicroHelperCompanion.exe`. Python is not required for the prebuilt EXE.
+4. Keep the console window open and copy the one-time pairing code into the Windows Companion panel in Micro Helper.
+5. Test only the supported actions: lock Windows, open Explorer, Notepad or Calculator.
+
+The executable is currently unsigned. Windows SmartScreen may display a warning. Only run a build downloaded from this repository's Actions artifacts.
+
+## Run from source
+
+Requires Python 3.11+:
+
+```powershell
+py -3 windows-companion/companion.py
+```
+
+Or run `run-companion.bat` from this folder.
 
 ## Security boundaries
-- Binds only to `127.0.0.1`, not Wi-Fi or the public internet.
-- Accepts browser requests only from the official Micro Helper origin.
-- Uses a random one-time pairing code and a random session token; both reset when the program restarts.
-- Allows only lock, Explorer, Notepad and Calculator actions.
-- Does not expose arbitrary shell, PowerShell, file browsing or remote desktop.
-- Closing the terminal stops the service.
 
-If the browser blocks local network access, allow the permission for Micro Helper. The helper uses port 8765.
+- Binds only to `127.0.0.1:8765`, not Wi-Fi or the public internet.
+- Accepts browser POST requests only from the official Micro Helper origin.
+- Uses a random one-time pairing code and random session token. Both reset when the process restarts.
+- Rejects repeated invalid pairing attempts.
+- Allows only lock, Explorer, Notepad and Calculator.
+- Does not expose arbitrary shell/PowerShell commands, arbitrary file browsing or remote desktop.
+- Closing the program stops the local service and invalidates the session.
+
+If the browser blocks local network access, allow the permission for Micro Helper. Keep the companion closed when you do not need it.
