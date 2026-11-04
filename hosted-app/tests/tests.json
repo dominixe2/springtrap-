@@ -11,14 +11,16 @@
       "AI image generation",
       "image analysis",
       "image OCR",
-      "visible retryable errors"
+      "visible retryable errors",
+      "client-side image resize and compression before upload",
+      "generated image preview and download"
     ],
     "description": "Verifies the main AI workflows work on a phone and unavailable browser or AI capabilities are reported honestly.",
     "steps": [
       "Sign in to Micro Helper",
       "Open the voice panel and verify Czech speech controls and the foreground-only Myklo explanation",
       "Search for a public topic and verify a summary and source links appear",
-      "Generate an image from a short prompt and verify the result and download action",
+      "Generate an image from a short prompt, verify the preview and download action, then select a reference image and verify a resized preview is shown",
       "Upload a reference image, run analysis and extract readable text"
     ],
     "expected": "Voice controls report actual browser support and foreground-only limits; web search shows a summary and source links; image generation, analysis and OCR return visible results or a clear retryable error."
@@ -30,7 +32,12 @@
       "authenticated cross-device synchronization",
       "live WebSocket subscription",
       "server-authorized user data isolation",
-      "learning-plan create and update"
+      "learning-plan create and update",
+      "authenticated task creation",
+      "AI task execution endpoint",
+      "persisted task result",
+      "retryable AI task failure",
+      "quick and deep chat response setting"
     ],
     "description": "Verifies learning plan changes propagate live between two clients belonging to the same account.",
     "steps": [
@@ -39,9 +46,14 @@
       "Create a plan named Live sync check as Actor A",
       "Verify the plan appears for Actor B without refreshing the second client",
       "Change the plan objective as Actor B",
-      "Verify the updated objective appears for Actor A"
+      "Verify the updated objective appears for Actor A",
+      "Create a task with a short title and a concrete text instruction",
+      "Select Run AI for the new task",
+      "Verify the task changes to completed and a useful result appears",
+      "Refresh the page and verify the completed result remains available",
+      "Switch the chat response depth between quick and deep and save the setting"
     ],
-    "expected": "Both clients show the latest plan data without manual refresh, and a signed-out client cannot access account data."
+    "expected": "Both clients show the latest plan data without manual refresh, and a signed-out client cannot access account data. The same account can also run a saved AI task, retain its completed result, retry failures, and choose quick or deep chat responses."
   },
   {
     "name": "Pair Windows Companion and reject unauthorized desktop commands",
