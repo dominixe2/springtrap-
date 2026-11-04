@@ -64,6 +64,10 @@ class CompanionSecurityTests(unittest.TestCase):
         self.assertEqual(status, 403)
         self.assertEqual(companion.FAILED_PAIRS, 0)
 
+    def test_non_object_json_body_is_rejected(self) -> None:
+        status, _ = self.request("/pair", ["not", "an", "object"])  # type: ignore[arg-type]
+        self.assertEqual(status, 400)
+
     def test_pairing_code_is_single_use(self) -> None:
         old_code = companion.PAIRING_CODE
         token = self.pair()
