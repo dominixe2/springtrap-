@@ -70,7 +70,7 @@ def test_mobile_layout_and_core_controls(app_url):
         page.on("pageerror", lambda error: errors.append(str(error)))
         response = page.goto(app_url, wait_until="networkidle")
         assert response and response.status == 200
-        assert page.locator("h1").inner_text() == "Micro Helper"
+        assert page.locator("h1").inner_text() == "Mykla · Micro Helper"
         assert page.locator("#chat").is_visible()
         assert page.locator("#memoryForm").is_visible()
         assert page.locator("#exportBackup").is_visible()
@@ -97,6 +97,6 @@ def test_chat_interaction_with_mocked_local_model(app_url):
         ))
         page.goto(app_url, wait_until="networkidle")
         page.locator("#prompt").fill("Otestuj chat")
-        page.locator("#chat button").click()
+        page.locator("#chat button.primary").click()
         assert page.get_by_text("Testovací odpověď Mykly").is_visible()
         browser.close()
