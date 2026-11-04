@@ -176,3 +176,13 @@ def test_launch_scripts_bind_only_to_loopback():
     for script in ("run-windows.bat", "termux-start.sh"):
         content = (repo_root / script).read_text(encoding="utf-8")
         assert "--host 127.0.0.1" in content, f"{script} must not expose private APIs on the LAN"
+
+
+def test_home_page_exposes_czech_browser_voice_controls():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'id="voiceInput"' in response.text
+    assert 'id="voiceOutput"' in response.text
+    assert 'id="voiceStop"' in response.text
+    assert 'recognition.lang="cs-CZ"' in response.text
+    assert 'utterance.lang="cs-CZ"' in response.text
