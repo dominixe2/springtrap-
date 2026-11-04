@@ -135,12 +135,12 @@ async def status():
         "version": app.version,
         "mode": "local-first",
         "implemented": [
-            "web_chat_ui", "health", "status", "pluggable_ai_providers", "ollama_chat_adapter",
+            "web_chat_ui", "health", "status", "pluggable_ai_providers", "ollama_chat_adapter", "browser_voice_input_output",
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear", "task_crud",
         ],
         "not_yet_implemented": [
-            "voice", "android_integration", "windows_worker",
+            "realtime_voice_streaming", "wake_word", "android_integration", "windows_worker",
             "agent_messaging", "animated_mascot", "encrypted_cloud_sync", "tool_execution", "push_notifications",
         ],
         "paid_api_required": False,
