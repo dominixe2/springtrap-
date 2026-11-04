@@ -91,6 +91,10 @@ class CompanionSecurityTests(unittest.TestCase):
         self.assertTrue(result.get("ok"))
         popen.assert_called_once_with(["notepad.exe"], shell=False, close_fds=True)
 
+    def test_command_requires_a_valid_session_token(self) -> None:
+        status, _ = self.request("/command", {"action": "notepad"})
+        self.assertEqual(status, 401)
+
     def test_arbitrary_command_is_rejected(self) -> None:
         token = self.pair()
         with patch.object(companion.sys, "platform", "win32"), patch.object(companion.subprocess, "Popen") as popen:
