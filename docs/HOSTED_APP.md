@@ -12,10 +12,16 @@ The repository also retains a separate local Python/FastAPI edition in `src/micr
 - Account-backed cloud chat and private per-user state.
 - Notes, preferences, learning plans, conversation history, draft tasks and daily review reports.
 - Browser voice input/output, optional hands-free continuation and a foreground-only wake phrase where supported by the browser.
-- Authenticated web search, AI image generation, image analysis and OCR. The newer candidate wires the image-studio controls to these routes and compresses photos before upload.
+- Authenticated web search, AI image generation, image analysis and OCR.
 - Realtime notifications between clients signed into the same account.
 - Optional Windows Companion with loopback-only pairing and a small fixed command allowlist.
 - Android debug APK wrapper that opens the hosted app.
+
+## Candidate improvements pending deployment
+
+Candidate snapshot `1793769353100` wires the image-studio controls to the existing generation, analysis and OCR endpoints, compresses selected photos before upload, adds explicit AI task execution with saved results, and lets users choose quick or deep chat responses.
+
+The live AppDeploy deployment remains on snapshot `1793767519998`. Publishing the candidate was blocked by the AppDeploy account usage limit. Do not treat these candidate improvements as live until a future deployment reaches `ready` and QA reports no frontend errors.
 
 ## Important limits
 
@@ -23,14 +29,10 @@ The repository also retains a separate local Python/FastAPI edition in `src/micr
 - The PWA caches the app shell only. It does not cache AI models, private API responses or provide offline AI.
 - Browser speech recognition depends on browser/OS support and may use an online speech service. Wake phrase recognition only runs while the app is open and voice mode is active.
 - Web search and AI image features depend on AppDeploy AI service availability and account quotas.
-- Background tasks currently store bounded draft requests. They are not a general autonomous agent and do not run arbitrary code or operate devices.
+- Saved AI tasks generate text outputs only. They do not run arbitrary code, control devices or perform actions outside the app.
 - Realtime events notify clients to reload account state; they do not broadcast private state payloads.
 - Local browser fallback data remains specific to that browser/device until explicitly imported into the signed-in account.
 - The Windows Companion is intentionally limited to lock, Explorer, Notepad and Calculator. It does not expose a shell, arbitrary file access or remote desktop.
-
-## Deployment status
-
-The live AppDeploy deployment remains on snapshot `1793767519998`. Candidate snapshot `1793769353100` adds working image-studio handlers, AI task execution and a quick/deep response setting, but its publish was blocked by the AppDeploy usage limit. Do not treat those candidate changes as live until a future deployment reaches `ready` and QA reports no frontend errors.
 
 ## Build and validation
 
