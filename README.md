@@ -5,11 +5,15 @@ Micro Helper is a Czech-first personal assistant project with two deliberately s
 ## Phone-first hosted app
 
 - **Live app:** https://micro-helper-ygeuyn.v2.appdeploy.ai/
-- **Hosted source mirror:** [hosted-app/](hosted-app/)
+- **Hosted source candidate:** [hosted-app/](hosted-app/)
 - **Install on Android:** use the hosted PWA from Chrome, or download the debug APK from [GitHub Actions](https://github.com/dominixe2/springtrap-/actions/workflows/android-apk.yml?query=branch%3Amicro-helper).
 - **Windows Companion:** build/download it from [GitHub Actions](https://github.com/dominixe2/springtrap-/actions/workflows/windows-companion.yml?query=branch%3Amicro-helper).
 
-The hosted edition includes account-backed cloud chat and sync, private notes and preferences, learning plans, tasks, daily review reports, browser voice, web search, image generation, image analysis and OCR. Feature availability depends on the signed-in account and platform AI quotas. The GitHub candidate adds executable AI tasks, working image-studio controls and quick/deep chat depth; these changes are pending AppDeploy redeployment because the current usage limit blocks publishing.
+The corrected GitHub candidate includes account-backed cloud chat and sync, private notes and preferences, learning plans, executable AI text tasks, daily review reports, browser voice, web search, working image-studio handlers and quick/deep chat response depth. Feature availability depends on the signed-in account and platform AI quotas.
+
+### Current deployment warning
+
+The active AppDeploy snapshot `1793769353100` currently reports a JavaScript syntax error in the task-list script. The corrected GitHub candidate fixes it and passes hosted-source CI, but AppDeploy blocked the redeployment because its account usage limit was reached. Do not rely on AI task execution in the live app until a new deployment is ready and frontend QA is clean.
 
 ### Honest platform limits
 
@@ -19,7 +23,7 @@ The hosted edition includes account-backed cloud chat and sync, private notes an
 - Background AI tasks generate bounded text outputs when explicitly run; they are not a general autonomous agent.
 - The Windows Companion permits only lock, Explorer, Notepad and Calculator. It does not expose arbitrary shell commands or remote desktop.
 - The Windows EXE is not code-signed; SmartScreen may warn.
-- The GitHub `hosted-app/` directory is a version-controlled candidate source mirror. GitHub commits do not automatically publish to AppDeploy; the live deployment remains on the earlier snapshot until the candidate can be redeployed.
+- GitHub commits do not automatically publish to AppDeploy.
 
 See [hosted app architecture](docs/HOSTED_APP.md) and [security notes](docs/SECURITY.md).
 
