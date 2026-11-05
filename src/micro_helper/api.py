@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Iterator
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from urllib.parse import urlsplit
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -20,6 +22,32 @@ from micro_helper.providers import ProviderConfigurationError, ProviderRequestEr
 app = FastAPI(title="Micro Helper", version="0.3.0")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+@app.middleware("http")
+async def protect_cross_origin_mutations(request: Request, call_next):
+    """Reject browser-originated cross-site writes to the local personal-data API.
+
+    This is a CSRF defense, not authentication. Keep the launcher bound to loopback
+    and use a separate authenticated design before exposing the service to a network.
+    """
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        fetch_site = request.headers.get("sec-fetch-site", "").lower()
+        origin = request.headers.get("origin")
+        if fetch_site == "cross-site":
+            return JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."})
+        if origin:
+            parsed_origin = urlsplit(origin)
+            request_host = request.headers.get("host", "").lower()
+            if (
+                parsed_origin.scheme != request.url.scheme
+                or not parsed_origin.netloc
+                or parsed_origin.netloc.lower() != request_host
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+            ):
+                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+    return await call_next(request)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
