@@ -1,9 +1,15 @@
 from fastapi.testclient import TestClient
+import pytest
 
 import micro_helper.api as api
 
 
 client = TestClient(api.app)
+
+
+@pytest.fixture(autouse=True)
+def isolated_database(tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "DATABASE_PATH", tmp_path / "origin-tests.sqlite3")
 
 
 def test_cross_origin_profile_write_is_rejected(tmp_path, monkeypatch):
