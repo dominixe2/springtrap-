@@ -206,9 +206,20 @@ async def restore_backup(request: RestoreRequest):
     if len(memories) > 10000 or len(messages) > 100000 or len(tasks) > 10000:
         raise HTTPException(status_code=413, detail="Záloha je příliš velká.")
     try:
-        memory_rows = [(int(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
-        message_rows = [(int(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
-        task_rows = [(int(x["id"]), str(x["title"]), str(x.get("description", "")), x.get("due_at"), int(bool(x.get("completed", 0))), str(x["created_at"])) for x in tasks]
+        def record_id(value):
+            # JSON booleans and floats are not valid SQLite record identifiers.
+            if type(value) is not int or value <= 0:
+                raise ValueError()
+            return value
+
+        for task in tasks:
+            completed = task.get("completed", 0)
+            if type(completed) not in (bool, int) or completed not in (0, 1, False, True):
+                raise ValueError()
+
+        memory_rows = [(record_id(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
+        message_rows = [(record_id(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
+        task_rows = [(record_id(x["id"]), str(x["title"]), str(x.get("description", "")), x.get("due_at"), int(bool(x.get("completed", 0))), str(x["created_at"])) for x in tasks]
         if any(row[1] not in ("user", "assistant") for row in message_rows):
             raise ValueError()
         if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows) or any(not row[1] for row in task_rows):
