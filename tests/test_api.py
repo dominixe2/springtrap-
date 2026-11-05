@@ -187,3 +187,89 @@ def test_home_page_exposes_czech_browser_voice_controls():
     assert 'id="voiceStop"' in response.text
     assert 'recognition.lang="cs-CZ"' in response.text
     assert 'utterance.lang="cs-CZ"' in response.text
+
+
+def test_legacy_v1_backup_without_tasks_restores_existing_data():
+    """Older v1 exports did not always include the tasks key."""
+    legacy_backup = {
+        "format": "micro-helper-backup",
+        "version": 1,
+        "exported_at": "2026-01-01T00:00:00+00:00",
+        "profile": {
+            "agent_name": "Mykla",
+            "language": "cs-CZ",
+            "style": "stručný",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+        },
+        "memories": [
+            {"id": 7, "content": "Původní paměť", "category": "preference", "created_at": "2026-01-01T00:00:00+00:00"}
+        ],
+        "messages": [
+            {"id": 11, "role": "user", "content": "Starší zpráva", "created_at": "2026-01-01T00:00:01+00:00"}
+        ],
+    }
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": legacy_backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"restored": True, "memories": 1, "messages": 1, "tasks": 0}
+    assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
+    assert client.get("/v1/memories").json()["memories"][0]["content"] == "Původní paměť"
+    assert client.get("/v1/conversations").json()["messages"][0]["content"] == "Starší zpráva"
+    assert client.get("/v1/tasks").json()["tasks"] == []
+
+
+def test_backup_round_trip_preserves_tasks_and_all_existing_records():
+    client.put("/v1/profile", json={"agent_name": "Mykla", "language": "cs-CZ", "style": "stručný"})
+    client.post("/v1/memories", json={"content": "Důležitá paměť", "category": "project"})
+    client.post("/v1/tasks", json={
+        "title": "Dokončit Micro Helper",
+        "description": "Zachovat historii a úkoly",
+        "due_at": "2026-12-01T12:00:00+01:00",
+    })
+    with api.database() as db:
+        db.execute(
+            "INSERT INTO messages(role, content, created_at) VALUES (?, ?, ?)",
+            ("user", "Původní zpráva", "2026-01-01T00:00:00Z"),
+        )
+        db.commit()
+
+    backup = client.get("/v1/backup").json()
+    assert len(backup["tasks"]) == 1
+
+    client.put("/v1/profile", json={"agent_name": "Jiný profil", "language": "cs-CZ", "style": "friendly"})
+    client.post("/v1/tasks", json={"title": "Dočasný úkol"})
+
+    restored = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert restored.status_code == 200
+    assert restored.json() == {"restored": True, "memories": 1, "messages": 1, "tasks": 1}
+    assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
+    assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Důležitá paměť"]
+    assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == ["Dokončit Micro Helper"]
+    assert [item["content"] for item in client.get("/v1/conversations").json()["messages"]] == ["Původní zpráva"]
+
+
+def test_invalid_task_in_backup_does_not_replace_existing_user_data():
+    client.put("/v1/profile", json={"agent_name": "Bezpečný profil", "language": "cs-CZ", "style": "stručný"})
+    client.post("/v1/memories", json={"content": "Zachovat mě", "category": "preference"})
+    client.post("/v1/tasks", json={"title": "Zachovat úkol"})
+    backup = client.get("/v1/backup").json()
+    backup["tasks"] = [{"id": "neplatné-id", "title": "Rozbitý úkol", "created_at": "now"}]
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/v1/profile").json()["agent_name"] == "Bezpečný profil"
+    assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Zachovat mě"]
+    assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == ["Zachovat úkol"]
+
