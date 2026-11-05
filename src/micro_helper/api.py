@@ -213,6 +213,15 @@ async def restore_backup(request: RestoreRequest):
             raise ValueError()
         if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows) or any(not row[1] for row in task_rows):
             raise ValueError()
+        # Primary keys must be positive and unique within each restored collection.
+        # Otherwise SQLite would raise an internal error during restore instead of
+        # returning a clear validation response before touching existing user data.
+        for rows in (memory_rows, message_rows, task_rows):
+            identifiers = [row[0] for row in rows]
+            if any(identifier <= 0 for identifier in identifiers):
+                raise ValueError()
+            if len(identifiers) != len(set(identifiers)):
+                raise ValueError()
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=422, detail="Záloha obsahuje neplatné záznamy.")
     with database() as db:
