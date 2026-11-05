@@ -273,3 +273,35 @@ def test_invalid_task_in_backup_does_not_replace_existing_user_data():
     assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Zachovat mě"]
     assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == ["Zachovat úkol"]
 
+
+@pytest.mark.parametrize(
+    "memory_ids",
+    [
+        [7, 7],
+        [0],
+    ],
+)
+def test_restore_rejects_duplicate_or_nonpositive_record_ids_without_replacing_data(memory_ids):
+    client.put("/v1/profile", json={"agent_name": "Bezpečný profil", "language": "cs-CZ", "style": "stručný"})
+    client.post("/v1/memories", json={"content": "Zachovat původní paměť", "category": "preference"})
+    backup = client.get("/v1/backup").json()
+    backup["memories"] = [
+        {
+            "id": identifier,
+            "content": f"Importovaná paměť {index}",
+            "category": "context",
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
+        for index, identifier in enumerate(memory_ids)
+    ]
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/v1/profile").json()["agent_name"] == "Bezpečný profil"
+    assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == [
+        "Zachovat původní paměť"
+    ]
