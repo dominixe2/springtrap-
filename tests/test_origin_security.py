@@ -58,3 +58,16 @@ def test_origin_guard_does_not_block_safe_get_requests():
     )
 
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize("origin", ["http://testserver:9999", "http://user@testserver"])
+def test_profile_write_rejects_origin_with_wrong_port_or_userinfo(origin):
+    response = client.put(
+        "/v1/profile",
+        headers={"origin": origin},
+        json={"agent_name": "Rejected", "language": "cs-CZ", "style": "friendly"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Cross-origin write blocked."
+    assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
