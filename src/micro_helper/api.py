@@ -1,6 +1,7 @@
 """Local-first Micro Helper API with persistent private data and optional Ollama chat."""
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 import sqlite3
@@ -24,27 +25,53 @@ STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+def _is_loopback_hostname(hostname: str | None) -> bool:
+    """Return whether a hostname is a literal loopback address or localhost.
+
+    Do not trust Origin/Host equality alone: DNS rebinding can make an attacker's
+    hostname resolve to 127.0.0.1 while both headers still match.
+    """
+    if not hostname:
+        return False
+    normalized = hostname.rstrip(".").lower()
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
 @app.middleware("http")
 async def protect_cross_origin_mutations(request: Request, call_next):
-    """Reject browser-originated cross-site writes to the local personal-data API.
+    """Reject cross-origin writes to the local personal-data API.
 
-    This is a CSRF defense, not authentication. Keep the launcher bound to loopback
-    and use a separate authenticated design before exposing the service to a network.
+    This is CSRF defense in depth, not authentication. Keep the launcher bound to
+    loopback and use a separate authenticated design before exposing the service
+    to a network.
     """
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        request_host = request.headers.get("host", "").lower()
+        if not _is_loopback_hostname(request.url.hostname):
+            return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
+
         fetch_site = request.headers.get("sec-fetch-site", "").lower()
         origin = request.headers.get("origin")
         if fetch_site == "cross-site":
             return JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."})
         if origin:
-            parsed_origin = urlsplit(origin)
-            request_host = request.headers.get("host", "").lower()
+            try:
+                parsed_origin = urlsplit(origin)
+            except ValueError:
+                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
             if (
-                parsed_origin.scheme != request.url.scheme
+                parsed_origin.scheme.lower() != request.url.scheme.lower()
                 or not parsed_origin.netloc
                 or parsed_origin.netloc.lower() != request_host
                 or parsed_origin.username is not None
                 or parsed_origin.password is not None
+                or bool(parsed_origin.path or parsed_origin.query or parsed_origin.fragment)
+                or not _is_loopback_hostname(parsed_origin.hostname)
             ):
                 return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
     return await call_next(request)
