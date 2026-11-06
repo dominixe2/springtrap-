@@ -273,3 +273,76 @@ def test_invalid_task_in_backup_does_not_replace_existing_user_data():
     assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Zachovat mě"]
     assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == ["Zachovat úkol"]
 
+def test_restore_rejects_coerced_task_completion_and_preserves_existing_data():
+    client.put("/v1/profile", json={"agent_name": "Bezpečný profil", "language": "cs-CZ", "style": "stručný"})
+    client.post("/v1/memories", json={"content": "Zachovat mě", "category": "preference"})
+    client.post("/v1/tasks", json={"title": "Zachovat úkol"})
+    backup = client.get("/v1/backup").json()
+    backup["tasks"][0]["completed"] = "false"
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/v1/profile").json()["agent_name"] == "Bezpečný profil"
+    assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Zachovat mě"]
+    assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == ["Zachovat úkol"]
+
+
+def test_restore_rejects_duplicate_record_ids_before_replacing_data():
+    client.post("/v1/memories", json={"content": "Původní paměť", "category": "preference"})
+    backup = client.get("/v1/backup").json()
+    backup["memories"].append({**backup["memories"][0], "content": "Duplicitní záznam"})
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Původní paměť"]
+
+
+def test_restore_rejects_non_string_memory_content_instead_of_coercing_it():
+    backup = client.get("/v1/backup").json()
+    backup["memories"] = [{"id": 1, "content": 123, "category": "preference", "created_at": "2026-01-01T00:00:00Z"}]
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/v1/memories").json()["memories"] == []
+
+def test_restore_rejects_boolean_backup_version():
+    backup = client.get("/v1/backup").json()
+    backup["version"] = True
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+
+
+def test_restore_rejects_ids_outside_sqlite_integer_range():
+    backup = client.get("/v1/backup").json()
+    backup["memories"] = [{
+        "id": 9223372036854775808,
+        "content": "Mimo rozsah",
+        "category": "context",
+        "created_at": "2026-01-01T00:00:00Z",
+    }]
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/v1/memories").json()["memories"] == []
+
