@@ -24,6 +24,10 @@
 - Does not invoke a shell or accept arbitrary executable paths/arguments.
 - The local bridge is not a general remote desktop. Keep the executable from a trusted build artifact and close it when it is not needed.
 
+## Deterministic permission policy
+
+The feature branch includes `src/micro_helper/trust_policy.py` and unit tests for exact grants, explicit-deny precedence, sensitive-data confirmation, financial/destructive confirmation and narrow optional-cookie rejection. This is a policy primitive, not proof that every hosted or desktop tool already calls it. Do not treat the policy as enforced end to end until each action adapter is wired to it and integration tests cover the full request path.
+
 ## Residual risks and limits
 
 - The Android wrapper loads the hosted origin, so cloud data and AI depend on network and the AppDeploy account.
