@@ -39,7 +39,7 @@ A level may be raised only when new implementation and evidence are linked in th
 ## Current test evidence
 
 - **PASS:** Micro Helper checks, PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`, GitHub Actions run [#270](https://github.com/dominixe2/springtrap-/actions/runs/42267396572). Dependency install, embedded browser JavaScript syntax, Python compilation and pytest completed successfully.
-- **PASS:** Hosted-source checks on the same head, GitHub Actions run [#17](https://github.com/dominixe2/springtrap-/actions/runs/42267396582).
+- **PASS:** Hosted-source checks on the same head, GitHub Actions run [#19](https://github.com/dominixe2/springtrap-/actions/runs/42267396582).
 - **PASS:** Isolated trust-policy suite copied from the exact branch files: 7 tests passed. This is supplementary; GitHub Actions is the repository-level result.
 - **NOT RUN:** Physical Android install/use, physical Windows use, signed-in end-to-end flows for hosted chat/sync/tasks/images/web search/voice, and full trust-policy integration across every action adapter.
 - **NOT RUN:** Production signing, store release, security penetration review, and verified rollback drill.
