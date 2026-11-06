@@ -26,7 +26,9 @@
 
 ## Deterministic permission policy
 
-The feature branch includes `src/micro_helper/trust_policy.py` and unit tests for exact grants, explicit-deny precedence, sensitive-data confirmation, financial/destructive confirmation and narrow optional-cookie rejection. This is a policy primitive, not proof that every hosted or desktop tool already calls it. Do not treat the policy as enforced end to end until each action adapter is wired to it and integration tests cover the full request path.
+The current feature branch includes `src/micro_helper/trust_policy.py` and `tests/test_trust_policy.py`. The policy covers exact grants, explicit-deny precedence, and fresh confirmation for financial/destructive actions, sensitive-data access or sharing, external messages, account changes, security-setting changes, software installation and untrusted code. Unit tests prove that an explicit grant does not bypass those confirmation requirements. Only the narrow `browser.cookie_consent:reject_optional` operation has a built-in low-risk allow rule; accepting all cookies is not auto-allowed.
+
+**Integration limitation:** this is a policy primitive, not proof that every hosted or desktop tool already calls it. Do not treat the policy as enforced end to end until each action adapter is wired to it and request-to-policy integration tests cover the full path. The weighted release evidence is tracked in [Micro Helper 1.0 acceptance checklist](MICRO_HELPER_1_0_CHECKLIST.md).
 
 ## Residual risks and limits
 
