@@ -88,3 +88,29 @@ def test_profile_write_rejects_non_loopback_host_even_when_origin_matches(host):
     assert response.json()["detail"] == "Non-loopback host blocked."
     assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
 
+
+def test_non_loopback_host_cannot_read_private_api_backup():
+    response = client.get(
+        "/v1/backup",
+        headers={
+            "host": "attacker.example:8000",
+            "origin": "http://attacker.example:8000",
+            "sec-fetch-site": "same-origin",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Non-loopback host blocked."
+
+
+@pytest.mark.parametrize("origin", ["http://[", "http://127.0.0.1:8000/path", "null"])
+def test_malformed_or_non_origin_value_is_rejected_for_writes(origin):
+    response = client.put(
+        "/v1/profile",
+        headers={"origin": origin},
+        json={"agent_name": "Rejected", "language": "cs-CZ", "style": "friendly"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Cross-origin write blocked."
+
