@@ -50,11 +50,14 @@ async def protect_cross_origin_mutations(request: Request, call_next):
     loopback and use a separate authenticated design before exposing the service
     to a network.
     """
-    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-        request_host = request.headers.get("host", "").lower()
+    # Protect reads as well as writes: DNS rebinding could otherwise expose
+    # private memories/history through GET endpoints even if mutations are blocked.
+    if request.url.path == "/v1" or request.url.path.startswith("/v1/"):
         if not _is_loopback_hostname(request.url.hostname):
             return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
 
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        request_host = request.headers.get("host", "").lower()
         fetch_site = request.headers.get("sec-fetch-site", "").lower()
         origin = request.headers.get("origin")
         if fetch_site == "cross-site":
