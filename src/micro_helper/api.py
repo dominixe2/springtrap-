@@ -168,30 +168,96 @@ async def restore_backup(request: RestoreRequest):
         raise HTTPException(status_code=400, detail="Obnova vyžaduje confirm_replace=true.")
     if backup.get("format") != "micro-helper-backup" or backup.get("version") != 1:
         raise HTTPException(status_code=422, detail="Nepodporovaný nebo poškozený záložní soubor.")
-    profile, memories, messages = backup.get("profile"), backup.get("memories"), backup.get("messages")
+
+    profile = backup.get("profile")
+    memories = backup.get("memories")
+    messages = backup.get("messages")
     tasks = backup.get("tasks", [])
-    if not isinstance(profile, dict) or not isinstance(memories, list) or not isinstance(messages, list) or not isinstance(tasks, list):
+    if not isinstance(profile, dict) or not all(isinstance(rows, list) for rows in (memories, messages, tasks)):
         raise HTTPException(status_code=422, detail="Záloha neobsahuje kompletní profil, paměti a historii.")
-    keys = ("agent_name", "language", "style", "updated_at")
-    if any(not isinstance(profile.get(key), str) for key in keys):
-        raise HTTPException(status_code=422, detail="Profil v záloze není platný.")
     if len(memories) > 10000 or len(messages) > 100000 or len(tasks) > 10000:
         raise HTTPException(status_code=413, detail="Záloha je příliš velká.")
+
+    def required_text(value: object, maximum: int) -> str:
+        if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+            raise ValueError("Neplatný text")
+        return value
+
     try:
-        memory_rows = [(int(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
-        message_rows = [(int(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
-        task_rows = [(int(x["id"]), str(x["title"]), str(x.get("description", "")), x.get("due_at"), int(bool(x.get("completed", 0))), str(x["created_at"])) for x in tasks]
-        if any(row[1] not in ("user", "assistant") for row in message_rows):
-            raise ValueError()
-        if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows) or any(not row[1] for row in task_rows):
-            raise ValueError()
+        profile_values = (
+            required_text(profile.get("agent_name"), 30),
+            required_text(profile.get("language"), 20),
+            required_text(profile.get("style"), 40),
+            required_text(profile.get("updated_at"), 40),
+        )
+
+        def record_id(item: dict) -> int:
+            value = item.get("id")
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError("Neplatné ID")
+            return value
+
+        memory_rows = []
+        for item in memories:
+            if not isinstance(item, dict):
+                raise ValueError("Neplatná paměť")
+            memory_rows.append((
+                record_id(item),
+                required_text(item.get("content"), 1000),
+                required_text(item.get("category"), 40),
+                required_text(item.get("created_at"), 40),
+            ))
+
+        message_rows = []
+        for item in messages:
+            if not isinstance(item, dict) or item.get("role") not in ("user", "assistant"):
+                raise ValueError("Neplatná zpráva")
+            message_rows.append((
+                record_id(item),
+                item["role"],
+                required_text(item.get("content"), 12000),
+                required_text(item.get("created_at"), 40),
+            ))
+
+        task_rows = []
+        for item in tasks:
+            if not isinstance(item, dict):
+                raise ValueError("Neplatný úkol")
+            due_at = item.get("due_at")
+            if due_at is not None and (not isinstance(due_at, str) or len(due_at) > 40):
+                raise ValueError("Neplatný termín")
+            completed = item.get("completed", 0)
+            if isinstance(completed, bool):
+                completed = int(completed)
+            if not isinstance(completed, int) or completed not in (0, 1):
+                raise ValueError("Neplatný stav úkolu")
+            description = item.get("description", "")
+            if not isinstance(description, str) or len(description) > 2000:
+                raise ValueError("Neplatný popis úkolu")
+            task_rows.append((
+                record_id(item),
+                required_text(item.get("title"), 160),
+                description,
+                due_at,
+                completed,
+                required_text(item.get("created_at"), 40),
+            ))
+
+        for rows in (memory_rows, message_rows, task_rows):
+            ids = [row[0] for row in rows]
+            if len(ids) != len(set(ids)):
+                raise ValueError("Duplicitní ID")
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=422, detail="Záloha obsahuje neplatné záznamy.")
+
     with database() as db:
         db.execute("DELETE FROM memories")
         db.execute("DELETE FROM messages")
         db.execute("DELETE FROM tasks")
-        db.execute("UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1", tuple(profile[k] for k in keys))
+        db.execute(
+            "UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1",
+            profile_values,
+        )
         db.executemany("INSERT INTO memories(id, content, category, created_at) VALUES (?, ?, ?, ?)", memory_rows)
         db.executemany("INSERT INTO messages(id, role, content, created_at) VALUES (?, ?, ?, ?)", message_rows)
         db.executemany("INSERT INTO tasks(id, title, description, due_at, completed, created_at) VALUES (?, ?, ?, ?, ?, ?)", task_rows)
