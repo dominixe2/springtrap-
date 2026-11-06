@@ -44,6 +44,15 @@
         gap: 14px;
         padding: 14px 0 22px;
       }
+      .avatar-wrap { position: relative; width: 58px; height: 58px; flex: 0 0 58px; display:grid; place-items:center; }
+      .orb { width: 52px; height: 52px; border-radius: 50%; background: radial-gradient(circle at 35% 28%,#effffb 0 5%,#b1f5e9 14%,#55cdb8 38%,#1d6076 72%,#12233d 100%); box-shadow: 0 0 18px #4bc7b477, inset 0 0 12px #eaffff88; animation: helper-breathe 3.6s ease-in-out infinite; }
+      .orb::before,.orb::after { content:""; position:absolute; top:25px; width:5px; height:8px; border-radius:50%; background:#10263a; box-shadow:0 0 7px #effffb; }
+      .orb::before { margin-left:-9px; } .orb::after { margin-left:9px; }
+      .avatar-ring { position:absolute; inset:1px; border:1px solid #83ead2a8; border-radius:50%; animation: helper-orbit 9s linear infinite; }
+      .avatar-ring::after { content:""; position:absolute; width:5px; height:5px; top:5px; left:7px; border-radius:50%; background:#c9fff2; box-shadow:0 0 10px #73d7c2; }
+      @keyframes helper-breathe { 0%,100%{transform:scale(.96);filter:brightness(.94)} 50%{transform:scale(1.04);filter:brightness(1.15)} }
+      @keyframes helper-orbit { to{transform:rotate(360deg)} }
+      @media (prefers-reduced-motion: reduce) { .orb,.avatar-ring { animation:none; } }
       .orb {
         width: 42px;
         height: 42px;
@@ -161,7 +170,7 @@
   <body>
     <main>
       <header>
-        <div class="orb"></div>
+        <div class="avatar-wrap" role="img" aria-label="Animovaný avatar Micro Helpera"><div class="orb"></div><div class="avatar-ring" aria-hidden="true"></div></div>
         <div>
           <h1 id="title">Micro Helper</h1>
           <small>Tvůj osobní AI pomocník · cloud i místní režim</small>

@@ -9,15 +9,20 @@ Micro Helper is a Czech-first personal assistant project with two deliberately s
 - **Install on Android:** use the hosted PWA from Chrome, or download the debug APK from [GitHub Actions](https://github.com/dominixe2/springtrap-/actions/workflows/android-apk.yml?query=branch%3Amicro-helper).
 - **Windows Companion:** build/download it from [GitHub Actions](https://github.com/dominixe2/springtrap-/actions/workflows/windows-companion.yml?query=branch%3Amicro-helper).
 
-The corrected GitHub candidate includes account-backed cloud chat and sync, private notes and preferences, learning plans, executable AI text tasks, daily review reports, browser voice, web search, working image-studio handlers and quick/deep chat response depth. Feature availability depends on the signed-in account and platform AI quotas.
+The hosted app exposes cloud/local modes, Czech chat UI, account sync, notes/preferences, learning plans, tasks/reports, browser voice, web search, image tools and a paired Windows Companion. Feature availability depends on sign-in, platform support and provider quotas. A visible control is not proof that its full workflow has passed end-to-end testing.
 
-### Current deployment warning
+### Deployment verification (2026-11-06)
 
-The active AppDeploy snapshot `1793769353100` currently reports a JavaScript syntax error in the task-list script. The corrected GitHub candidate fixes it and passes hosted-source CI, but AppDeploy blocked the redeployment because its account usage limit was reached. Do not rely on AI task execution in the live app until a new deployment is ready and frontend QA is clean.
+- AppDeploy reports the existing deployment as `ready` and its latest validation as valid.
+- The latest AppDeploy QA snapshot reports zero frontend errors and zero network errors.
+- The public live URL returned HTTP 200 and rendered the Czech Micro Helper interface during a read-only check.
+- Historical AppDeploy logs still contain earlier `Unexpected token ';'` errors at the task-list script. Those older log entries are not evidence of a current failure, but they must not be silently erased from the release record.
+- Signed-in end-to-end checks for chat persistence, sync, AI task execution, image generation, web search and voice have not been completed by this verification.
+- The hosted GitHub source mirror and the deployed AppDeploy snapshot are separate artifacts. Do not assume a GitHub commit is live until AppDeploy confirms the matching source snapshot and QA.
 
 ### Honest platform limits
 
-- The Android APK is currently a debug-signed WebView wrapper. It loads the hosted app and needs internet for cloud AI and synchronization. It is not a Play Store release.
+- The Android APK is a debug-signed WebView wrapper. It loads the hosted app and needs internet for cloud AI and synchronization. It is not a Play Store release.
 - The PWA caches its public shell, not AI models or private API responses. There is no offline AI.
 - Browser voice and wake phrase support depend on the browser and work only while the app is open and voice mode is active.
 - Background AI tasks generate bounded text outputs when explicitly run; they are not a general autonomous agent.
