@@ -317,3 +317,32 @@ def test_restore_rejects_non_string_memory_content_instead_of_coercing_it():
     assert response.status_code == 422
     assert client.get("/v1/memories").json()["memories"] == []
 
+def test_restore_rejects_boolean_backup_version():
+    backup = client.get("/v1/backup").json()
+    backup["version"] = True
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+
+
+def test_restore_rejects_ids_outside_sqlite_integer_range():
+    backup = client.get("/v1/backup").json()
+    backup["memories"] = [{
+        "id": 9223372036854775808,
+        "content": "Mimo rozsah",
+        "category": "context",
+        "created_at": "2026-01-01T00:00:00Z",
+    }]
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/v1/memories").json()["memories"] == []
+
