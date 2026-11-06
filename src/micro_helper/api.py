@@ -166,7 +166,7 @@ async def restore_backup(request: RestoreRequest):
     backup = request.backup
     if not request.confirm_replace:
         raise HTTPException(status_code=400, detail="Obnova vyžaduje confirm_replace=true.")
-    if backup.get("format") != "micro-helper-backup" or backup.get("version") != 1:
+    if backup.get("format") != "micro-helper-backup" or isinstance(backup.get("version"), bool) or backup.get("version") != 1:
         raise HTTPException(status_code=422, detail="Nepodporovaný nebo poškozený záložní soubor.")
 
     profile = backup.get("profile")
@@ -193,7 +193,7 @@ async def restore_backup(request: RestoreRequest):
 
         def record_id(item: dict) -> int:
             value = item.get("id")
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 9223372036854775807:
                 raise ValueError("Neplatné ID")
             return value
 
