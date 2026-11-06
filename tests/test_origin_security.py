@@ -114,3 +114,12 @@ def test_malformed_or_non_origin_value_is_rejected_for_writes(origin):
     assert response.status_code == 403
     assert response.json()["detail"] == "Cross-origin write blocked."
 
+@pytest.mark.parametrize("hostname", ["localhost", "localhost.", "127.0.0.1", "::1"])
+def test_loopback_hostname_helper_accepts_loopback_names(hostname):
+    assert api._is_loopback_hostname(hostname) is True
+
+
+@pytest.mark.parametrize("hostname", ["attacker.example", "192.0.2.10", "0.0.0.0", ""])
+def test_loopback_hostname_helper_rejects_non_loopback_names(hostname):
+    assert api._is_loopback_hostname(hostname) is False
+
