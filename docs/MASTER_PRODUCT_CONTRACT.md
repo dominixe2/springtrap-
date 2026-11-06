@@ -50,12 +50,12 @@ A capability counts as complete only when its implementation exists, its permiss
 
 ## Current known baseline (verified from repository sources on 2026-11-06)
 
-- The `micro-helper` branch already contains a hosted AppDeploy source mirror with authenticated account state, chat/history, memories/preferences, learning plans, tasks/reports, browser voice, web search and image-related handlers. Its README warns that the currently published AppDeploy snapshot has a task-list JavaScript syntax error; the corrected GitHub candidate cannot be deployed because the AppDeploy account usage limit was reached.
+- The `micro-helper` branch already contains a hosted AppDeploy source mirror with authenticated account state, chat/history, memories/preferences, learning plans, tasks/reports, browser voice, web search and image-related handlers. On 2026-11-06 AppDeploy reported the live deployment as ready, valid and free of frontend/network errors in its latest QA snapshot; the public page returned HTTP 200. Historical syntax-error logs remain, and signed-in end-to-end workflows still need testing. The deployed snapshot and GitHub source mirror must be compared before claiming source parity.
 - The root Python/FastAPI edition is separate and supports local SQLite plus an optional Ollama adapter. It is not the backend serving the hosted URL.
 - The Android wrapper is a debug-signed WebView package loading the hosted origin; it requires internet for hosted AI/sync and is not a native offline AI release.
 - The Windows Companion is a separately paired loopback bridge with a small fixed allowlist (lock, Explorer, Notepad, Calculator), not a full desktop agent.
 - The local Python branch documents a small capability registry and browser voice, but not full-duplex voice, background wake word, general tool execution, encrypted sync or a finished desktop worker.
-- PR #11 is a draft orchestration foundation; PR #13 is an open security hardening PR; PR #14 is an open draft deterministic trust-policy core. They are not merged into the `micro-helper` branch and must be reviewed/integrated deliberately.
+- The current PR #15 feature branch now includes the deterministic trust-policy module and unit tests from PR #14. The policy is not yet wired into every hosted/desktop action adapter. PR #11 remains a separate draft orchestration foundation and PR #13 remains a separate security-hardening PR; neither is represented as fully integrated.
 - Earlier checks found test dependencies absent in one environment; never report tests as passed unless a current run proves it.
 
 ## Progress reporting
