@@ -4,7 +4,7 @@ import pytest
 import micro_helper.api as api
 
 
-client = TestClient(api.app)
+client = TestClient(api.app, base_url="http://127.0.0.1:8000")
 
 
 @pytest.fixture(autouse=True)
@@ -43,7 +43,7 @@ def test_same_origin_profile_write_still_works(tmp_path, monkeypatch):
 
     response = client.put(
         "/v1/profile",
-        headers={"origin": "http://testserver"},
+        headers={"origin": "http://127.0.0.1:8000"},
         json={"agent_name": "Nova", "language": "cs-CZ", "style": "friendly"},
     )
 
@@ -71,3 +71,20 @@ def test_profile_write_rejects_origin_with_wrong_port_or_userinfo(origin):
     assert response.status_code == 403
     assert response.json()["detail"] == "Cross-origin write blocked."
     assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
+
+@pytest.mark.parametrize("host", ["attacker.example:8000", "192.0.2.10:8000"])
+def test_profile_write_rejects_non_loopback_host_even_when_origin_matches(host):
+    response = client.put(
+        "/v1/profile",
+        headers={
+            "host": host,
+            "origin": f"http://{host}",
+            "sec-fetch-site": "same-origin",
+        },
+        json={"agent_name": "Rejected", "language": "cs-CZ", "style": "friendly"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Non-loopback host blocked."
+    assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
+
