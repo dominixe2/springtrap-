@@ -18,7 +18,7 @@
     "description": "Verifies the main AI workflows work on a phone and unavailable browser or AI capabilities are reported honestly.",
     "steps": [
       "Sign in to Micro Helper",
-      "Open the voice panel and verify Czech speech controls and the foreground-only Myklo explanation",
+      "Open the voice panel and verify Czech speech controls and the foreground-only wake-phrase limitation",
       "Search for a public topic and verify a summary and source links appear",
       "Generate an image from a short prompt, verify the preview and download action, then select a reference image and verify a resized preview is shown",
       "Upload a reference image, run analysis and extract readable text"
