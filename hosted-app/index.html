@@ -2145,3 +2145,58 @@
             const payload = kind === 'generate'
               ? { prompt: text, images: reference ? [reference] : [] }
               : {
+                  prompt: text || undefined,
+                  image: reference
+                };
+            const response = await apiFetch(route, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.detail || data.error || 'AI akce se nepodařila.');
+            }
+
+            if (kind === 'generate') {
+              if (!data.image?.data || !data.image?.mimeType) {
+                throw new Error('AI nevrátila platný obrázek. Zkus to znovu.');
+              }
+              const source = 'data:' + data.image.mimeType + ';base64,' + data.image.data;
+              const output = document.createElement('img');
+              output.src = source;
+              output.alt = 'Obrázek vygenerovaný Micro Helperem';
+              output.loading = 'lazy';
+              output.style.cssText = 'max-width:100%;max-height:520px;object-fit:contain;border-radius:14px;border:1px solid var(--line)';
+              const download = document.createElement('a');
+              const extension = data.image.mimeType === 'image/webp' ? 'webp'
+                : data.image.mimeType === 'image/jpeg' ? 'jpg' : 'png';
+              download.href = source;
+              download.download = 'micro-helper-' + new Date().toISOString().slice(0, 10) + '.' + extension;
+              download.textContent = 'Stáhnout vygenerovaný obrázek';
+              download.style.cssText = 'padding:10px;border:1px solid var(--line);border-radius:10px;width:max-content';
+              result.append(output, download);
+              status.textContent = 'Obrázek je hotový. Můžeš si ho prohlédnout nebo stáhnout.';
+            } else {
+              const output = document.createElement('pre');
+              output.textContent = data.text || 'AI nenašla žádný čitelný obsah.';
+              output.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;background:#0c1425;padding:12px;border-radius:12px';
+              result.append(output);
+              status.textContent = kind === 'analyze'
+                ? 'Analýza obrázku dokončena.'
+                : 'Rozpoznávání textu dokončeno.';
+            }
+          } catch (error) {
+            status.textContent = error.message || 'AI akce se nepodařila. Zkus to znovu.';
+          } finally {
+            setBusy(false);
+          }
+        };
+
+        buttons[0].addEventListener('click', () => runImageAction('generate'));
+        buttons[1].addEventListener('click', () => runImageAction('analyze'));
+        buttons[2].addEventListener('click', () => runImageAction('ocr'));
+      })();
+    </script>
+  </body>
+</html>
