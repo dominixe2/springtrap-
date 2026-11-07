@@ -84,3 +84,15 @@ def test_pairing_claims_are_rate_limited():
         assert response.status_code == 404
     response = client.post("/v1/pair/claim", json={"pairing_code": "999999"})
     assert response.status_code == 429
+
+
+def test_mobile_can_revoke_entire_pairing():
+    assert register().status_code == 200
+    desktop_token = "d" * 40
+    mobile_token = client.post("/v1/pair/claim", json={"pairing_code": "123456"}).json()["token"]
+    response = client.post("/v1/pair/revoke", json={"token": mobile_token})
+    assert response.status_code == 200
+    assert response.json() == {"revoked": True}
+    assert not sessions
+    assert not tokens
+    assert desktop_token not in tokens
