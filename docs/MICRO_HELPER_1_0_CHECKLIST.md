@@ -1,6 +1,6 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.2
+- **Checklist version:** 1.0.0-checklist.3
 - **Snapshot date:** 2026-11-07
 - **Snapshot source:** PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
@@ -28,12 +28,12 @@ A level may be raised only when new implementation and evidence are linked in th
 | MH-02 | One identity, persistent chat history, user-controlled memory/preferences, export/import/delete | 12 | Partial | 0.50 | 6.00 | Local API and tests in `src/micro_helper/api.py`, `tests/`; hosted account-backed state is documented in `docs/SECURITY.md`. Cross-client persistence/sync and full user workflow tests remain unverified. |
 | MH-03 | Modular AI provider adapters, optional local inference, visible limits and tested no-charge fallback | 10 | Partial | 0.50 | 5.00 | Local Ollama path is documented in the Python edition and JARVIS PR #5. A unified provider router and tested quota-to-provider-to-local-to-offline fallback are not yet proven. |
 | MH-04 | Czech speech input/output, permission/error state, cancellation and honest fallback | 8 | Partial | 0.50 | 4.00 | Browser speech controls are documented in the local UI and JARVIS README. Full-duplex streaming, interruption under real device conditions, and Android/Windows voice acceptance tests are not proven. |
-| MH-05 | Capability-based tools, bounded tasks, cancellation, visible results, extensible adapters | 12 | Partial | 0.25 | 3.00 | `docs/ARCHITECTURE.md` documents the current `agent.draft` task worker; PR #11 is an orchestration foundation. General tool execution, search/file/image tools under one runtime, and end-to-end task tests are not integrated. |
+| MH-05 | Capability-based tools, bounded tasks, cancellation, visible results, extensible adapters | 12 | Partial | 0.25 | 3.00 | `docs/ARCHITECTURE.md` documents the current `agent.draft` task worker. The local API now executes three fixed tools through the policy gateway (`profile.read`, `memory.list`, `memory.create`); broad tool adapters, web/file/image execution under one runtime, and platform-level task workflows remain unintegrated. |
 | MH-06 | Adaptive Trust Engine: explicit grants, deny precedence, fresh confirmation for high-impact actions, audit and revocation | 12 | Partial | 0.50 | 6.00 | `src/micro_helper/trust_policy.py`, `tests/test_trust_policy.py`, and the new local API gateway in `src/micro_helper/api.py`. The exact low-risk reads have fixed grants; `memory.create` requires a 60-second one-time token bound to normalized arguments; `/v1/audit` records metadata without payloads. API integration tests cover missing/forged boolean confirmation, argument mismatch, expiry, replay and audit privacy. Hosted and Windows/JARVIS adapters and user-managed grant revocation remain unintegrated. |
 | MH-07 | Authenticated phone/Windows pairing, encrypted sync, revocation, conflict handling and least privilege | 12 | Partial | 0.25 | 3.00 | `docs/SECURITY.md` documents a limited loopback Windows Companion with one-time pairing and session token. Full Android/Windows sync, encrypted transport/storage, conflict resolution, and device-level verification remain open. |
 | MH-08 | Android package/install path, backup/restore and core workflows verified on a physical Android device | 8 | Partial | 0.50 | 4.00 | Android debug APK workflow and backup/restore tests exist. A debug wrapper is not a store release; no physical-device acceptance test is recorded. |
 | MH-09 | Windows companion with explicit approval, workspace scope, action log and tested restrictions | 8 | Partial | 0.50 | 4.00 | `windows-companion/tests/test_companion_security.py` and `docs/SECURITY.md` document a fixed allowlist (lock, Explorer, Notepad, Calculator). A general workspace-scoped coding agent and physical Windows acceptance test are not proven. |
-| MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | Baseline PR #15 CI runs #270/#19 passed. This checklist snapshot adds local API policy integration; current branch CI is pending until the new PR runs. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
+| MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 implementation snapshot `3f5794837c60506761f9f76ebcd503dd849af701`, GitHub Actions run #42400456289. Project pytest: 61 passed; cloud-relay pytest: 11 passed; embedded browser JavaScript syntax and Python compilation passed. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
 |  | **Total** | **100** | **Not release-ready** |  | **44.00** | **Evidence-weighted score: 44.00%.** This measures verified acceptance evidence, not a claim that 44% of all possible features exist. |
 
 ## Current test evidence
@@ -55,13 +55,15 @@ A level may be raised only when new implementation and evidence are linked in th
 
 ## Next development order
 
-1. Extend the integrated policy gate to hosted and Windows/JARVIS adapters only after each adapter has an authenticated identity and explicit action boundary.
+1. Extend the policy gate to the first hosted action adapter only after its authenticated identity, explicit approval UI and audit boundary are covered by integration tests.
 2. Secure JARVIS's chat-only Ollama relay with per-launch pairing/authentication, bounded concurrent requests and rate limits.
 3. Add a single capability matrix shared by hosted tools, local Python, Android and Windows Companion.
 4. Run signed-in hosted end-to-end tests, then physical Android and Windows smoke tests.
 5. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.3 (2026-11-07):** records the first policy-enforced local tool gateway, argument-bound one-time confirmations, payload-free audit events, and passing PR #23 CI run #42400456289. The evidence-weighted score remains 44.00%; platform acceptance and broader adapter integration are still open.
 
 - **1.0.0-checklist.2 (2026-11-07):** records the first local API tool-gateway integration, one-time argument-bound confirmations and payload-free audit log. Evidence-weighted score remains 44.00% pending current branch CI and target-platform acceptance.
 
