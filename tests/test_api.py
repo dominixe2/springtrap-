@@ -198,17 +198,85 @@ def test_tool_registry_is_explicit_and_defaults_to_deny():
     assert next(item for item in body["tools"] if item["id"] == "memory.create")["confirmation_required"] is True
 
 
-def test_tool_execution_is_allowlisted_and_memory_write_requires_confirmation():
+def test_tool_execution_uses_policy_and_one_time_confirmation_tokens():
     assert client.post("/v1/tools/profile.read/execute", json={}).status_code == 200
+    assert client.post("/v1/tools/memory.list/execute", json={}).status_code == 200
     assert client.post("/v1/tools/shell/execute", json={}).status_code == 404
-    denied = client.post("/v1/tools/memory.create/execute", json={"arguments": {"content": "test"}})
+
+    arguments = {"content": "poznámka z nástroje", "category": "context"}
+    denied = client.post("/v1/tools/memory.create/execute", json={"arguments": arguments})
     assert denied.status_code == 403
+
+    # A caller-provided boolean is not proof of a fresh user confirmation.
+    forged_boolean = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": arguments, "confirmed": True
+    })
+    assert forged_boolean.status_code == 403
+
+    challenge = client.post("/v1/tools/memory.create/confirm", json={"arguments": arguments})
+    assert challenge.status_code == 200
+    token = challenge.json()["confirmation_token"]
+
+    # The token is bound to the exact normalized arguments and is not consumed by a mismatch.
+    mismatch = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": {"content": "jiná poznámka", "category": "context"},
+        "confirmation_token": token,
+    })
+    assert mismatch.status_code == 403
+
     saved = client.post("/v1/tools/memory.create/execute", json={
-        "arguments": {"content": "poznámka z nástroje", "category": "context"}, "confirmed": True
+        "arguments": arguments, "confirmation_token": token
     })
     assert saved.status_code == 200
     assert saved.json()["result"]["content"] == "poznámka z nástroje"
     assert client.get("/v1/memories").json()["memories"][0]["content"] == "poznámka z nástroje"
+
+    replay = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": arguments, "confirmation_token": token
+    })
+    assert replay.status_code == 403
+
+
+def test_tool_confirmation_expires_and_audit_omits_private_arguments(monkeypatch):
+    import hashlib
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    arguments = {"content": "tajná testovací poznámka", "category": "context"}
+    challenge = client.post("/v1/tools/memory.create/confirm", json={"arguments": arguments})
+    assert challenge.status_code == 200
+    token = challenge.json()["confirmation_token"]
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    with api.database() as db:
+        db.execute(
+            "UPDATE tool_confirmations SET expires_at=? WHERE token_hash=?",
+            (expired, token_hash),
+        )
+        db.commit()
+
+    response = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": arguments, "confirmation_token": token
+    })
+    assert response.status_code == 403
+
+    events = client.get("/v1/audit?limit=20").json()["events"]
+    assert any(event["outcome"] == "confirmation_issued" for event in events)
+    assert any(event["outcome"] == "confirmation_rejected" for event in events)
+    serialized = json.dumps(events, ensure_ascii=False)
+    assert "tajná testovací poznámka" not in serialized
+    assert token not in serialized
+
+
+def test_tool_audit_records_success_without_storing_tool_payloads():
+    result = client.post("/v1/tools/profile.read/execute", json={})
+    assert result.status_code == 200
+    events = client.get("/v1/audit").json()["events"]
+    event = next(item for item in events if item["tool_id"] == "profile.read")
+    assert event["decision"] == "allow"
+    assert event["outcome"] == "succeeded"
+    assert "arguments" not in event
+    assert "result" not in event
 
 
 
