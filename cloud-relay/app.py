@@ -42,7 +42,8 @@ class Session:
 sessions: dict[str, Session] = {}
 tokens: dict[str, tuple[str, str]] = {}
 registry_lock = asyncio.Lock()
-claim_attempts: dict[str, list[float]] = {}\nregister_attempts: dict[str, list[float]] = {}
+claim_attempts: dict[str, list[float]] = {}
+register_attempts: dict[str, list[float]] = {}
 
 
 class RegisterRequest(BaseModel):
