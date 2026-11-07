@@ -13,9 +13,17 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Micro Helper Relay", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://micro-helper-ygeuyn.v2.appdeploy.ai"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 ALLOWED_ACTIONS = {"lock", "explorer", "notepad", "calculator"}
 PAIR_TTL = 300
 SESSION_TTL = 12 * 60 * 60
