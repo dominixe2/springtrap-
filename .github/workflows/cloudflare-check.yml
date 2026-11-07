@@ -24,6 +24,8 @@ jobs:
           node-version: "22"
       - name: Check JavaScript syntax
         run: node --check cloudflare/worker.js
+      - name: Test Durable Object websocket guards
+        run: node --experimental-default-type=module --test cloudflare/worker.test.mjs
       - name: Validate Wrangler configuration
         run: |
           npm install --global wrangler
