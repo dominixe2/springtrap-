@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Micro Helper Relay", version="0.1.0")
@@ -42,6 +42,7 @@ class Session:
 sessions: dict[str, Session] = {}
 tokens: dict[str, tuple[str, str]] = {}
 registry_lock = asyncio.Lock()
+claim_attempts: dict[str, list[float]] = {}
 
 
 class RegisterRequest(BaseModel):
@@ -89,7 +90,14 @@ async def register(body: RegisterRequest) -> dict[str, Any]:
 
 
 @app.post("/v1/pair/claim")
-async def claim(body: ClaimRequest) -> dict[str, Any]:
+async def claim(body: ClaimRequest, request: Request) -> dict[str, Any]:
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    attempts = [stamp for stamp in claim_attempts.get(client_ip, []) if now - stamp < 300]
+    if len(attempts) >= 8:
+        raise HTTPException(429, "Too many pairing attempts. Try again later.")
+    attempts.append(now)
+    claim_attempts[client_ip] = attempts
     async with registry_lock:
         prune()
         code_hash = digest(body.pairing_code)
