@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.6
+- **Checklist version:** 1.0.0-checklist.7
 - **Snapshot date:** 2026-11-07
-- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`; latest checklist head `67fdc8f93b55c5e3783ad6f7831e72b04c08b042` passed CI run #42400792683.
+- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`; latest checklist head `c391f77e20e08eecc5c0949eaeeb21a4980d25b2` passed CI run #42400871649.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -62,6 +62,8 @@ A level may be raised only when new implementation and evidence are linked in th
 5. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.7 (2026-11-07):** updates the checklist snapshot to PR #23 head `c391f77e20e08eecc5c0949eaeeb21a4980d25b2` and records its passing CI run #42400871649. Score remains 47.00%.
 
 - **1.0.0-checklist.6 (2026-11-07):** records passing CI on checklist head `67fdc8f93b55c5e3783ad6f7831e72b04c08b042` (run #42400792683) and keeps the weighted score at 47.00%.
 
