@@ -123,3 +123,43 @@ def test_loopback_hostname_helper_accepts_loopback_names(hostname):
 def test_loopback_hostname_helper_rejects_non_loopback_names(hostname):
     assert api._is_loopback_hostname(hostname) is False
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/v1/status",
+        "/v1/profile",
+        "/v1/memories",
+        "/v1/tasks",
+        "/v1/conversations",
+        "/v1/backup",
+        "/v1/providers",
+        "/v1/models",
+    ],
+)
+def test_non_loopback_host_cannot_read_any_private_api_route(path):
+    response = client.get(
+        path,
+        headers={
+            "host": "localhost.attacker.example:8000",
+            "origin": "http://localhost.attacker.example:8000",
+            "sec-fetch-site": "same-origin",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Non-loopback host blocked."
+
+
+def test_non_loopback_host_cannot_submit_chat_requests():
+    response = client.post(
+        "/v1/chat",
+        headers={
+            "host": "attacker.example:8000",
+            "origin": "http://attacker.example:8000",
+            "sec-fetch-site": "same-origin",
+        },
+        json={"message": "nepovolený požadavek"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Non-loopback host blocked."
