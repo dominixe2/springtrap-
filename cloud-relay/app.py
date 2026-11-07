@@ -112,8 +112,19 @@ async def claim(body: ClaimRequest, request: Request) -> dict[str, Any]:
 
 
 @app.websocket("/v1/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = "") -> None:
-    token_hash = digest(token) if token else ""
+async def websocket_endpoint(websocket: WebSocket) -> None:
+    origin = websocket.headers.get("origin")
+    if origin and origin != "https://micro-helper-ygeuyn.v2.appdeploy.ai":
+        await websocket.close(code=4403, reason="Origin not allowed")
+        return
+    await websocket.accept()
+    try:
+        auth_message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
+    except Exception:
+        await websocket.close(code=4401, reason="Authentication required")
+        return
+    token = auth_message.get("token", "") if isinstance(auth_message, dict) and auth_message.get("type") == "auth" else ""
+    token_hash = digest(token) if isinstance(token, str) and token else ""
     async with registry_lock:
         prune()
         identity = tokens.get(token_hash)
@@ -122,7 +133,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str = "") -> None:
     if session is None or role not in {"desktop", "mobile"}:
         await websocket.close(code=4401, reason="Invalid or expired relay token")
         return
-    await websocket.accept()
     async with session.lock:
         if role == "desktop":
             old, session.desktop = session.desktop, websocket
