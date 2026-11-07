@@ -18,7 +18,7 @@
     "description": "Verifies the main AI workflows work on a phone and unavailable browser or AI capabilities are reported honestly.",
     "steps": [
       "Sign in to Micro Helper",
-      "Open the voice panel and verify Czech speech controls and the foreground-only Myklo explanation",
+      "Open the voice panel and verify Czech speech controls and the foreground-only wake-phrase limitation",
       "Search for a public topic and verify a summary and source links appear",
       "Generate an image from a short prompt, verify the preview and download action, then select a reference image and verify a resized preview is shown",
       "Upload a reference image, run analysis and extract readable text"
@@ -112,5 +112,25 @@
       "Switch the chat response depth between quick and deep and save the setting"
     ],
     "expected": "The authenticated task endpoint produces and persists a Czech result; failures are shown as retryable errors, and chat sends the selected response depth."
+  },
+  {
+    "name": "Use the refreshed Micro Helper identity and responsive interface",
+    "viewport": "mobile",
+    "covers": [
+      "Micro Helper default identity",
+      "responsive phone layout",
+      "keyboard focus visibility",
+      "reduced-motion preference",
+      "user-editable assistant name"
+    ],
+    "description": "Checks the refreshed phone-first design and confirms that the default identity is consistent without overwriting a name explicitly chosen by the user.",
+    "steps": [
+      "Open Micro Helper in a fresh local profile and verify the assistant name defaults to Micro Helper",
+      "Resize or open the app on a narrow phone viewport and verify controls fit without horizontal overflow",
+      "Use keyboard navigation and verify visible focus indicators on inputs and buttons",
+      "Enable reduced motion at the operating-system level and verify transitions are disabled",
+      "Set a custom assistant name, reload the app, and verify the custom name remains"
+    ],
+    "expected": "The default identity is Micro Helper, the layout remains usable on narrow phones, focus indicators are visible, reduced-motion is respected, and explicit user names persist."
   }
 ]
