@@ -162,46 +162,70 @@ export class RelayHub {
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
-    server.accept();
-    let authenticated = false;
-    let identity = null;
-
-    server.addEventListener("message", async (event) => {
-      let message;
-      try { message = JSON.parse(event.data); } catch { server.send(JSON.stringify({ type: "error", error: "invalid_json" })); return; }
-      if (!authenticated) {
-        if (message?.type !== "auth" || typeof message.token !== "string") { server.close(4401, "Authentication required"); return; }
-        const tokenHash = await sha256(message.token);
-        identity = await this.state.storage.get("token:" + tokenHash);
-        const session = identity ? await this.state.storage.get("session:" + identity.sessionId) : null;
-        if (!identity || !session || session.expiresAt <= Date.now()) { server.close(4401, "Invalid or expired relay token"); return; }
-        authenticated = true;
-        server.serializeAttachment({ sessionId: identity.sessionId, role: identity.role });
-        server.send(JSON.stringify({ type: "ready", role: identity.role }));
-        return;
-      }
-      const attachment = server.deserializeAttachment();
-      if (attachment.role === "mobile") {
-        if (message?.type !== "command" || !ALLOWED_ACTIONS.has(message.action) || typeof message.request_id !== "string" || message.request_id.length < 1 || message.request_id.length > 80) {
-          server.send(JSON.stringify({ type: "error", error: "action_not_allowed" }));
-          return;
-        }
-        const peer = this.findPeer(attachment.sessionId, "desktop");
-        if (!peer) { server.send(JSON.stringify({ type: "error", request_id: message.request_id, error: "desktop_offline" })); return; }
-        peer.send(JSON.stringify({ type: "command", action: message.action, request_id: message.request_id }));
-      } else if (attachment.role === "desktop") {
-        if (message?.type !== "result" || typeof message.request_id !== "string" || message.request_id.length < 1 || message.request_id.length > 80) {
-          server.send(JSON.stringify({ type: "error", error: "message_not_allowed" }));
-          return;
-        }
-        const peer = this.findPeer(attachment.sessionId, "mobile");
-        if (peer) peer.send(JSON.stringify({ type: "result", request_id: message.request_id, ok: Boolean(message.ok), message: String(message.message || "").slice(0, 240) }));
-      }
-    });
-    server.addEventListener("close", () => {});
-    server.addEventListener("error", () => {});
+    // Use the Durable Object WebSocket API so sockets survive hibernation
+    // and can be enumerated/closed during pairing revocation.
+    this.state.acceptWebSocket(server);
     return new Response(null, { status: 101, webSocket: client });
   }
+
+  async webSocketMessage(server, rawMessage) {
+    let message;
+    try {
+      const raw = typeof rawMessage === "string" ? rawMessage : new TextDecoder().decode(rawMessage);
+      message = JSON.parse(raw);
+    } catch {
+      try { server.send(JSON.stringify({ type: "error", error: "invalid_json" })); } catch {}
+      return;
+    }
+
+    let attachment = server.deserializeAttachment();
+    if (!attachment) {
+      if (message?.type !== "auth" || typeof message.token !== "string" || message.token.length < 32 || message.token.length > 200) {
+        server.close(4401, "Authentication required");
+        return;
+      }
+      const tokenHash = await sha256(message.token);
+      const identity = await this.state.storage.get("token:" + tokenHash);
+      const session = identity ? await this.state.storage.get("session:" + identity.sessionId) : null;
+      if (!identity || !session || session.expiresAt <= Date.now()) {
+        server.close(4401, "Invalid or expired relay token");
+        return;
+      }
+      attachment = { sessionId: identity.sessionId, role: identity.role };
+      server.serializeAttachment(attachment);
+      server.send(JSON.stringify({ type: "ready", role: identity.role }));
+      return;
+    }
+
+    if (attachment.role === "mobile") {
+      if (message?.type !== "command" || !ALLOWED_ACTIONS.has(message.action) || typeof message.request_id !== "string" || message.request_id.length < 1 || message.request_id.length > 80) {
+        server.send(JSON.stringify({ type: "error", error: "action_not_allowed" }));
+        return;
+      }
+      const peer = this.findPeer(attachment.sessionId, "desktop");
+      if (!peer) {
+        server.send(JSON.stringify({ type: "error", request_id: message.request_id, error: "desktop_offline" }));
+        return;
+      }
+      peer.send(JSON.stringify({ type: "command", action: message.action, request_id: message.request_id }));
+      return;
+    }
+
+    if (attachment.role === "desktop") {
+      if (message?.type !== "result" || typeof message.request_id !== "string" || message.request_id.length < 1 || message.request_id.length > 80) {
+        server.send(JSON.stringify({ type: "error", error: "message_not_allowed" }));
+        return;
+      }
+      const peer = this.findPeer(attachment.sessionId, "mobile");
+      if (peer) peer.send(JSON.stringify({ type: "result", request_id: message.request_id, ok: Boolean(message.ok), message: String(message.message || "").slice(0, 240) }));
+      return;
+    }
+
+    server.close(4403, "Unknown relay role");
+  }
+
+  webSocketClose(_server, _code, _reason, _wasClean) {}
+  webSocketError(_server, _error) {}
 
   findPeer(sessionId, role) {
     for (const socket of this.state.getWebSockets()) {
