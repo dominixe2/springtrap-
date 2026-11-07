@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
-from app import app, sessions, tokens, digest, claim_attempts
+from app import app, sessions, tokens, digest, claim_attempts, register_attempts
 
 client = TestClient(app)
 
@@ -10,6 +10,7 @@ def setup_function():
     sessions.clear()
     tokens.clear()
     claim_attempts.clear()
+    register_attempts.clear()
 
 
 def register(code="123456", token="d" * 40):
