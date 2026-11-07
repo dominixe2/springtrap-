@@ -1,5 +1,5 @@
 /* Micro Helper offline shell. API responses and personal data are never cached here. */
-const CACHE_NAME = 'micro-helper-pwa-v2';
+const CACHE_NAME = 'micro-helper-pwa-v3';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', event => {
@@ -31,9 +31,11 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
+  // Never cache API/auth responses or private account data.
   if (
     request.method !== 'GET' ||
     url.origin !== self.location.origin ||
+    url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/v1/') ||
     url.pathname.startsWith('/docs') ||
     url.pathname.startsWith('/openapi')
@@ -55,23 +57,28 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-  if (
+  const isAppAsset =
+    ['script', 'style', 'image', 'font'].includes(request.destination) ||
+    url.pathname.startsWith('/assets/') ||
     url.pathname === '/manifest.webmanifest' ||
     url.pathname === '/icon.svg' ||
-    url.pathname.startsWith('/static/')
-  ) {
+    url.pathname.startsWith('/static/');
+
+  if (isAppAsset) {
     event.respondWith(
-      caches.match(request).then(
-        cached =>
-          cached ||
-          fetch(request).then(response => {
-            if (response.ok)
-              caches
-                .open(CACHE_NAME)
-                .then(cache => cache.put(request, response.clone()));
+      caches.match(request).then(async cached => {
+        const network = fetch(request)
+          .then(response => {
+            if (response.ok && response.type === 'basic') {
+              const copy = response.clone();
+              void caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+            }
             return response;
           })
-      )
+          .catch(() => cached || Response.error());
+
+        return cached || network;
+      })
     );
   }
 });
