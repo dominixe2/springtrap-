@@ -36,6 +36,10 @@ jobs:
               subprocess.run(["node", "--check", str(path)], check=True)
           PY
       - name: Compile source
-        run: python -m compileall -q src tests
-      - name: Run tests
+        run: python -m compileall -q src tests cloud-relay
+      - name: Run project tests
         run: pytest -q
+      - name: Run relay tests
+        run: |
+          python -m pip install -r cloud-relay/requirements.txt
+          python -m pytest -q cloud-relay/tests
