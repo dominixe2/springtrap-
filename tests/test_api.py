@@ -3,7 +3,7 @@ import pytest
 import micro_helper.api as api
 
 
-client = TestClient(api.app)
+client = TestClient(api.app, base_url="http://127.0.0.1:8000")
 
 
 @pytest.fixture(autouse=True)
