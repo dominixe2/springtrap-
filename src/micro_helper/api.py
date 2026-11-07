@@ -1,6 +1,7 @@
 """Local-first Micro Helper API with persistent private data and optional Ollama chat."""
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 import sqlite3
@@ -10,7 +11,9 @@ from pathlib import Path
 from typing import Iterator
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from urllib.parse import urlsplit
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -20,6 +23,61 @@ from micro_helper.providers import ProviderConfigurationError, ProviderRequestEr
 app = FastAPI(title="Micro Helper", version="0.3.0")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+def _is_loopback_hostname(hostname: str | None) -> bool:
+    """Return whether a hostname is a literal loopback address or localhost.
+
+    Do not trust Origin/Host equality alone: DNS rebinding can make an attacker's
+    hostname resolve to 127.0.0.1 while both headers still match.
+    """
+    if not hostname:
+        return False
+    normalized = hostname.rstrip(".").lower()
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+@app.middleware("http")
+async def protect_cross_origin_mutations(request: Request, call_next):
+    """Reject cross-origin writes to the local personal-data API.
+
+    This is CSRF defense in depth, not authentication. Keep the launcher bound to
+    loopback and use a separate authenticated design before exposing the service
+    to a network.
+    """
+    # Protect reads as well as writes: DNS rebinding could otherwise expose
+    # private memories/history through GET endpoints even if mutations are blocked.
+    if request.url.path == "/v1" or request.url.path.startswith("/v1/"):
+        if not _is_loopback_hostname(request.url.hostname):
+            return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
+
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        request_host = request.headers.get("host", "").lower()
+        fetch_site = request.headers.get("sec-fetch-site", "").lower()
+        origin = request.headers.get("origin")
+        if fetch_site == "cross-site":
+            return JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."})
+        if origin:
+            try:
+                parsed_origin = urlsplit(origin)
+            except ValueError:
+                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+            if (
+                parsed_origin.scheme.lower() != request.url.scheme.lower()
+                or not parsed_origin.netloc
+                or parsed_origin.netloc.lower() != request_host
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+                or bool(parsed_origin.path or parsed_origin.query or parsed_origin.fragment)
+                or not _is_loopback_hostname(parsed_origin.hostname)
+            ):
+                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+    return await call_next(request)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
@@ -178,13 +236,33 @@ async def restore_backup(request: RestoreRequest):
     if len(memories) > 10000 or len(messages) > 100000 or len(tasks) > 10000:
         raise HTTPException(status_code=413, detail="Záloha je příliš velká.")
     try:
-        memory_rows = [(int(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
-        message_rows = [(int(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
-        task_rows = [(int(x["id"]), str(x["title"]), str(x.get("description", "")), x.get("due_at"), int(bool(x.get("completed", 0))), str(x["created_at"])) for x in tasks]
+        def record_id(value):
+            # JSON booleans and floats are not valid SQLite record identifiers.
+            if type(value) is not int or value <= 0:
+                raise ValueError()
+            return value
+
+        for task in tasks:
+            completed = task.get("completed", 0)
+            if type(completed) not in (bool, int) or completed not in (0, 1, False, True):
+                raise ValueError()
+
+        memory_rows = [(record_id(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
+        message_rows = [(record_id(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
+        task_rows = [(record_id(x["id"]), str(x["title"]), str(x.get("description", "")), x.get("due_at"), int(bool(x.get("completed", 0))), str(x["created_at"])) for x in tasks]
         if any(row[1] not in ("user", "assistant") for row in message_rows):
             raise ValueError()
         if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows) or any(not row[1] for row in task_rows):
             raise ValueError()
+        # Primary keys must be positive and unique within each restored collection.
+        # Otherwise SQLite would raise an internal error during restore instead of
+        # returning a clear validation response before touching existing user data.
+        for rows in (memory_rows, message_rows, task_rows):
+            identifiers = [row[0] for row in rows]
+            if any(identifier <= 0 for identifier in identifiers):
+                raise ValueError()
+            if len(identifiers) != len(set(identifiers)):
+                raise ValueError()
     except (KeyError, TypeError, ValueError):
         raise HTTPException(status_code=422, detail="Záloha obsahuje neplatné záznamy.")
     with database() as db:
