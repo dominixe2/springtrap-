@@ -33,7 +33,7 @@ async function notifySubscribers(userId: string) {
       .filter(item => item.user_id === userId && item.entity_type === "user_state" && item.entity_id === userId)
       .map(async item => {
         try {
-          const result = await ws.send(item.connection_id, {
+          const result = await ws.send([item.connection_id], {
             type: "entity.update",
             entity_type: "user_state",
             entity_id: userId,
