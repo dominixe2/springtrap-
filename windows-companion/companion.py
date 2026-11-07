@@ -94,6 +94,9 @@ def serve() -> None:
                         print("[Micro Helper] Příkaz odmítnut nebo selhal:", str(exc)[:180])
                     socket.send(json.dumps(response, ensure_ascii=False))
         except ConnectionClosed as exc:
+            if exc.code == 4401 and exc.reason == "Pairing revoked":
+                print("[Micro Helper] Párování bylo zrušeno z aplikace.")
+                return
             if exc.code == 4401:
                 print("[Micro Helper] Relace vypršela. Vytvářím nový párovací kód…")
                 pairing_code, desktop_token = register_device()
