@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { RelayHub } from "../worker.js";
+import { RelayHub } from "./worker.js";
 
 function makeState(entries = {}) {
   const values = new Map(Object.entries(entries));
