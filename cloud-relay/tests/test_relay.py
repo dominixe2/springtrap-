@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
-from app import app, sessions, tokens, digest
+from app import app, sessions, tokens, digest, claim_attempts
 
 client = TestClient(app)
 
