@@ -1,86 +1,120 @@
 #!/usr/bin/env python3
-"""Micro Helper Windows Companion. Loopback-only, paired, fixed-command bridge."""
+"""Micro Helper Windows Companion using an authenticated cloud WebSocket relay."""
 from __future__ import annotations
-import ctypes, json, secrets, subprocess, sys, threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-APP_ORIGIN = "https://micro-helper-ygeuyn.v2.appdeploy.ai"
-HOST, PORT = "127.0.0.1", 8765
-PAIRING_CODE = secrets.token_urlsafe(8)
-SESSION_TOKEN = ""
-FAILED_PAIRS = 0
-PAIR_LOCK = threading.Lock()
+import ctypes
+import json
+import secrets
+import sys
+import time
+import urllib.error
+import urllib.request
+
+RELAY_HTTP = "https://micro-helper-relay.onrender.com"
+RELAY_WS = "wss://micro-helper-relay.onrender.com/v1/ws"
 ALLOWED = {"lock", "explorer", "notepad", "calculator"}
 
-class Handler(BaseHTTPRequestHandler):
-    server_version = "MicroHelperCompanion/1.0"
-    def log_message(self, fmt, *args): print("[Micro Helper]", fmt % args)
-    def _cors(self):
-        if self.headers.get("Origin", "") == APP_ORIGIN:
-            self.send_header("Access-Control-Allow-Origin", APP_ORIGIN)
-            self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-            self.send_header("Access-Control-Allow-Private-Network", "true")
-    def _send(self, status, payload):
-        raw=json.dumps(payload,ensure_ascii=False).encode("utf-8")
-        self.send_response(status); self.send_header("Content-Type","application/json; charset=utf-8")
-        self.send_header("Content-Length",str(len(raw))); self.send_header("Cache-Control","no-store")
-        self._cors(); self.end_headers(); self.wfile.write(raw)
-    def _origin_ok(self): return self.headers.get("Origin","") == APP_ORIGIN
-    def do_OPTIONS(self):
-        if not self._origin_ok(): self.send_error(403); return
-        self.send_response(204); self._cors(); self.send_header("Content-Length","0"); self.end_headers()
-    def do_GET(self):
-        if self.path != "/health": self._send(404,{"detail":"Not found"}); return
-        self._send(200,{"ready":True,"name":"Micro Helper Windows Companion"})
-    def do_POST(self):
-        global PAIRING_CODE, SESSION_TOKEN, FAILED_PAIRS
-        if not self._origin_ok(): self._send(403,{"detail":"Původ požadavku není povolen."}); return
-        if self.client_address[0] not in ("127.0.0.1","::1"):
-            self._send(403,{"detail":"Přístup je povolen pouze z tohoto počítače."}); return
-        try:
-            length=int(self.headers.get("Content-Length","0"))
-            if length<2 or length>4096: self._send(413,{"detail":"Neplatná velikost požadavku."}); return
-            payload=json.loads(self.rfile.read(length).decode("utf-8"))
-            if not isinstance(payload, dict):
-                self._send(400,{"detail":"JSON požadavek musí být objekt."}); return
-        except Exception: self._send(400,{"detail":"Neplatný JSON požadavek."}); return
-        if self.path=="/pair":
-            with PAIR_LOCK:
-                if FAILED_PAIRS>=8: self._send(429,{"detail":"Příliš mnoho pokusů. Restartuj doprovodný program."}); return
-                if not secrets.compare_digest(str(payload.get("code","")),PAIRING_CODE):
-                    FAILED_PAIRS+=1; self._send(401,{"detail":"Párovací kód nesouhlasí."}); return
-                SESSION_TOKEN=secrets.token_urlsafe(32); PAIRING_CODE=secrets.token_urlsafe(8); FAILED_PAIRS=0
-                self._send(200,{"paired":True,"token":SESSION_TOKEN})
-                print("[Micro Helper] Nové párování dokončeno.")
-            return
-        if self.path not in ("/command", "/unpair"): self._send(404,{"detail":"Neznámá akce."}); return
-        supplied=self.headers.get("Authorization","")
-        if not SESSION_TOKEN or not secrets.compare_digest(supplied,"Bearer "+SESSION_TOKEN):
-            self._send(401,{"detail":"Relace vypršela. Spáruj notebook znovu."}); return
-        if self.path == "/unpair":
-            SESSION_TOKEN = ""
-            self._send(200, {"unpaired": True, "message": "Relace notebooku byla zrušena."})
-            return
-        action=str(payload.get("action",""))
-        if action not in ALLOWED: self._send(403,{"detail":"Tento příkaz není povolen."}); return
-        try:
-            if sys.platform!="win32": self._send(501,{"detail":"Program je určen pro Windows."}); return
-            if action=="lock":
-                ctypes.windll.user32.LockWorkStation(); message="Windows se uzamyká."
-            else:
-                executable={"explorer":"explorer.exe","notepad":"notepad.exe","calculator":"calc.exe"}[action]
-                subprocess.Popen([executable],shell=False,close_fds=True); message="Spuštěno: "+executable
-            self._send(200,{"ok":True,"message":message})
-        except Exception as exc: self._send(500,{"detail":"Příkaz se nepodařilo provést: "+str(exc)[:180]})
-    def do_PUT(self): self._send(405,{"detail":"Metoda není povolena."})
-    def do_DELETE(self): self._send(405,{"detail":"Metoda není povolena."})
 
-if __name__=="__main__":
-    if sys.platform!="win32": print("Tento program je určen pro Windows."); raise SystemExit(1)
-    print("="*54); print("MICRO HELPER WINDOWS COMPANION")
-    print("Pouze místní adresa 127.0.0.1. Párovací kód:")
-    print(PAIRING_CODE); print("Nech toto okno otevřené. Zavřením se relace zruší."); print("="*54)
-    try: ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()
-    except OSError as exc: print("Nelze spustit místní službu:",exc); input("Stiskni Enter pro zavření…")
+def execute_action(action: str) -> str:
+    """Execute one fixed, allowlisted Windows action. Never invokes a shell."""
+    if action not in ALLOWED:
+        raise ValueError("Příkaz není povolen.")
+    if sys.platform != "win32":
+        raise OSError("Program je určen pro Windows.")
+    if action == "lock":
+        if not ctypes.windll.user32.LockWorkStation():
+            raise OSError("Windows se nepodařilo uzamknout.")
+        return "Windows se uzamyká."
+    executable = {
+        "explorer": "explorer.exe",
+        "notepad": "notepad.exe",
+        "calculator": "calc.exe",
+    }[action]
+    import subprocess
+    subprocess.Popen([executable], shell=False, close_fds=True)
+    return "Spuštěno: " + executable
+
+
+def register_device() -> tuple[str, str]:
+    """Register a short-lived pairing code and receive the desktop-only secret."""
+    pairing_code = f"{secrets.randbelow(1_000_000):06d}"
+    desktop_token = secrets.token_urlsafe(40)
+    body = json.dumps({
+        "pairing_code": pairing_code,
+        "desktop_token": desktop_token,
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        RELAY_HTTP + "/v1/pair/register",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not payload.get("registered"):
+        raise RuntimeError("Cloud relay odmítl registraci notebooku.")
+    return pairing_code, desktop_token
+
+
+def serve() -> None:
+    if sys.platform != "win32":
+        raise SystemExit("Micro Helper Windows Companion je určen pro Windows.")
+    from websockets.exceptions import ConnectionClosed
+    from websockets.sync.client import connect
+
+    retry_delay = 2
+    pairing_code, desktop_token = register_device()
+    print("=" * 58)
+    print("MICRO HELPER · BEZPEČNÉ CLOUDOVÉ PROPOJENÍ")
+    print("Párovací kód pro telefon:", pairing_code)
+    print("Platnost kódu: 5 minut. Zadej ho v Micro Helperu.")
+    print("Povolené akce: uzamknout, Průzkumník, Poznámkový blok, Kalkulačka.")
+    print("Libovolné příkazy PowerShell/CMD nejsou podporovány.")
+    print("Nech toto okno otevřené. Ctrl+C spojení ukončí.")
+    print("=" * 58)
+
+    while True:
+        try:
+            with connect(RELAY_WS, open_timeout=20, close_timeout=5, ping_interval=20, ping_timeout=20, max_size=16_384) as socket:
+                socket.send(json.dumps({"type": "auth", "token": desktop_token}))
+                print("[Micro Helper] Notebook je připojen k relay.")
+                retry_delay = 2
+                while True:
+                    message = json.loads(socket.recv())
+                    if not isinstance(message, dict) or message.get("type") != "command":
+                        continue
+                    request_id = str(message.get("request_id", ""))[:80]
+                    action = str(message.get("action", ""))
+                    try:
+                        result = execute_action(action)
+                        response = {"type": "result", "request_id": request_id, "ok": True, "message": result}
+                        print("[Micro Helper]", result)
+                    except Exception as exc:
+                        response = {"type": "result", "request_id": request_id, "ok": False, "message": str(exc)[:240]}
+                        print("[Micro Helper] Příkaz odmítnut nebo selhal:", str(exc)[:180])
+                    socket.send(json.dumps(response, ensure_ascii=False))
+        except ConnectionClosed as exc:
+            if exc.code == 4401:
+                print("[Micro Helper] Relace vypršela. Vytvářím nový párovací kód…")
+                pairing_code, desktop_token = register_device()
+                print("[Micro Helper] Nový párovací kód:", pairing_code)
+                print("Zadej nový kód v Micro Helperu.")
+                retry_delay = 2
+                continue
+            print("[Micro Helper] Spojení přerušeno. Obnovuji…")
+        except (OSError, urllib.error.URLError, TimeoutError) as exc:
+            print("[Micro Helper] Relay není dostupný. Opakuji spojení…", str(exc)[:120])
+        except KeyboardInterrupt:
+            print("\n[Micro Helper] Spojení ukončeno.")
+            return
+        except Exception as exc:
+            print("[Micro Helper] Neočekávaná chyba spojení:", str(exc)[:160])
+        time.sleep(retry_delay)
+        retry_delay = min(retry_delay * 2, 30)
+
+
+if __name__ == "__main__":
+    try:
+        serve()
+    except KeyboardInterrupt:
+        print("\nMicro Helper ukončen.")
