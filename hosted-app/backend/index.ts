@@ -19,7 +19,7 @@ type State = {
 };
 
 const initialState = (): State => ({
-  profile: { agent_name: "Mykla", language: "cs-CZ", style: "friendly" },
+  profile: { agent_name: "Micro Helper", language: "cs-CZ", style: "friendly" },
   memories: [], preferences: [], messages: [], learningPlans: [], tasks: [], reports: [], nextId: 1
 });
 const tableFor = (userId: string) => "mh_" + userId.replace(/[^A-Za-z0-9_-]/g, "");
@@ -145,7 +145,7 @@ export const handler = router({
   "PUT /api/v1/profile": [requireAuth(), async ({ user, body }) => {
     const state = await readState(user!.userId);
     const data = bodyOf(body);
-    const name = String(data.agent_name || "Mykla").trim().slice(0, 30) || "Mykla";
+    const name = String(data.agent_name || "Micro Helper").trim().slice(0, 30) || "Micro Helper";
     state.profile = { ...state.profile, agent_name: name, language: "cs-CZ" };
     await writeState(user!.userId, state);
     return json(state.profile);
