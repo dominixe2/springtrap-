@@ -16,6 +16,7 @@ The relay connects the Windows Companion to the signed-in Micro Helper web app w
 3. The user enters the code in the Micro Helper Windows panel.
 4. The browser claims it with `POST /v1/pair/claim`, receiving a separate mobile token.
 5. Each side opens `/v1/ws` and sends its token in the first WebSocket frame, not in the URL.
+6. The browser can revoke the whole pairing with `POST /v1/pair/revoke`; both tokens and both sockets are invalidated.
 6. The relay forwards only four fixed actions: `lock`, `explorer`, `notepad`, `calculator`. It returns bounded result messages.
 
 ## Security boundaries
