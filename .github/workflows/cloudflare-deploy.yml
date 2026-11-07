@@ -2,11 +2,6 @@ name: Deploy Micro Helper Cloudflare Relay
 
 on:
   workflow_dispatch:
-  push:
-    branches: [micro-helper]
-    paths:
-      - "cloudflare/**"
-      - ".github/workflows/cloudflare-deploy.yml"
 
 permissions:
   contents: read
