@@ -1,6 +1,7 @@
 """Local-first Micro Helper API with persistent private data and optional Ollama chat."""
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 import sqlite3
@@ -9,16 +10,64 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
+from urllib.parse import urlsplit
 
 import httpx
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Micro Helper", version="0.3.0")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+def _is_loopback_hostname(hostname: str | None) -> bool:
+    """Accept only localhost and literal loopback IP addresses."""
+    if not hostname:
+        return False
+    normalized = hostname.strip("[]").rstrip(".").lower()
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+@app.middleware("http")
+async def protect_local_api(request: Request, call_next):
+    """Defend local private API reads and writes against DNS rebinding and CSRF.
+
+    This is not authentication. The local service must remain bound to loopback.
+    """
+    if request.url.path == "/v1" or request.url.path.startswith("/v1/"):
+        if not _is_loopback_hostname(request.url.hostname):
+            return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
+
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        request_host = request.headers.get("host", "").lower()
+        fetch_site = request.headers.get("sec-fetch-site", "").lower()
+        origin = request.headers.get("origin")
+        if fetch_site == "cross-site":
+            return JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."})
+        if origin:
+            try:
+                parsed_origin = urlsplit(origin)
+            except ValueError:
+                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+            if (
+                parsed_origin.scheme.lower() != request.url.scheme.lower()
+                or not parsed_origin.netloc
+                or parsed_origin.netloc.lower() != request_host
+                or parsed_origin.username is not None
+                or parsed_origin.password is not None
+                or bool(parsed_origin.path or parsed_origin.query or parsed_origin.fragment)
+                or not _is_loopback_hostname(parsed_origin.hostname)
+            ):
+                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+    return await call_next(request)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
@@ -40,13 +89,13 @@ def database() -> Iterator[sqlite3.Connection]:
             """
             CREATE TABLE IF NOT EXISTS profile (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
-                agent_name TEXT NOT NULL DEFAULT 'Mykla',
+                agent_name TEXT NOT NULL DEFAULT 'Micro Helper',
                 language TEXT NOT NULL DEFAULT 'cs-CZ',
                 style TEXT NOT NULL DEFAULT 'friendly',
                 updated_at TEXT NOT NULL
             );
             INSERT OR IGNORE INTO profile (id, agent_name, language, style, updated_at)
-            VALUES (1, 'Mykla', 'cs-CZ', 'friendly', CURRENT_TIMESTAMP);
+            VALUES (1, 'Micro Helper', 'cs-CZ', 'friendly', CURRENT_TIMESTAMP);
             CREATE TABLE IF NOT EXISTS memories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 content TEXT NOT NULL,
@@ -134,7 +183,7 @@ class MemoryRequest(BaseModel):
 
 
 class ProfileRequest(BaseModel):
-    agent_name: str = Field(default="Mykla", min_length=1, max_length=30)
+    agent_name: str = Field(default="Micro Helper", min_length=1, max_length=30)
     language: str = Field(default="cs-CZ", min_length=2, max_length=20)
     style: str = Field(default="friendly", min_length=1, max_length=40)
 
