@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.3
+- **Checklist version:** 1.0.0-checklist.4
 - **Snapshot date:** 2026-11-07
-- **Snapshot source:** PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`
+- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`, validated by CI run #42400456289; checklist evidence refresh follows on the same branch.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -38,9 +38,9 @@ A level may be raised only when new implementation and evidence are linked in th
 
 ## Current test evidence
 
-- **PASS:** Micro Helper checks, PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`, GitHub Actions run [#270](https://github.com/dominixe2/springtrap-/actions/runs/42267396572). Dependency install, embedded browser JavaScript syntax, Python compilation and pytest completed successfully.
-- **PASS:** Hosted-source checks on the same head, GitHub Actions run [#19](https://github.com/dominixe2/springtrap-/actions/runs/42267396582).
-- **PASS:** Isolated trust-policy suite copied from the exact branch files: 7 tests passed. This is supplementary; GitHub Actions is the repository-level result.
+- **PASS:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`, GitHub Actions run [#42400456289](https://github.com/dominixe2/springtrap-/actions/runs/42400456289). Embedded browser JavaScript syntax and Python compilation passed; project pytest reported **61 passed**; cloud-relay pytest reported **11 passed**.
+- **WARNING:** The two pytest suites each emitted one Starlette/httpx TestClient deprecation warning. No test failures occurred.
+- **PASS (historical baseline):** PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`, checks run [#270](https://github.com/dominixe2/springtrap-/actions/runs/42267396572) and hosted-source run [#19](https://github.com/dominixe2/springtrap-/actions/runs/42267396582).
 - **NOT RUN:** Physical Android install/use, physical Windows use, signed-in end-to-end flows for hosted chat/sync/tasks/images/web search/voice, and full trust-policy integration across every action adapter.
 - **NOT RUN:** Production signing, store release, security penetration review, and verified rollback drill.
 
@@ -48,7 +48,7 @@ A level may be raised only when new implementation and evidence are linked in th
 
 1. The trust policy is not yet enforced through every hosted and desktop tool/action path.
 2. JARVIS PR #5's LAN Ollama relay still needs authenticated pairing, request/concurrency limits and regression tests before it is safe for broader LAN use. Keep it chat-only and do not port-forward it.
-3. PR #13 local API origin/host hardening is a separate open PR and is not equivalent to securing every hosted route or the JARVIS relay.
+3. The current `micro-helper` base contains loopback/Origin/Fetch-Metadata checks for the local Python API; PR #13 remains open as a related hardening change. These checks are defense in depth, not authentication, and do not secure hosted routes or the JARVIS relay.
 4. Android/Windows physical-device acceptance tests are not recorded.
 5. The hosted source mirror and AppDeploy live snapshot need explicit parity evidence before a source change can be called deployed.
 6. Cross-device encrypted sync, conflict handling and device-session revocation are not yet proven end to end.
@@ -62,6 +62,8 @@ A level may be raised only when new implementation and evidence are linked in th
 5. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.4 (2026-11-07):** corrects the snapshot source to the PR #23 implementation head and separates current PR #23 CI evidence from the historical PR #15 baseline. Score remains 44.00%.
 
 - **1.0.0-checklist.3 (2026-11-07):** records the first policy-enforced local tool gateway, argument-bound one-time confirmations, payload-free audit events, and passing PR #23 CI run #42400456289. The evidence-weighted score remains 44.00%; platform acceptance and broader adapter integration are still open.
 
