@@ -55,6 +55,10 @@ class ClaimRequest(BaseModel):
     pairing_code: str = Field(min_length=6, max_length=12, pattern=r"^[0-9]{6,12}$")
 
 
+class RevokeRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=200)
+
+
 def prune() -> None:
     now = time.time()
     expired = []
@@ -110,6 +114,29 @@ async def claim(body: ClaimRequest, request: Request) -> dict[str, Any]:
         found.claimed = True
         tokens[found.mobile_hash] = (found.session_id, "mobile")
         return {"paired": True, "session_id": found.session_id, "token": mobile_token, "expires_in": SESSION_TTL}
+
+
+@app.post("/v1/pair/revoke")
+async def revoke(body: RevokeRequest) -> dict[str, bool]:
+    token_hash = digest(body.token)
+    async with registry_lock:
+        identity = tokens.get(token_hash)
+        if identity is None:
+            return {"revoked": False}
+        session = sessions.pop(identity[0], None)
+        if session is None:
+            tokens.pop(token_hash, None)
+            return {"revoked": False}
+        tokens.pop(session.desktop_hash, None)
+        if session.mobile_hash:
+            tokens.pop(session.mobile_hash, None)
+    for peer in (session.desktop, session.mobile):
+        if peer is not None:
+            try:
+                await peer.close(code=4401, reason="Pairing revoked")
+            except Exception:
+                pass
+    return {"revoked": True}
 
 
 @app.websocket("/v1/ws")
