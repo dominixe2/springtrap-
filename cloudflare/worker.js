@@ -72,14 +72,19 @@ export class RelayHub {
         return json({ error: "invalid_payload" }, 422, origin);
       }
       const codeHash = await sha256(body.pairing_code);
-      const existing = await this.state.storage.get("code:" + codeHash);
-      if (existing && existing.expiresAt > Date.now()) return json({ error: "code_conflict" }, 409, origin);
       const sessionId = randomToken(18);
       const desktopHash = await sha256(body.desktop_token);
-      const session = { sessionId, codeHash, desktopHash, mobileHash: null, claimed: false, createdAt: Date.now(), expiresAt: Date.now() + PAIR_TTL_MS };
-      await this.state.storage.put("session:" + sessionId, session);
-      await this.state.storage.put("code:" + codeHash, { sessionId, expiresAt: session.expiresAt });
-      await this.state.storage.put("token:" + desktopHash, { sessionId, role: "desktop" });
+      const now = Date.now();
+      const registered = await this.state.storage.transaction(async (txn) => {
+        const existing = await txn.get("code:" + codeHash);
+        if (existing && existing.expiresAt > now) return false;
+        const session = { sessionId, codeHash, desktopHash, mobileHash: null, claimed: false, createdAt: now, expiresAt: now + PAIR_TTL_MS };
+        await txn.put("session:" + sessionId, session);
+        await txn.put("code:" + codeHash, { sessionId, expiresAt: session.expiresAt });
+        await txn.put("token:" + desktopHash, { sessionId, role: "desktop" });
+        return true;
+      });
+      if (!registered) return json({ error: "code_conflict" }, 409, origin);
       return json({ registered: true, session_id: sessionId, expires_in: 300 }, 200, origin);
     }
 
@@ -92,19 +97,24 @@ export class RelayHub {
       try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400, origin); }
       if (!/^\d{6}$/.test(body.pairing_code || "")) return json({ error: "invalid_payload" }, 422, origin);
       const codeHash = await sha256(body.pairing_code);
-      const code = await this.state.storage.get("code:" + codeHash);
-      if (!code || code.expiresAt <= Date.now()) return json({ error: "invalid_or_expired_code" }, 404, origin);
-      const session = await this.state.storage.get("session:" + code.sessionId);
-      if (!session || session.claimed || session.expiresAt <= Date.now()) return json({ error: "invalid_or_expired_code" }, 404, origin);
       const token = randomToken(48);
       const mobileHash = await sha256(token);
-      session.mobileHash = mobileHash;
-      session.claimed = true;
-      session.expiresAt = Date.now() + SESSION_TTL_MS;
-      await this.state.storage.put("session:" + session.sessionId, session);
-      await this.state.storage.put("token:" + mobileHash, { sessionId: session.sessionId, role: "mobile" });
-      await this.state.storage.delete("code:" + codeHash);
-      return json({ paired: true, session_id: session.sessionId, token, expires_in: 43200 }, 200, origin);
+      const now = Date.now();
+      const claimed = await this.state.storage.transaction(async (txn) => {
+        const code = await txn.get("code:" + codeHash);
+        if (!code || code.expiresAt <= now) return null;
+        const session = await txn.get("session:" + code.sessionId);
+        if (!session || session.claimed || session.expiresAt <= now) return null;
+        session.mobileHash = mobileHash;
+        session.claimed = true;
+        session.expiresAt = now + SESSION_TTL_MS;
+        await txn.put("session:" + session.sessionId, session);
+        await txn.put("token:" + mobileHash, { sessionId: session.sessionId, role: "mobile" });
+        await txn.delete("code:" + codeHash);
+        return session.sessionId;
+      });
+      if (!claimed) return json({ error: "invalid_or_expired_code" }, 404, origin);
+      return json({ paired: true, session_id: claimed, token, expires_in: 43200 }, 200, origin);
     }
 
     if (url.pathname === "/v1/pair/revoke" && request.method === "POST") {
