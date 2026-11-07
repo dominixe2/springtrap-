@@ -20,7 +20,7 @@ def test_cross_origin_profile_write_is_rejected():
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "Cross-origin write blocked."
-    assert client.get("/v1/profile").json()["agent_name"] == "Mykla"
+    assert client.get("/v1/profile").json()["agent_name"] == "Micro Helper"
 
 
 def test_cross_site_fetch_metadata_is_rejected_without_origin():
