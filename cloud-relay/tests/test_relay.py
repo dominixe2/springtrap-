@@ -96,3 +96,25 @@ def test_mobile_can_revoke_entire_pairing():
     assert not sessions
     assert not tokens
     assert desktop_token not in tokens
+
+
+def test_browser_pairing_preflight_allows_only_official_origin():
+    allowed = client.options(
+        "/v1/pair/claim",
+        headers={
+            "Origin": "https://micro-helper-ygeuyn.v2.appdeploy.ai",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert allowed.status_code == 200
+    assert allowed.headers["access-control-allow-origin"] == "https://micro-helper-ygeuyn.v2.appdeploy.ai"
+    blocked = client.options(
+        "/v1/pair/claim",
+        headers={
+            "Origin": "https://attacker.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert "access-control-allow-origin" not in blocked.headers
