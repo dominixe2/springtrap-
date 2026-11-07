@@ -55,8 +55,23 @@ def test_mobile_cannot_claim_twice():
 
 def test_websocket_rejects_unknown_token():
     with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect("/v1/ws?token=not-a-valid-token") as ws:
+        with client.websocket_connect("/v1/ws") as ws:
+            ws.send_json({"type": "auth", "token": "not-a-valid-token"})
             ws.receive_json()
+
+
+def test_allowlisted_command_routes_between_paired_devices():
+    assert register().status_code == 200
+    desktop_token = "d" * 40
+    mobile_token = client.post("/v1/pair/claim", json={"pairing_code": "123456"}).json()["token"]
+    with client.websocket_connect("/v1/ws") as desktop:
+        desktop.send_json({"type": "auth", "token": desktop_token})
+        with client.websocket_connect("/v1/ws") as mobile:
+            mobile.send_json({"type": "auth", "token": mobile_token})
+            mobile.send_json({"type": "command", "action": "notepad", "request_id": "req-1"})
+            assert desktop.receive_json() == {"type": "command", "action": "notepad", "request_id": "req-1"}
+            desktop.send_json({"type": "result", "request_id": "req-1", "ok": True, "message": "Spuštěno"})
+            assert mobile.receive_json() == {"type": "result", "request_id": "req-1", "ok": True, "message": "Spuštěno"}
 
 
 def test_pairing_claims_are_rate_limited():
