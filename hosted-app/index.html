@@ -234,9 +234,9 @@
 
       <section class="settings" id="windowsPanel" style="align-items:stretch;flex-direction:column">
         <strong>🖥️ Windows Companion</strong>
-        <small>Bezpečné místní propojení s notebookem. Spusť doprovodný program ve Windows a zadej jednorázový párovací kód. Povolené akce: uzamčení počítače a spuštění Průzkumníka, Poznámkového bloku nebo Kalkulačky. Libovolné shell příkazy nejsou povolené.</small>
+        <small>Bezpečné propojení s notebookem přes šifrovaný cloudový relay. Spusť doprovodný program ve Windows a zadej jednorázový šestimístný kód. Cloudová bezplatná služba se může po nečinnosti probouzet pomaleji. Povolené akce: uzamčení počítače a spuštění Průzkumníka, Poznámkového bloku nebo Kalkulačky. Libovolné shell příkazy nejsou povolené.</small>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input id="desktopPairCode" type="password" autocomplete="off" maxlength="100" placeholder="Jednorázový párovací kód z Windows" />
+          <input id="desktopPairCode" type="password" autocomplete="off" maxlength="12" inputmode="numeric" placeholder="Šestimístný kód z Windows" />
           <button class="primary" type="button" id="desktopPair">Spárovat notebook</button>
           <button type="button" id="desktopDisconnect" disabled>Odpojit</button>
         </div>
@@ -1791,30 +1791,91 @@
     </script>
     <script>
       (() => {
-        const base='http://127.0.0.1:8765',pairButton=document.getElementById('desktopPair');
-        const disconnectButton=document.getElementById('desktopDisconnect'),codeInput=document.getElementById('desktopPairCode');
-        const status=document.getElementById('desktopStatus'),buttons=[...document.querySelectorAll('[data-desktop-action]')];
+        const relay='https://micro-helper-relay.onrender.com';
+        const pairButton=document.getElementById('desktopPair');
+        const disconnectButton=document.getElementById('desktopDisconnect');
+        const codeInput=document.getElementById('desktopPairCode');
+        const status=document.getElementById('desktopStatus');
+        const buttons=[...document.querySelectorAll('[data-desktop-action]')];
         let token=sessionStorage.getItem('mh_windows_session')||'';
-        const setConnected=connected=>{buttons.forEach(button=>button.disabled=!connected);disconnectButton.disabled=!connected;};
-        const request=async(path,body,sessionToken='')=>{
-          const headers={'Content-Type':'application/json'};if(sessionToken)headers.Authorization='Bearer '+sessionToken;
-          const response=await fetch(base+path,{method:'POST',mode:'cors',credentials:'omit',cache:'no-store',headers,body:JSON.stringify(body||{})});
-          const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.detail||'Windows Companion odmítl požadavek.');return data;
+        let socket=null,reconnectTimer=null,retryDelay=2000,ready=false;
+        const pending=new Map();
+        const setConnected=connected=>{
+          ready=connected;
+          buttons.forEach(button=>button.disabled=!connected);
+          disconnectButton.disabled=!token;
+          pairButton.disabled=false;
         };
-        setConnected(Boolean(token));
+        const clearPending=message=>{
+          for(const [id,item] of pending){clearTimeout(item.timer);item.reject(new Error(message));pending.delete(id);}
+        };
+        const connect=()=>{
+          if(!token||socket&&[WebSocket.CONNECTING,WebSocket.OPEN].includes(socket.readyState))return;
+          clearTimeout(reconnectTimer);setConnected(false);
+          status.textContent='Připojuji notebook přes zabezpečený cloud…';
+          const current=new WebSocket('wss://micro-helper-relay.onrender.com/v1/ws');
+          socket=current;
+          current.addEventListener('open',()=>current.send(JSON.stringify({type:'auth',token})));
+          current.addEventListener('message',event=>{
+            let message;try{message=JSON.parse(event.data);}catch{return;}
+            if(message.type==='ready'){
+              retryDelay=2000;setConnected(true);
+              status.textContent='Notebook je připojen přes cloudový relay.';
+            }else if(message.type==='result'){
+              const item=pending.get(message.request_id);if(!item)return;
+              clearTimeout(item.timer);pending.delete(message.request_id);
+              if(message.ok)item.resolve(message.message||'Příkaz proveden.');
+              else item.reject(new Error(message.message||'Příkaz se nepodařilo provést.'));
+            }else if(message.type==='error'){
+              status.textContent='Relay: '+(message.error||'chyba spojení');
+            }
+          });
+          current.addEventListener('close',event=>{
+            if(socket!==current)return;
+            socket=null;setConnected(false);clearPending('Spojení s notebookem se přerušilo.');
+            if(event.code===4401){token='';sessionStorage.removeItem('mh_windows_session');status.textContent='Párování vypršelo. Zadej nový kód z Windows Companion.';return;}
+            status.textContent='Notebook je offline. Zkouším obnovit spojení…';
+            reconnectTimer=setTimeout(connect,retryDelay);retryDelay=Math.min(retryDelay*2,30000);
+          });
+          current.addEventListener('error',()=>{status.textContent='Cloud relay neodpovídá. Obnovuji spojení…';});
+        };
+        const claim=async code=>{
+          const response=await fetch(relay+'/v1/pair/claim',{method:'POST',mode:'cors',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({pairing_code:code})});
+          const data=await response.json().catch(()=>({}));
+          if(!response.ok)throw new Error(data.detail||'Párování notebooku selhalo.');
+          return data;
+        };
+        setConnected(false);
+        if(token)connect();
         pairButton.addEventListener('click',async()=>{
-          pairButton.disabled=true;status.textContent='Páruji notebook…';
-          try{const data=await request('/pair',{code:codeInput.value.trim()});token=data.token;sessionStorage.setItem('mh_windows_session',token);codeInput.value='';setConnected(true);status.textContent='Notebook je spárován. Relace platí do restartu doprovodného programu.';}
-          catch(error){token='';sessionStorage.removeItem('mh_windows_session');setConnected(false);status.textContent=error.message+' Ověř, že program běží a prohlížeč povolil místní síť.';}
+          const code=codeInput.value.trim();if(!/^\\d{6,12}$/.test(code)){status.textContent='Zadej platný číselný kód z Windows Companion.';return;}
+          pairButton.disabled=true;status.textContent='Ověřuji jednorázový párovací kód…';
+          try{
+            const data=await claim(code);token=data.token;sessionStorage.setItem('mh_windows_session',token);
+            codeInput.value='';status.textContent='Kód přijat. Připojuji notebook…';connect();
+          }catch(error){status.textContent=error.message;}
           finally{pairButton.disabled=false;}
         });
-        disconnectButton.addEventListener('click',async()=>{const oldToken=token;try{if(oldToken)await request('/unpair',{},oldToken);}catch(error){}token='';sessionStorage.removeItem('mh_windows_session');setConnected(false);status.textContent='Notebook odpojen a relace zrušena.';});
+        disconnectButton.addEventListener('click',()=>{
+          token='';sessionStorage.removeItem('mh_windows_session');clearTimeout(reconnectTimer);
+          if(socket){socket.close(1000,'User disconnected');socket=null;}
+          clearPending('Notebook byl odpojen.');setConnected(false);
+          status.textContent='Odpojeno v tomto prohlížeči. Pro úplné zrušení relace zavři Windows Companion.';
+        });
         buttons.forEach(button=>button.addEventListener('click',async()=>{
-          if(!token)return;button.disabled=true;status.textContent='Posílám bezpečný příkaz…';
-          try{const data=await request('/command',{action:button.dataset.desktopAction},token);status.textContent=data.message||'Příkaz přijat notebookem.';}
-          catch(error){token='';sessionStorage.removeItem('mh_windows_session');setConnected(false);status.textContent=error.message+' Připoj notebook znovu.';}
-          finally{setConnected(Boolean(token));}
+          if(!ready||!socket||socket.readyState!==WebSocket.OPEN)return;
+          const requestId=crypto.randomUUID();button.disabled=true;status.textContent='Posílám bezpečný příkaz notebooku…';
+          try{
+            const result=await new Promise((resolve,reject)=>{
+              const timer=setTimeout(()=>{pending.delete(requestId);reject(new Error('Notebook neodpověděl včas.'));},15000);
+              pending.set(requestId,{resolve,reject,timer});
+              socket.send(JSON.stringify({type:'command',action:button.dataset.desktopAction,request_id:requestId}));
+            });
+            status.textContent=result;
+          }catch(error){status.textContent=error.message;}
+          finally{setConnected(ready);}
         }));
+        document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token&&(!socket||socket.readyState===WebSocket.CLOSED))connect();});
       })();
     </script>
 
