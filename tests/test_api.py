@@ -82,7 +82,7 @@ def test_chat_uses_local_memory_and_persists_successful_exchange(monkeypatch):
             return None
 
         def json(self):
-            return {"message": {"content": "Ahoj, jsem Mykla."}}
+            return {"message": {"content": "Ahoj, jsem Micro Helper."}}
 
     class FakeAsyncClient:
         def __init__(self, *args, **kwargs):
@@ -108,7 +108,7 @@ def test_chat_uses_local_memory_and_persists_successful_exchange(monkeypatch):
 
     response = client.post("/v1/chat", json={"message": "Ahoj", "model": "llama3.2"})
     assert response.status_code == 200
-    assert response.json()["reply"] == "Ahoj, jsem Mykla."
+    assert response.json()["reply"] == "Ahoj, jsem Micro Helper."
     assert "Uživatel chce odpovědi česky" in captured["payload"]["messages"][0]["content"]
     saved = client.get("/v1/conversations").json()["messages"]
     assert [item["role"] for item in saved] == ["user", "assistant"]
