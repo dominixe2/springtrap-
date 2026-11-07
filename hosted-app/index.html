@@ -156,6 +156,183 @@
         }
       }
     </style>
+
+    <style id="mh-interface-v2">
+      :root {
+        color-scheme: dark;
+        --bg: #080d14;
+        --panel: #101a27;
+        --panel-raised: #142235;
+        --line: #26384b;
+        --accent: #72f0d0;
+        --accent-2: #9c8cff;
+        --muted: #9eafc2;
+        --text: #edf5fb;
+      }
+      html { background: var(--bg); scroll-behavior: smooth; }
+      body {
+        background:
+          radial-gradient(ellipse at 12% 0%, rgba(67, 210, 190, .13), transparent 34rem),
+          radial-gradient(ellipse at 90% 12%, rgba(143, 117, 255, .12), transparent 32rem),
+          var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: .01em;
+      }
+      main {
+        width: min(100% - 28px, 1180px);
+        max-width: 1180px;
+        min-height: 100dvh;
+        padding: 22px 0 56px;
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        align-content: start;
+        gap: 14px;
+      }
+      main > header, main > #setup, main > #messages, main > #chat,
+      main > .settings, main > #voicePanel { grid-column: 1 / -1; }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        margin: 0 0 4px;
+        padding: 14px 18px;
+        border: 1px solid rgba(114,240,208,.16);
+        border-radius: 20px;
+        background: rgba(8, 15, 24, .82);
+        backdrop-filter: blur(18px);
+        box-shadow: 0 12px 42px rgba(0,0,0,.22);
+      }
+      header h1 { font-size: clamp(20px, 3vw, 26px); letter-spacing: -.04em; }
+      header small { display:block; margin-top: 3px; color: #a8bbcc; }
+      .orb {
+        width: 48px; height: 48px; flex: 0 0 48px;
+        background: radial-gradient(circle at 35% 28%, #eafffb, #72f0d0 28%, #3b8e9c 58%, #6655a7 82%);
+        box-shadow: 0 0 0 7px rgba(114,240,208,.06), 0 0 34px rgba(114,240,208,.25);
+      }
+      .status {
+        max-width: 38%;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--accent);
+        background: rgba(114,240,208,.06);
+        text-align: right;
+      }
+      #setup, .settings, #messages {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: linear-gradient(145deg, rgba(20,34,53,.94), rgba(13,23,36,.96));
+        box-shadow: 0 12px 30px rgba(0,0,0,.14);
+      }
+      #setup {
+        padding: 16px;
+        gap: 12px;
+        align-items: end;
+      }
+      #setup label { display:grid; gap:7px; color:#b8c8d7; font-size:12px; }
+      #setup label input, #setup label select { display:block; min-width:170px; }
+      .settings {
+        display: grid !important;
+        grid-template-columns: minmax(0,1fr);
+        align-content: start;
+        gap: 12px;
+        padding: 18px;
+        margin: 0;
+        font-size: 14px;
+      }
+      .settings > strong { font-size: 15px; letter-spacing: -.01em; color:#f3fbff; }
+      .settings small, small, .muted { color: var(--muted); line-height: 1.5; }
+      #messages {
+        min-height: 280px;
+        max-height: min(54vh, 620px);
+        padding: 16px;
+        background: rgba(8,14,23,.76);
+        border-color: #223448;
+      }
+      .msg {
+        max-width: min(78%, 760px);
+        margin: 10px 0;
+        padding: 13px 16px;
+        border-radius: 16px;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+      }
+      .msg.user {
+        background: linear-gradient(135deg, #174f4a, #1d3d50);
+        border: 1px solid rgba(114,240,208,.22);
+      }
+      .msg.agent {
+        background: #142236;
+        border: 1px solid #2b4057;
+      }
+      #chat {
+        margin: 0;
+        padding: 10px;
+        gap: 10px;
+        border: 1px solid #35536a;
+        border-radius: 18px;
+        background: rgba(15,27,42,.96);
+        box-shadow: 0 12px 35px rgba(0,0,0,.22);
+      }
+      input, select, textarea, button {
+        font: inherit;
+        color: var(--text);
+        background: #0a1420;
+        border: 1px solid #2a4055;
+        border-radius: 12px;
+        padding: 11px 13px;
+        accent-color: var(--accent);
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: 2px solid rgba(114,240,208,.32);
+        border-color: var(--accent);
+      }
+      button {
+        cursor: pointer;
+        transition: transform .16s ease, border-color .16s ease, background .16s ease;
+        background: #17283b;
+      }
+      button:hover:not(:disabled) { transform: translateY(-1px); border-color: #72f0d0; }
+      button:disabled { opacity:.48; cursor:not-allowed; }
+      button.primary {
+        background: linear-gradient(135deg, #167c70, #286d83);
+        border-color: #48bcae;
+        color: white;
+        font-weight: 650;
+      }
+      a { color: #86e9dc; text-underline-offset: 3px; }
+      .settings form { min-width:0; }
+      .settings input, .settings textarea, .settings select { max-width:100%; }
+      .settings img { border:1px solid var(--line); }
+      #voicePanel { display:flex !important; align-items:center; gap:10px; }
+      #voicePanel small { flex-basis:100%; }
+      #voicePanel label { display:flex; align-items:center; gap:7px; }
+      #voicePanel input[type=checkbox] { width:17px; height:17px; }
+      #webSearchPanel, #windowsPanel, #imageStudio, #learningPanel { grid-column: span 6; }
+      @media (max-width: 760px) {
+        main { width: min(100% - 20px, 620px); padding: 10px 0 36px; gap:10px; }
+        header { position:relative; padding:12px; border-radius:16px; }
+        .orb { width:40px; height:40px; flex-basis:40px; }
+        .status { font-size:11px; max-width:42%; }
+        #setup { align-items:stretch; }
+        #setup label { flex:1 1 100%; }
+        #setup label input, #setup label select { width:100%; }
+        #messages { max-height:none; min-height:240px; padding:10px; }
+        .msg { max-width:94%; }
+        #chat { position:sticky; bottom:8px; z-index:15; }
+        #chat input { min-width:0; }
+        .settings { padding:14px; border-radius:15px; }
+        #webSearchPanel, #windowsPanel, #imageStudio, #learningPanel { grid-column:1 / -1; }
+        #voicePanel { align-items:stretch; }
+        #voicePanel button { flex:1 1 42%; }
+        #voicePanel label { flex:1 1 100%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; }
+      }
+    </style>
     <script type="module" src="./src/main.ts"></script>
   </head>
   <body>
@@ -171,7 +348,7 @@
       <section id="setup">
         <label
           >Jméno agenta
-          <input id="agentName" value="Mykla" maxlength="30" /></label
+          <input id="agentName" value="Micro Helper" maxlength="30" /></label
         ><label
           >Hloubka AI <select id="model" aria-label="Hloubka odpovědi"><option value="FAST">Rychlá</option><option value="DEEP">Důkladná</option></select></label
         ><button class="primary" id="save">Uložit nastavení</button>
@@ -217,7 +394,7 @@
           />
           Pokračovat v rozhovoru bez mačkání</label
         >
-        <label><input type="checkbox" id="voiceWakeWord" style="min-width:auto;flex:0" /> Probudit slovem „Myklo“ (jen při otevřené aplikaci)</label>
+        <label><input type="checkbox" id="voiceWakeWord" style="min-width:auto;flex:0" /> Probudit slovem „Micro“ (jen při otevřené aplikaci)</label>
         <small id="voiceStatus">Hlasový režim: čeká na spuštění. Naslouchání na pozadí není podporováno prohlížečem.</small>
       </div>
 
@@ -510,7 +687,7 @@
       });
       const localKey = 'micro_helper_local_v1';
       const localDefaults = () => ({
-        profile: { agent_name: 'Mykla', language: 'cs-CZ', style: 'friendly' },
+        profile: { agent_name: 'Micro Helper', language: 'cs-CZ', style: 'friendly' },
         memories: [], preferences: [], messages: [], learningPlans: [], tasks: [], reports: [], nextId: 1
       });
       const readLocal = () => {
@@ -538,7 +715,7 @@
           return localReply({ available: false, models: [], note: 'V místním režimu není připojen AI model. Přihlas se pro cloudové AI odpovědi.' });
         if (url.pathname === '/v1/profile' && method === 'GET') return localReply(state.profile);
         if (url.pathname === '/v1/profile' && method === 'PUT') {
-          state.profile = { ...state.profile, agent_name: String(body.agent_name || 'Mykla').trim().slice(0, 30) || 'Mykla', language: 'cs-CZ' };
+          state.profile = { ...state.profile, agent_name: String(body.agent_name || 'Micro Helper').trim().slice(0, 30) || 'Micro Helper', language: 'cs-CZ' };
           if (!writeLocal(state)) return fail('V zařízení není dost místa pro uložení.', 507);
           return localReply(state.profile);
         }
@@ -679,7 +856,7 @@
         const client = await appClientReady;
         const user = client?.user;
         const local = readLocal();
-        const hasLocalData = (local.profile?.agent_name && local.profile.agent_name !== 'Mykla') ||
+        const hasLocalData = (local.profile?.agent_name && local.profile.agent_name !== 'Micro Helper') ||
           local.memories.length || local.preferences.length || local.learningPlans.length || local.tasks.length;
         const alreadyImported = user && localStorage.getItem(localImportMarker(user)) === '1';
         importButton.hidden = !user || !hasLocalData || alreadyImported;
@@ -700,7 +877,7 @@
             return data;
           };
           let imported = 0, skipped = 0;
-          if (local.profile?.agent_name && local.profile.agent_name !== 'Mykla') {
+          if (local.profile?.agent_name && local.profile.agent_name !== 'Micro Helper') {
             await request('/v1/profile', 'PUT', local.profile); imported++;
           }
           const cloudMemories = (await request('/v1/memories')).memories || [];
@@ -749,7 +926,7 @@
         $('title').textContent = $('agentName').value + ' · Micro Helper';
         $('status').textContent = 'Nastavení uloženo';
       };
-      $('agentName').value = localStorage.getItem('mh_name') || 'Mykla';
+      $('agentName').value = localStorage.getItem('mh_name') || 'Micro Helper';
       $('model').value = localStorage.getItem('mh_model') === 'DEEP' ? 'DEEP' : 'FAST';
       $('save').click();
       $('check').onclick = async () => {
@@ -998,7 +1175,7 @@
           } catch (error) {}
         }
         byId('save').onclick = async () => {
-          const name = byId('agentName').value.trim() || 'Mykla';
+          const name = byId('agentName').value.trim() || 'Micro Helper';
           try {
             const response = await apiFetch('/v1/profile', {
               method: 'PUT',
@@ -1094,7 +1271,7 @@
             return (
               JSON.parse(localStorage.getItem(key)) || {
                 profile: {
-                  agent_name: 'Mykla',
+                  agent_name: 'Micro Helper',
                   language: 'cs-CZ',
                   style: 'friendly',
                 },
@@ -1107,7 +1284,7 @@
           } catch {
             return {
               profile: {
-                agent_name: 'Mykla',
+                agent_name: 'Micro Helper',
                 language: 'cs-CZ',
                 style: 'friendly',
               },
@@ -1397,14 +1574,14 @@
           window.speechSynthesis.cancel();
           const utterance=new SpeechSynthesisUtterance(text);utterance.lang='cs-CZ';utterance.rate=1;utterance.pitch=1;
           utterance.onstart=()=>setStatus('Odpovídám hlasem…');
-          utterance.onend=()=>{if(handsFree){setStatus(wakeToggle.checked?'Čekám na oslovení „Myklo“…':'Poslouchám dál…');window.setTimeout(beginListening,450);}};
+          utterance.onend=()=>{if(handsFree){setStatus(wakeToggle.checked?'Čekám na oslovení „Micro“…':'Poslouchám dál…');window.setTimeout(beginListening,450);}};
           utterance.onerror=()=>{if(handsFree)window.setTimeout(beginListening,700);};
           window.speechSynthesis.speak(utterance);
         };
         if(!SpeechRecognition){startButton.disabled=true;setStatus('Rozpoznávání řeči není dostupné. Zkus Chrome nebo hlas zadej textem.');}
         else{
           recognition=new SpeechRecognition();recognition.lang='cs-CZ';recognition.continuous=false;recognition.interimResults=true;
-          recognition.onstart=()=>{restarting=false;startButton.disabled=true;setStatus(wakeToggle.checked&&!awaitingWakeCommand?'Čekám na oslovení „Myklo“…':'Poslouchám…');};
+          recognition.onstart=()=>{restarting=false;startButton.disabled=true;setStatus(wakeToggle.checked&&!awaitingWakeCommand?'Čekám na oslovení „Micro“…':'Poslouchám…');};
           recognition.onresult=event=>{
             let finalText='',interimText='';
             for(let i=event.resultIndex;i<event.results.length;i++){const transcript=event.results[i][0].transcript;if(event.results[i].isFinal)finalText+=transcript;else interimText+=transcript;}
@@ -1412,8 +1589,8 @@
             let command=finalText.trim();
             if(wakeToggle.checked&&handsFree){
               if(!awaitingWakeCommand){
-                const match=command.match(/(?:hej\s+)?myklo[\s,.:!?-]*(.*)$/i);
-                if(!match){prompt.value='';setStatus('Čekám na oslovení „Myklo“…');recognition.stop();return;}
+                const match=command.match(/(?:hej\s+)?micro[\s,.:!?-]*(.*)$/i);
+                if(!match){prompt.value='';setStatus('Čekám na oslovení „Micro“…');recognition.stop();return;}
                 command=match[1].trim();
                 if(!command){awaitingWakeCommand=true;setStatus('Jsem vzhůru. Řekni příkaz…');recognition.stop();return;}
               }
@@ -1429,7 +1606,7 @@
           recognition.onend=()=>{
             startButton.disabled=false;
             if(handsFree&&!document.hidden&&!window.speechSynthesis?.speaking){
-              setStatus(wakeToggle.checked&&!awaitingWakeCommand?'Čekám na oslovení „Myklo“…':'Čekám na příkaz…');
+              setStatus(wakeToggle.checked&&!awaitingWakeCommand?'Čekám na oslovení „Micro“…':'Čekám na příkaz…');
               window.setTimeout(beginListening,650);
             }
           };
@@ -1437,7 +1614,7 @@
         }
         stopButton.addEventListener('click',()=>{handsFree=false;awaitingWakeCommand=false;try{recognition?.stop();}catch(error){}window.speechSynthesis?.cancel();startButton.disabled=false;setStatus('Hlasový rozhovor zastaven.');});
         handsFreeToggle.addEventListener('change',()=>{if(!handsFreeToggle.checked&&!wakeToggle.checked){handsFree=false;setStatus('Automatické pokračování vypnuto.');}});
-        wakeToggle.addEventListener('change',()=>{if(wakeToggle.checked){handsFreeToggle.checked=true;setStatus('Slovo „Myklo“ funguje jen po ručním spuštění a při otevřené aplikaci.');}else{awaitingWakeCommand=false;setStatus('Probuzení slovem vypnuto.');}});
+        wakeToggle.addEventListener('change',()=>{if(wakeToggle.checked){handsFreeToggle.checked=true;setStatus('Slovo „Micro“ funguje jen po ručním spuštění a při otevřené aplikaci.');}else{awaitingWakeCommand=false;setStatus('Probuzení slovem vypnuto.');}});
         document.addEventListener('visibilitychange',()=>{if(document.hidden){try{recognition?.stop();}catch(error){}if(handsFree)setStatus('Aplikace je na pozadí. Hlasové naslouchání je pozastavené.');}else if(handsFree){setStatus('Aplikace je zpět. Obnovuji poslech…');window.setTimeout(beginListening,400);}});
         const messages=document.getElementById('messages');let lastSpoken='';
         new MutationObserver(()=>{const items=messages.querySelectorAll('.msg.agent'),last=items[items.length-1];if(!last)return;const text=last.textContent.trim();if(!text||text==='Přemýšlím…'||text===lastSpoken)return;lastSpoken=text;speak(text);}).observe(messages,{childList:true,subtree:true,characterData:true});
@@ -1968,58 +2145,3 @@
             const payload = kind === 'generate'
               ? { prompt: text, images: reference ? [reference] : [] }
               : {
-                  prompt: text || undefined,
-                  image: reference
-                };
-            const response = await apiFetch(route, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            if (!response.ok) {
-              throw new Error(data.detail || data.error || 'AI akce se nepodařila.');
-            }
-
-            if (kind === 'generate') {
-              if (!data.image?.data || !data.image?.mimeType) {
-                throw new Error('AI nevrátila platný obrázek. Zkus to znovu.');
-              }
-              const source = 'data:' + data.image.mimeType + ';base64,' + data.image.data;
-              const output = document.createElement('img');
-              output.src = source;
-              output.alt = 'Obrázek vygenerovaný Micro Helperem';
-              output.loading = 'lazy';
-              output.style.cssText = 'max-width:100%;max-height:520px;object-fit:contain;border-radius:14px;border:1px solid var(--line)';
-              const download = document.createElement('a');
-              const extension = data.image.mimeType === 'image/webp' ? 'webp'
-                : data.image.mimeType === 'image/jpeg' ? 'jpg' : 'png';
-              download.href = source;
-              download.download = 'micro-helper-' + new Date().toISOString().slice(0, 10) + '.' + extension;
-              download.textContent = 'Stáhnout vygenerovaný obrázek';
-              download.style.cssText = 'padding:10px;border:1px solid var(--line);border-radius:10px;width:max-content';
-              result.append(output, download);
-              status.textContent = 'Obrázek je hotový. Můžeš si ho prohlédnout nebo stáhnout.';
-            } else {
-              const output = document.createElement('pre');
-              output.textContent = data.text || 'AI nenašla žádný čitelný obsah.';
-              output.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;background:#0c1425;padding:12px;border-radius:12px';
-              result.append(output);
-              status.textContent = kind === 'analyze'
-                ? 'Analýza obrázku dokončena.'
-                : 'Rozpoznávání textu dokončeno.';
-            }
-          } catch (error) {
-            status.textContent = error.message || 'AI akce se nepodařila. Zkus to znovu.';
-          } finally {
-            setBusy(false);
-          }
-        };
-
-        buttons[0].addEventListener('click', () => runImageAction('generate'));
-        buttons[1].addEventListener('click', () => runImageAction('analyze'));
-        buttons[2].addEventListener('click', () => runImageAction('ocr'));
-      })();
-    </script>
-  </body>
-</html>
