@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.4
+- **Checklist version:** 1.0.0-checklist.5
 - **Snapshot date:** 2026-11-07
-- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`, validated by CI run #42400456289; checklist evidence refresh follows on the same branch.
+- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`; latest checklist evidence commit `e3fbaa5fb15850122bfd3b43998841d8a2de6cd7` passed CI run #42400687405.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -28,17 +28,17 @@ A level may be raised only when new implementation and evidence are linked in th
 | MH-02 | One identity, persistent chat history, user-controlled memory/preferences, export/import/delete | 12 | Partial | 0.50 | 6.00 | Local API and tests in `src/micro_helper/api.py`, `tests/`; hosted account-backed state is documented in `docs/SECURITY.md`. Cross-client persistence/sync and full user workflow tests remain unverified. |
 | MH-03 | Modular AI provider adapters, optional local inference, visible limits and tested no-charge fallback | 10 | Partial | 0.50 | 5.00 | Local Ollama path is documented in the Python edition and JARVIS PR #5. A unified provider router and tested quota-to-provider-to-local-to-offline fallback are not yet proven. |
 | MH-04 | Czech speech input/output, permission/error state, cancellation and honest fallback | 8 | Partial | 0.50 | 4.00 | Browser speech controls are documented in the local UI and JARVIS README. Full-duplex streaming, interruption under real device conditions, and Android/Windows voice acceptance tests are not proven. |
-| MH-05 | Capability-based tools, bounded tasks, cancellation, visible results, extensible adapters | 12 | Partial | 0.25 | 3.00 | `docs/ARCHITECTURE.md` documents the current `agent.draft` task worker. The local API now executes three fixed tools through the policy gateway (`profile.read`, `memory.list`, `memory.create`); broad tool adapters, web/file/image execution under one runtime, and platform-level task workflows remain unintegrated. |
+| MH-05 | Capability-based tools, bounded tasks, cancellation, visible results, extensible adapters | 12 | Partial | 0.50 | 6.00 | `src/micro_helper/api.py` now exposes three fixed local tools through the policy gateway (`profile.read`, `memory.list`, `memory.create`) and a bounded `agent.draft` queue with cancellation and persisted success/failure results. `tests/test_api.py` covers the API and worker paths; PR #23 CI passed 61 project tests. Pluggable adapters and web/file/image execution under one runtime remain unintegrated. |
 | MH-06 | Adaptive Trust Engine: explicit grants, deny precedence, fresh confirmation for high-impact actions, audit and revocation | 12 | Partial | 0.50 | 6.00 | `src/micro_helper/trust_policy.py`, `tests/test_trust_policy.py`, and the new local API gateway in `src/micro_helper/api.py`. The exact low-risk reads have fixed grants; `memory.create` requires a 60-second one-time token bound to normalized arguments; `/v1/audit` records metadata without payloads. API integration tests cover missing/forged boolean confirmation, argument mismatch, expiry, replay and audit privacy. Hosted and Windows/JARVIS adapters and user-managed grant revocation remain unintegrated. |
 | MH-07 | Authenticated phone/Windows pairing, encrypted sync, revocation, conflict handling and least privilege | 12 | Partial | 0.25 | 3.00 | `docs/SECURITY.md` documents a limited loopback Windows Companion with one-time pairing and session token. Full Android/Windows sync, encrypted transport/storage, conflict resolution, and device-level verification remain open. |
 | MH-08 | Android package/install path, backup/restore and core workflows verified on a physical Android device | 8 | Partial | 0.50 | 4.00 | Android debug APK workflow and backup/restore tests exist. A debug wrapper is not a store release; no physical-device acceptance test is recorded. |
 | MH-09 | Windows companion with explicit approval, workspace scope, action log and tested restrictions | 8 | Partial | 0.50 | 4.00 | `windows-companion/tests/test_companion_security.py` and `docs/SECURITY.md` document a fixed allowlist (lock, Explorer, Notepad, Calculator). A general workspace-scoped coding agent and physical Windows acceptance test are not proven. |
 | MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 implementation snapshot `3f5794837c60506761f9f76ebcd503dd849af701`, GitHub Actions run #42400456289. Project pytest: 61 passed; cloud-relay pytest: 11 passed; embedded browser JavaScript syntax and Python compilation passed. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
-|  | **Total** | **100** | **Not release-ready** |  | **44.00** | **Evidence-weighted score: 44.00%.** This measures verified acceptance evidence, not a claim that 44% of all possible features exist. |
+|  | **Total** | **100** | **Not release-ready** |  | **47.00** | **Evidence-weighted score: 47.00%.** This measures verified acceptance evidence, not a claim that 44% of all possible features exist. |
 
 ## Current test evidence
 
-- **PASS:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`, GitHub Actions run [#42400456289](https://github.com/dominixe2/springtrap-/actions/runs/42400456289). Embedded browser JavaScript syntax and Python compilation passed; project pytest reported **61 passed**; cloud-relay pytest reported **11 passed**.
+- **PASS:** PR #23 latest checklist head `e3fbaa5fb15850122bfd3b43998841d8a2de6cd7`, GitHub Actions run [#42400687405](https://github.com/dominixe2/springtrap-/actions/runs/42400687405). Embedded browser JavaScript syntax and Python compilation passed; project pytest reported **61 passed**; cloud-relay pytest reported **11 passed**.
 - **WARNING:** The two pytest suites each emitted one Starlette/httpx TestClient deprecation warning. No test failures occurred.
 - **PASS (historical baseline):** PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`, checks run [#270](https://github.com/dominixe2/springtrap-/actions/runs/42267396572) and hosted-source run [#19](https://github.com/dominixe2/springtrap-/actions/runs/42267396582).
 - **NOT RUN:** Physical Android install/use, physical Windows use, signed-in end-to-end flows for hosted chat/sync/tasks/images/web search/voice, and full trust-policy integration across every action adapter.
@@ -63,9 +63,9 @@ A level may be raised only when new implementation and evidence are linked in th
 
 ## Change log
 
-- **1.0.0-checklist.4 (2026-11-07):** corrects the snapshot source to the PR #23 implementation head and separates current PR #23 CI evidence from the historical PR #15 baseline. Score remains 44.00%.
+- **1.0.0-checklist.5 (2026-11-07):** raises MH-05 from evidence level 0.25 to 0.50 because the bounded task queue and three policy-gated local tools are now implemented and covered by passing CI. Weighted score increases from 44.00% to 47.00%; no physical-platform credit is added.
 
-- **1.0.0-checklist.3 (2026-11-07):** records the first policy-enforced local tool gateway, argument-bound one-time confirmations, payload-free audit events, and passing PR #23 CI run #42400456289. The evidence-weighted score remains 44.00%; platform acceptance and broader adapter integration are still open.
+- **1.0.0-checklist.4 (2026-11-07):** corrects the snapshot source to the PR #23 implementation head and separates current PR #23 CI evidence from the historical PR #15 baseline. Score remained 44.00%.
 
 - **1.0.0-checklist.2 (2026-11-07):** records the first local API tool-gateway integration, one-time argument-bound confirmations and payload-free audit log. Evidence-weighted score remains 44.00% pending current branch CI and target-platform acceptance.
 
