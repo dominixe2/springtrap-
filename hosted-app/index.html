@@ -1856,11 +1856,13 @@
           }catch(error){status.textContent=error.message;}
           finally{pairButton.disabled=false;}
         });
-        disconnectButton.addEventListener('click',()=>{
+        disconnectButton.addEventListener('click',async()=>{
+          const oldToken=token;disconnectButton.disabled=true;
+          try{if(oldToken)await fetch(relay+'/v1/pair/revoke',{method:'POST',mode:'cors',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:oldToken})});}catch(error){}
           token='';sessionStorage.removeItem('mh_windows_session');clearTimeout(reconnectTimer);
           if(socket){socket.close(1000,'User disconnected');socket=null;}
           clearPending('Notebook byl odpojen.');setConnected(false);
-          status.textContent='Odpojeno v tomto prohlížeči. Pro úplné zrušení relace zavři Windows Companion.';
+          status.textContent='Párování notebooku bylo zrušeno.';
         });
         buttons.forEach(button=>button.addEventListener('click',async()=>{
           if(!ready||!socket||socket.readyState!==WebSocket.OPEN)return;
