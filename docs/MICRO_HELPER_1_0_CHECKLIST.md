@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.5
+- **Checklist version:** 1.0.0-checklist.6
 - **Snapshot date:** 2026-11-07
-- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`; latest checklist evidence commit `e3fbaa5fb15850122bfd3b43998841d8a2de6cd7` passed CI run #42400687405.
+- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`; latest checklist head `67fdc8f93b55c5e3783ad6f7831e72b04c08b042` passed CI run #42400792683.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -34,7 +34,7 @@ A level may be raised only when new implementation and evidence are linked in th
 | MH-08 | Android package/install path, backup/restore and core workflows verified on a physical Android device | 8 | Partial | 0.50 | 4.00 | Android debug APK workflow and backup/restore tests exist. A debug wrapper is not a store release; no physical-device acceptance test is recorded. |
 | MH-09 | Windows companion with explicit approval, workspace scope, action log and tested restrictions | 8 | Partial | 0.50 | 4.00 | `windows-companion/tests/test_companion_security.py` and `docs/SECURITY.md` document a fixed allowlist (lock, Explorer, Notepad, Calculator). A general workspace-scoped coding agent and physical Windows acceptance test are not proven. |
 | MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 implementation snapshot `3f5794837c60506761f9f76ebcd503dd849af701`, GitHub Actions run #42400456289. Project pytest: 61 passed; cloud-relay pytest: 11 passed; embedded browser JavaScript syntax and Python compilation passed. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
-|  | **Total** | **100** | **Not release-ready** |  | **47.00** | **Evidence-weighted score: 47.00%.** This measures verified acceptance evidence, not a claim that 44% of all possible features exist. |
+|  | **Total** | **100** | **Not release-ready** |  | **47.00** | **Evidence-weighted score: 47.00%.** This measures verified acceptance evidence, not a claim that 47% of all possible features exist. |
 
 ## Current test evidence
 
@@ -63,9 +63,13 @@ A level may be raised only when new implementation and evidence are linked in th
 
 ## Change log
 
+- **1.0.0-checklist.6 (2026-11-07):** records passing CI on checklist head `67fdc8f93b55c5e3783ad6f7831e72b04c08b042` (run #42400792683) and keeps the weighted score at 47.00%.
+
 - **1.0.0-checklist.5 (2026-11-07):** raises MH-05 from evidence level 0.25 to 0.50 because the bounded task queue and three policy-gated local tools are now implemented and covered by passing CI. Weighted score increases from 44.00% to 47.00%; no physical-platform credit is added.
 
 - **1.0.0-checklist.4 (2026-11-07):** corrects the snapshot source to the PR #23 implementation head and separates current PR #23 CI evidence from the historical PR #15 baseline. Score remained 44.00%.
+
+- **1.0.0-checklist.3 (2026-11-07):** recorded the first policy-enforced local API tool gateway, argument-bound one-time confirmations, payload-free audit events, and passing implementation CI run #42400456289. Score remained 44.00%.
 
 - **1.0.0-checklist.2 (2026-11-07):** records the first local API tool-gateway integration, one-time argument-bound confirmations and payload-free audit log. Evidence-weighted score remains 44.00% pending current branch CI and target-platform acceptance.
 
