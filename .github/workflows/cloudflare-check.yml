@@ -1,0 +1,30 @@
+name: Cloudflare Relay Checks
+
+on:
+  push:
+    branches: [micro-helper]
+    paths:
+      - "cloudflare/**"
+      - ".github/workflows/cloudflare-check.yml"
+  pull_request:
+    paths:
+      - "cloudflare/**"
+      - ".github/workflows/cloudflare-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check JavaScript syntax
+        run: node --check cloudflare/worker.js
+      - name: Validate Wrangler configuration
+        run: |
+          npm install --global wrangler
+          wrangler deploy --config cloudflare/wrangler.toml --dry-run
