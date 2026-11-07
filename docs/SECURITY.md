@@ -31,3 +31,13 @@
 - The Windows EXE is not code-signed; Windows SmartScreen may display a warning.
 - The browser-local fallback uses browser storage and is not encrypted by this app. Treat device access and browser profile security accordingly.
 - A successful CI build proves packaging and static checks, not behavior on the user's physical phone or notebook.
+
+
+## Local API tool policy integration (2026-11-07)
+
+- The local Python API now evaluates registered tool calls through `src/micro_helper/trust_policy.py`.
+- Only the exact low-risk reads `profile.read` and `memory.list` have built-in grants. Unknown tool IDs remain unavailable.
+- `memory.create` is classified as a state-changing local write and requires a one-time confirmation token bound to the normalized arguments. Tokens expire after 60 seconds, are stored only as SHA-256 hashes, and are consumed atomically once.
+- The `/v1/audit` endpoint records tool ID, capability, operation, policy decision, reason and outcome. It deliberately does not store tool arguments, results, or confirmation tokens.
+- This integration covers only the three registered local API tools. It does not yet protect every hosted, Windows Companion, or JARVIS adapter. There is no user-managed grant editor/revocation UI yet; do not imply otherwise.
+- The confirmation endpoint must only be called after the client has displayed the exact action and received explicit user approval. The token is a short-lived server-side replay guard, not authentication. The local API must remain bound to loopback; Origin/Fetch-Metadata checks are defense in depth, not a substitute for authentication.
