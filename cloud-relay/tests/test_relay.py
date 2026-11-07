@@ -67,8 +67,10 @@ def test_allowlisted_command_routes_between_paired_devices():
     mobile_token = client.post("/v1/pair/claim", json={"pairing_code": "123456"}).json()["token"]
     with client.websocket_connect("/v1/ws") as desktop:
         desktop.send_json({"type": "auth", "token": desktop_token})
+        assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
         with client.websocket_connect("/v1/ws") as mobile:
             mobile.send_json({"type": "auth", "token": mobile_token})
+            assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
             mobile.send_json({"type": "command", "action": "notepad", "request_id": "req-1"})
             assert desktop.receive_json() == {"type": "command", "action": "notepad", "request_id": "req-1"}
             desktop.send_json({"type": "result", "request_id": "req-1", "ok": True, "message": "Spuštěno"})
