@@ -2,6 +2,7 @@ const APP_ORIGIN = "https://micro-helper-ygeuyn.v2.appdeploy.ai";
 const ALLOWED_ACTIONS = new Set(["lock", "explorer", "notepad", "calculator"]);
 const PAIR_TTL_MS = 5 * 60 * 1000;
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const MAX_WEBSOCKET_MESSAGE_BYTES = 4096;
 
 function json(data, status = 200, origin = null) {
   const headers = {
@@ -172,6 +173,10 @@ export class RelayHub {
     let message;
     try {
       const raw = typeof rawMessage === "string" ? rawMessage : new TextDecoder().decode(rawMessage);
+      if (new TextEncoder().encode(raw).byteLength > MAX_WEBSOCKET_MESSAGE_BYTES) {
+        server.close(1009, "Message too large");
+        return;
+      }
       message = JSON.parse(raw);
     } catch {
       try { server.send(JSON.stringify({ type: "error", error: "invalid_json" })); } catch {}
@@ -194,6 +199,20 @@ export class RelayHub {
       attachment = { sessionId: identity.sessionId, role: identity.role };
       server.serializeAttachment(attachment);
       server.send(JSON.stringify({ type: "ready", role: identity.role }));
+      return;
+    }
+
+    // A socket must not outlive its pairing: check storage on every message so
+    // expiry and revocation apply to already-authenticated, hibernated sockets.
+    const session = await this.state.storage.get("session:" + attachment.sessionId);
+    if (!session || session.expiresAt <= Date.now()) {
+      server.close(4401, "Pairing expired or revoked");
+      return;
+    }
+
+    // Bound command/result traffic per paired device role, including reconnects.
+    if (!(await this.rateLimit("websocket:" + attachment.sessionId + ":" + attachment.role, 120, 60 * 1000))) {
+      try { server.send(JSON.stringify({ type: "error", error: "rate_limited" })); } catch {}
       return;
     }
 
