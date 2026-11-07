@@ -89,13 +89,13 @@ def database() -> Iterator[sqlite3.Connection]:
             """
             CREATE TABLE IF NOT EXISTS profile (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
-                agent_name TEXT NOT NULL DEFAULT 'Mykla',
+                agent_name TEXT NOT NULL DEFAULT 'Micro Helper',
                 language TEXT NOT NULL DEFAULT 'cs-CZ',
                 style TEXT NOT NULL DEFAULT 'friendly',
                 updated_at TEXT NOT NULL
             );
             INSERT OR IGNORE INTO profile (id, agent_name, language, style, updated_at)
-            VALUES (1, 'Mykla', 'cs-CZ', 'friendly', CURRENT_TIMESTAMP);
+            VALUES (1, 'Micro Helper', 'cs-CZ', 'friendly', CURRENT_TIMESTAMP);
             CREATE TABLE IF NOT EXISTS memories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 content TEXT NOT NULL,
@@ -183,7 +183,7 @@ class MemoryRequest(BaseModel):
 
 
 class ProfileRequest(BaseModel):
-    agent_name: str = Field(default="Mykla", min_length=1, max_length=30)
+    agent_name: str = Field(default="Micro Helper", min_length=1, max_length=30)
     language: str = Field(default="cs-CZ", min_length=2, max_length=20)
     style: str = Field(default="friendly", min_length=1, max_length=40)
 
