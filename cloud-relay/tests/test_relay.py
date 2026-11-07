@@ -58,3 +58,12 @@ def test_websocket_rejects_unknown_token():
             assert False, "unauthorized socket must not receive messages"
         except Exception:
             pass
+
+
+def test_pairing_claims_are_rate_limited():
+    assert register().status_code == 200
+    for _ in range(8):
+        response = client.post("/v1/pair/claim", json={"pairing_code": "999999"})
+        assert response.status_code == 404
+    response = client.post("/v1/pair/claim", json={"pairing_code": "999999"})
+    assert response.status_code == 429
