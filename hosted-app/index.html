@@ -981,15 +981,19 @@
           try {
             const response = await apiFetch('/v1/conversations');
             const data = await response.json();
+            if (!Array.isArray(data.messages)) return;
+            history = [];
             if (!data.messages.length) return;
             byId('messages').replaceChildren();
             for (const item of data.messages) {
+              if (!['user', 'assistant'].includes(item.role) || typeof item.content !== 'string') continue;
               const message = document.createElement('div');
-              message.className =
-                'msg ' + (item.role === 'user' ? 'user' : 'agent');
+              message.className = 'msg ' + (item.role === 'user' ? 'user' : 'agent');
               message.textContent = item.content;
               byId('messages').append(message);
+              history.push({ role: item.role, content: item.content });
             }
+            history = history.slice(-20);
             byId('messages').scrollTop = byId('messages').scrollHeight;
           } catch (error) {}
         }
@@ -1064,6 +1068,7 @@
         window.addEventListener('mh-cloud-update', () => {
           restoreProfile();
           renderMemories();
+          loadSavedConversation();
         });
       })();
     </script>
