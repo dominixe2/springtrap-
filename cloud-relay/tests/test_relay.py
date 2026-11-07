@@ -1,4 +1,6 @@
+import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 from app import app, sessions, tokens, digest
 
 client = TestClient(app)
@@ -7,6 +9,7 @@ client = TestClient(app)
 def setup_function():
     sessions.clear()
     tokens.clear()
+    claim_attempts.clear()
 
 
 def register(code="123456", token="d" * 40):
@@ -51,13 +54,9 @@ def test_mobile_cannot_claim_twice():
 
 
 def test_websocket_rejects_unknown_token():
-    with client.websocket_connect("/v1/ws?token=not-a-valid-token") as ws:
-        # TestClient may accept before server-side close is observed.
-        try:
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/v1/ws?token=not-a-valid-token") as ws:
             ws.receive_json()
-            assert False, "unauthorized socket must not receive messages"
-        except Exception:
-            pass
 
 
 def test_pairing_claims_are_rate_limited():
