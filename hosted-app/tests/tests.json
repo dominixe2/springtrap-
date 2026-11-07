@@ -37,7 +37,8 @@
       "AI task execution endpoint",
       "persisted task result",
       "retryable AI task failure",
-      "quick and deep chat response setting"
+      "quick and deep chat response setting",
+      "reconnect after network interruption and app resume"
     ],
     "description": "Verifies learning plan changes propagate live between two clients belonging to the same account.",
     "steps": [
@@ -51,9 +52,12 @@
       "Select Run AI for the new task",
       "Verify the task changes to completed and a useful result appears",
       "Refresh the page and verify the completed result remains available",
-      "Switch the chat response depth between quick and deep and save the setting"
+      "Switch the chat response depth between quick and deep and save the setting",
+      "Temporarily disable the network on Actor A and restore it",
+      "Verify Actor A reconnects automatically and receives the latest plan, note and preference changes",
+      "Background the mobile app and reopen it, then verify live synchronization is active again"
     ],
-    "expected": "Both clients show the latest plan data without manual refresh, and a signed-out client cannot access account data. The same account can run a saved AI task, retain its completed result, retry failures, and choose quick or deep chat responses."
+    "expected": "Both clients show the latest plan data without manual refresh, and a signed-out client cannot access account data. The same account can run a saved AI task, retain its completed result, retry failures, and choose quick or deep chat responses. After a temporary network interruption or mobile app resume, the client automatically restores its live subscription and receives the latest updates."
   },
   {
     "name": "Pair Windows Companion and reject unauthorized desktop commands",
