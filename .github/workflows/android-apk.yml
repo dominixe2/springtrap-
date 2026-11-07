@@ -27,6 +27,18 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Validate secure hosted app target
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          config = Path("capacitor.config.ts").read_text()
+          wrapper = Path("www/index.html").read_text()
+          assert "appId: 'cz.dominik.microhelper'" in config
+          assert "https://micro-helper-ygeuyn.v2.appdeploy.ai/" in config
+          assert "cleartext: false" in config
+          assert "Micro Helper" in wrapper
+          print("Android wrapper target and HTTPS settings verified.")
+          PY
       - name: Install Capacitor
         run: npm install
       - name: Create Android project
