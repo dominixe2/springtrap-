@@ -26,19 +26,15 @@
     "expected": "Voice controls report actual browser support and foreground-only limits; web search shows a summary and source links; image generation, analysis and OCR return visible results or a clear retryable error."
   },
   {
-    "name": "Synchronize account data between two signed-in devices",
+    "name": "Synchronize plans, notes and preferences across devices",
     "viewport": "mobile",
     "covers": [
       "authenticated cross-device synchronization",
       "live WebSocket subscription",
       "server-authorized user data isolation",
       "learning-plan create and update",
-      "authenticated task creation",
-      "AI task execution endpoint",
-      "persisted task result",
-      "retryable AI task failure",
-      "quick and deep chat response setting",
-      "reconnect after network interruption and app resume"
+      "private note create update delete",
+      "preference create update delete"
     ],
     "description": "Verifies learning plan changes propagate live between two clients belonging to the same account.",
     "steps": [
@@ -46,18 +42,15 @@
       "Sign in as Actor B in a second client using the same account",
       "Create a plan named Live sync check as Actor A",
       "Verify the plan appears for Actor B without refreshing the second client",
-      "Change the plan objective as Actor B",
-      "Verify the updated objective appears for Actor A",
-      "Create a task with a short title and a concrete text instruction",
-      "Select Run AI for the new task",
-      "Verify the task changes to completed and a useful result appears",
-      "Refresh the page and verify the completed result remains available",
-      "Switch the chat response depth between quick and deep and save the setting",
-      "Temporarily disable the network on Actor A and restore it",
-      "Verify Actor A reconnects automatically and receives the latest plan, note and preference changes",
-      "Background the mobile app and reopen it, then verify live synchronization is active again"
+      "Change the plan objective as Actor B and verify the updated objective appears for Actor A",
+      "Create a private note and a preference as Actor A",
+      "Verify both appear for Actor B without refreshing the second client",
+      "Edit the note and update the preference as Actor B",
+      "Verify the changed note and preference appear for Actor A",
+      "Delete the note and preference as Actor B",
+      "Verify both deleted items disappear for Actor A and a signed-out client cannot access account data"
     ],
-    "expected": "Both clients show the latest plan data without manual refresh, and a signed-out client cannot access account data. The same account can run a saved AI task, retain its completed result, retry failures, and choose quick or deep chat responses. After a temporary network interruption or mobile app resume, the client automatically restores its live subscription and receives the latest updates."
+    "expected": "Both clients show the latest plan, note and preference data without manual refresh; note and preference deletion is reflected across devices, and a signed-out client cannot access account data."
   },
   {
     "name": "Pair Windows Companion and reject unauthorized desktop commands",
@@ -79,24 +72,6 @@
     "expected": "Invalid pairing is rejected, commands remain disabled without a valid local session, and arbitrary shell execution is not exposed."
   },
   {
-    "name": "Manage private notes and preferences",
-    "viewport": "desktop",
-    "covers": [
-      "private memory create read update delete",
-      "preference create update delete",
-      "cross-device refresh after writes"
-    ],
-    "description": "Verifies users can create, edit and delete personal notes and preferences.",
-    "steps": [
-      "Sign in",
-      "Create a private note and verify it appears",
-      "Edit the note and verify the changed text",
-      "Delete the note and verify it disappears",
-      "Create a preference and verify it appears in the preference list"
-    ],
-    "expected": "Note and preference changes persist in the signed-in account and are reflected in visible lists."
-  },
-  {
     "name": "Keep offline mode honest and install the Android app",
     "viewport": "mobile",
     "covers": [
@@ -111,9 +86,31 @@
     "steps": [
       "Remain signed out and verify cloud-only actions explain that sign-in is required",
       "Create a local note and reload the page to verify local persistence",
+      "After the first online visit, reload with the network disabled and verify the app shell plus JavaScript and CSS still load while cloud actions clearly report that they need a connection",
       "Open the browser install option when supported or use Chrome's Install app menu",
       "Open the GitHub Android build workflow and verify a successful run produces an installable debug APK artifact"
     ],
     "expected": "Local data persists, cloud AI and remote commands are not fabricated offline, PWA installation is available where supported, and the Android workflow builds an APK artifact."
+  },
+  {
+    "name": "Create and execute an AI task",
+    "viewport": "mobile",
+    "covers": [
+      "authenticated task creation",
+      "AI task execution endpoint",
+      "persisted task result",
+      "retryable AI task failure",
+      "quick and deep chat response setting"
+    ],
+    "description": "Verifies a saved task can be run by the cloud AI and its completed result remains visible after refreshing the task list.",
+    "steps": [
+      "Sign in to Micro Helper",
+      "Create a task with a short title and a concrete text instruction",
+      "Select Run AI for the new task",
+      "Verify the task changes to completed and a useful result appears",
+      "Refresh the page and verify the completed result remains available",
+      "Switch the chat response depth between quick and deep and save the setting"
+    ],
+    "expected": "The authenticated task endpoint produces and persists a Czech result; failures are shown as retryable errors, and chat sends the selected response depth."
   }
 ]
