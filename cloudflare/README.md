@@ -14,7 +14,7 @@ This folder contains the durable replacement for the Render staging relay.
   - `GET /health`
   - `wss://<worker-host>/v1/ws`
 
-The worker allows only the four fixed Windows actions: `lock`, `explorer`, `notepad`, and `calculator`. Pairing registration and claims are rate-limited. Registration and one-time claim are performed inside Durable Object storage transactions to prevent simultaneous duplicate claims.
+The worker allows only the four fixed Windows actions: `lock`, `explorer`, `notepad`, and `calculator`. Pairing registration and claims are rate-limited. Registration and one-time claim are performed inside Durable Object storage transactions to prevent simultaneous duplicate claims. Authenticated WebSocket messages re-check the session expiry/revocation state, are limited to 120 messages per minute per paired role, and reject payloads above 4 KiB.
 
 ## Connect Cloudflare to this repository
 
