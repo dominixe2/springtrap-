@@ -133,6 +133,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     if session is None or role not in {"desktop", "mobile"}:
         await websocket.close(code=4401, reason="Invalid or expired relay token")
         return
+    await websocket.send_json({"type": "ready", "role": role})
     async with session.lock:
         if role == "desktop":
             old, session.desktop = session.desktop, websocket
