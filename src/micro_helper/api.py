@@ -82,6 +82,83 @@ async def protect_local_api(request: Request, call_next):
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
 MAX_BACKUP_BYTES = 8 * 1024 * 1024
+
+
+class RestoreBodyLimitMiddleware:
+    """Enforce the restore limit on actual streamed bytes, not only Content-Length."""
+
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+        self.too_large_body = b'{"detail":"Záloha je příliš velká (maximum 8 MiB)."}'
+        self.bad_length_body = b'{"detail":"Neplatná velikost požadavku."}'
+
+    async def __call__(self, scope, receive, send):
+        if (
+            scope.get("type") != "http"
+            or scope.get("method") != "POST"
+            or scope.get("path") != "/v1/backup/restore"
+        ):
+            return await self.app(scope, receive, send)
+
+        headers = dict(scope.get("headers", []))
+        raw_length = headers.get(b"content-length")
+        if raw_length is not None:
+            try:
+                declared_length = int(raw_length)
+            except ValueError:
+                return await self._respond(send, 400, self.bad_length_body)
+            if declared_length < 0:
+                return await self._respond(send, 400, self.bad_length_body)
+            if declared_length > self.max_bytes:
+                return await self._respond(send, 413, self.too_large_body)
+
+        chunks = []
+        total = 0
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            if message["type"] != "http.request":
+                continue
+            chunk = message.get("body", b"")
+            total += len(chunk)
+            if total > self.max_bytes:
+                return await self._respond(send, 413, self.too_large_body)
+            chunks.append(chunk)
+            if not message.get("more_body", False):
+                break
+
+        index = 0
+
+        async def replay_receive():
+            nonlocal index
+            if index < len(chunks):
+                chunk = chunks[index]
+                index += 1
+                return {
+                    "type": "http.request",
+                    "body": chunk,
+                    "more_body": index < len(chunks),
+                }
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        return await self.app(scope, replay_receive, send)
+
+    async def _respond(self, send, status_code: int, body: bytes):
+        await send({
+            "type": "http.response.start",
+            "status": status_code,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode("ascii")),
+                (b"cache-control", b"no-store"),
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
+
+
+app.add_middleware(RestoreBodyLimitMiddleware, max_bytes=MAX_BACKUP_BYTES)
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
 
 
