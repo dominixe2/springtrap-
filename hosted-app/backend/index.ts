@@ -447,9 +447,15 @@ export const handler = router({
     task.status = "cancelled";
     await writeState(user!.userId, state);
     const queueTable = jobsTableFor(user!.userId);
-    const [job] = await db.get<AgentJob>(queueTable, [task.id]);
+    // Queue IDs include a random suffix, so locate by task_id rather than assuming task.id is the queue record ID.
+    const queuedJobs = await db.list<AgentJob>(queueTable, { limit: 20 });
+    const job = queuedJobs.items.find(item => item.task_id === task.id);
     if (job && (job.status === "queued" || job.status === "running")) {
-      await db.tx.update(queueTable, [{ id: task.id, if: { status: job.status }, record: { status: "cancelled", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+      await db.tx.update(queueTable, [{
+        id: job.id,
+        if: { status: job.status },
+        record: { status: "cancelled", updated_at: stamp(), lease_until: undefined, lease_token: undefined }
+      }], { patch: true });
     }
     return json({ cancelled: true });
   }],
