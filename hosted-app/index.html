@@ -1740,32 +1740,35 @@
                 const run = document.createElement('button');
                 run.type = 'button';
                 run.textContent = signedInUser
-                  ? (task.status === 'error' ? 'Zkusit znovu' : 'Spustit AI')
+                  ? (task.status === 'error' ? 'Zařadit znovu' : 'Zařadit na server')
                   : 'Přihlásit pro AI';
                 run.disabled = !signedInUser;
                 if (!signedInUser) run.title = 'Pro zpracování úkolu se přihlas ke cloudové AI.';
                 run.onclick = async () => {
                   run.disabled = true;
-                  run.textContent = 'Zpracovávám…';
-                  $('status').textContent = 'AI zpracovává úkol';
+                  run.textContent = 'Zařazuji…';
                   try {
                     const response = await apiFetch(
                       '/v1/tasks/' + encodeURIComponent(task.id) + '/run',
                       { method: 'POST' }
                     );
                     const data = await response.json();
-                    if (!response.ok) throw new Error(data.detail || 'Úkol se nepodařilo dokončit.');
-                    $('status').textContent = 'Úkol dokončen';
+                    if (!response.ok) throw new Error(data.detail || 'Úkol se nepodařilo zařadit.');
+                    $('status').textContent = 'Úkol čeká na serverový worker';
                   } catch (error) {
-                    $('status').textContent = error.message || 'Úkol se nepodařilo dokončit';
+                    $('status').textContent = error.message || 'Úkol se nepodařilo zařadit';
                   } finally {
                     await refreshTasks();
                   }
                 };
                 row.append(run);
+              } else if (task.status === 'queued') {
+                const progress = document.createElement('small');
+                progress.textContent = 'Ve frontě serveru. Zpracování pokračuje i po zavření aplikace.';
+                row.append(progress);
               } else if (task.status === 'running') {
                 const progress = document.createElement('small');
-                progress.textContent = 'AI právě připravuje výsledek…';
+                progress.textContent = 'Server právě zpracovává úkol…';
                 row.append(progress);
               }
               root.append(row);
@@ -1793,7 +1796,7 @@
           } else $('status').textContent = 'Úkol se nepodařilo zařadit';
         });
         refreshTasks();
-        window.addEventListener('mh-cloud-update', refreshTasks);
+        window.addEventListener('mh-cloud-update', refreshTasks);\n        window.setInterval(() => { if (signedInUser) refreshTasks(); }, 30000);
       })();
     </script>
 
