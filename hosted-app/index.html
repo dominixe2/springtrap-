@@ -1796,7 +1796,8 @@
           } else $('status').textContent = 'Úkol se nepodařilo zařadit';
         });
         refreshTasks();
-        window.addEventListener('mh-cloud-update', refreshTasks);\n        window.setInterval(() => { if (signedInUser) refreshTasks(); }, 30000);
+        window.addEventListener('mh-cloud-update', refreshTasks);
+        window.setInterval(() => { if (signedInUser) refreshTasks(); }, 30000);
       })();
     </script>
 
