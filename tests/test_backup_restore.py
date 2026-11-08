@@ -248,3 +248,43 @@ def test_restore_replays_valid_chunked_body_without_content_length():
     assert "content-length" not in response.request.headers
     assert response.status_code == 200
     assert client.get("/v1/profile").json()["agent_name"] == "Nova"
+
+def test_restore_rolls_back_every_collection_when_database_write_fails():
+    seed_existing_data()
+    with api.database() as db:
+        db.execute(
+            "INSERT INTO messages(role, content, created_at) VALUES ('user', 'Původní zpráva', ?)",
+            (STAMP,),
+        )
+        db.execute(
+            """
+            CREATE TRIGGER fail_restore_memory
+            BEFORE INSERT ON memories
+            BEGIN
+                SELECT RAISE(ABORT, 'simulated restore failure');
+            END;
+            """
+        )
+        db.commit()
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": valid_backup(), "confirm_replace": True},
+    )
+
+    assert response.status_code == 422
+    assert client.get("/v1/profile").json()["agent_name"] == "Původní"
+    assert [row["content"] for row in client.get("/v1/memories").json()["memories"]] == ["Původní poznámka"]
+    assert [row["content"] for row in client.get("/v1/conversations").json()["messages"]] == ["Původní zpráva"]
+    assert client.get("/v1/tasks").json()["tasks"][0]["title"] == "Původní úkol"
+    assert client.get("/v1/learning-plans").json()["plans"][0]["title"] == "Původní plán"
+    assert client.get("/v1/preferences").json()["preferences"][0]["value"] == "yes"
+
+
+def test_local_ui_uses_micro_helper_as_the_default_identity():
+    html = client.get("/").text
+
+    assert 'value="Micro Helper"' in html
+    assert "Mykla" not in html
+    assert "localStorage.getItem('mh_name')||'Micro Helper'" in html
+    assert 'profile:{agent_name:"Micro Helper"' in html
