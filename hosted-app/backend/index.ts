@@ -183,10 +183,9 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
         await writeState(userId, state);
         const preferences = state.preferences.map(item => item.preference + ": " + item.value).join("\\n").slice(0, 3500);
         const memories = state.memories.slice(-12).map(item => item.content).join("\\n").slice(0, 2500);
-        const generated = await ai.run({
+        const generated = await ai.generate({
           system: "Jsi vykonavatel úkolů v Micro Helperu. Pracuj po krocích, ale používej pouze skutečně dostupné nástroje. V této verzi smíš vytvořit kvalitní textový výstup, rozpad úkolu a ověřovací plán; nesmíš tvrdit, že jsi upravil repozitář, spustil testy nebo nasadil aplikaci. Vrať konkrétní použitelný výsledek v češtině. Preference uživatele: " + (preferences || "neuvedeny") + "\\nPoznámky: " + (memories || "neuvedeny"),
           prompt: "Úkol: " + task.title + "\\nZadání: " + task.input_text + "\\nVrať výsledek včetně konkrétních kroků a kritérií ověření.",
-          maxSteps: 3,
           maxTokens: 1800,
           thinkingMode: "DEEP"
         });
