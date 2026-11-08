@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import os
 import re
 import sqlite3
@@ -42,6 +43,16 @@ async def protect_local_api(request: Request, call_next):
 
     This is not authentication. The local service must remain bound to loopback.
     """
+    if request.url.path == "/v1/backup/restore":
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                declared_length = int(content_length)
+            except ValueError:
+                return JSONResponse(status_code=400, content={"detail": "Neplatná velikost požadavku."})
+            if declared_length < 0 or declared_length > MAX_BACKUP_BYTES:
+                return JSONResponse(status_code=413, content={"detail": "Záloha je příliš velká (maximum 8 MiB)."})
+
     if request.url.path == "/v1" or request.url.path.startswith("/v1/"):
         if not _is_loopback_hostname(request.url.hostname):
             return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
@@ -70,6 +81,84 @@ async def protect_local_api(request: Request, call_next):
     return await call_next(request)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
+MAX_BACKUP_BYTES = 8 * 1024 * 1024
+
+
+class RestoreBodyLimitMiddleware:
+    """Enforce the restore limit on actual streamed bytes, not only Content-Length."""
+
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+        self.too_large_body = '{"detail":"Záloha je příliš velká (maximum 8 MiB)."}'.encode("utf-8")
+        self.bad_length_body = '{"detail":"Neplatná velikost požadavku."}'.encode("utf-8")
+
+    async def __call__(self, scope, receive, send):
+        if (
+            scope.get("type") != "http"
+            or scope.get("method") != "POST"
+            or scope.get("path") != "/v1/backup/restore"
+        ):
+            return await self.app(scope, receive, send)
+
+        headers = dict(scope.get("headers", []))
+        raw_length = headers.get(b"content-length")
+        if raw_length is not None:
+            try:
+                declared_length = int(raw_length)
+            except ValueError:
+                return await self._respond(send, 400, self.bad_length_body)
+            if declared_length < 0:
+                return await self._respond(send, 400, self.bad_length_body)
+            if declared_length > self.max_bytes:
+                return await self._respond(send, 413, self.too_large_body)
+
+        chunks = []
+        total = 0
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            if message["type"] != "http.request":
+                continue
+            chunk = message.get("body", b"")
+            total += len(chunk)
+            if total > self.max_bytes:
+                return await self._respond(send, 413, self.too_large_body)
+            chunks.append(chunk)
+            if not message.get("more_body", False):
+                break
+
+        index = 0
+
+        async def replay_receive():
+            nonlocal index
+            if index < len(chunks):
+                chunk = chunks[index]
+                index += 1
+                return {
+                    "type": "http.request",
+                    "body": chunk,
+                    "more_body": index < len(chunks),
+                }
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        return await self.app(scope, replay_receive, send)
+
+    async def _respond(self, send, status_code: int, body: bytes):
+        await send({
+            "type": "http.response.start",
+            "status": status_code,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode("ascii")),
+                (b"cache-control", b"no-store"),
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
+
+
+app.add_middleware(RestoreBodyLimitMiddleware, max_bytes=MAX_BACKUP_BYTES)
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
 
 
@@ -193,6 +282,11 @@ class ToolExecuteRequest(BaseModel):
     confirmed: bool = False
 
 
+class RestoreBackupRequest(BaseModel):
+    backup: dict[str, object]
+    confirm_replace: bool = False
+
+
 @app.get("/")
 async def home():
     return FileResponse(STATIC / "index.html")
@@ -223,6 +317,7 @@ async def status():
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
             "capability_catalog", "browser_voice_input", "browser_voice_output",
+            "full_backup_restore",
         ],
         "not_yet_implemented": [
             "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
@@ -600,6 +695,279 @@ async def clear_conversations():
         db.execute("DELETE FROM messages")
         db.commit()
     return {"deleted": True}
+
+
+@app.get("/v1/backup")
+async def export_backup():
+    """Export all local user data without caching private backup contents."""
+    with database() as db:
+        profile = db.execute(
+            "SELECT agent_name, language, style, updated_at FROM profile WHERE id=1"
+        ).fetchone()
+        memories = [dict(row) for row in db.execute(
+            "SELECT id, content, category, created_at FROM memories ORDER BY id"
+        ).fetchall()]
+        messages = [dict(row) for row in db.execute(
+            "SELECT id, role, content, created_at FROM messages ORDER BY id"
+        ).fetchall()]
+        tasks = [dict(row) for row in db.execute(
+            "SELECT id, kind, title, input_text, status, result, error, created_at, updated_at, started_at, finished_at FROM tasks ORDER BY created_at, id"
+        ).fetchall()]
+        learning_plans = []
+        for row in db.execute(
+            "SELECT id, title, goal, steps_json, status, created_at, updated_at FROM learning_plans ORDER BY created_at, id"
+        ).fetchall():
+            item = dict(row)
+            try:
+                item["steps"] = json.loads(item.pop("steps_json"))
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=500, detail="Učební plán obsahuje poškozená data; záloha nebyla vytvořena.")
+            learning_plans.append(item)
+        preferences = [dict(row) for row in db.execute(
+            "SELECT id, category, preference, value, source, updated_at FROM preferences ORDER BY id"
+        ).fetchall()]
+
+    payload = {
+        "format": "micro-helper-backup",
+        "version": 1,
+        "created_at": utc_now(),
+        "profile": dict(profile),
+        "memories": memories,
+        "messages": messages,
+        "tasks": tasks,
+        "learning_plans": learning_plans,
+        "preferences": preferences,
+    }
+    serialized_size = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    if serialized_size > MAX_BACKUP_BYTES:
+        raise HTTPException(status_code=413, detail="Záloha přesahuje limit 8 MiB a nelze ji bezpečně obnovit.")
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+    )
+
+
+@app.post("/v1/backup/restore")
+async def restore_backup(request: RestoreBackupRequest):
+    """Validate the entire backup before replacing local data in one transaction."""
+    if request.confirm_replace is not True:
+        raise HTTPException(status_code=403, detail="Obnova vyžaduje výslovné potvrzení nahrazení místních dat.")
+
+    backup = request.backup
+    expected_keys = {
+        "format", "version", "created_at", "profile", "memories",
+        "messages", "tasks", "learning_plans", "preferences",
+    }
+    if set(backup) != expected_keys or backup.get("format") != "micro-helper-backup":
+        raise HTTPException(status_code=422, detail="Soubor není úplná záloha Micro Helperu verze 1.")
+    if type(backup.get("version")) is not int or backup["version"] != 1:
+        raise HTTPException(status_code=422, detail="Verze zálohy není podporována.")
+
+    def required_text(value: object, maximum: int) -> str:
+        if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+            raise ValueError("invalid text")
+        return value.strip()
+
+    def optional_text(value: object, maximum: int) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or len(value) > maximum:
+            raise ValueError("invalid optional text")
+        return value
+
+    def record_id(value: object) -> int:
+        if type(value) is not int or value <= 0:
+            raise ValueError("invalid record id")
+        return value
+
+    def record_uuid(value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("invalid record uuid")
+        parsed = uuid.UUID(value)
+        return str(parsed)
+
+    def collection(name: str, maximum: int) -> list[object]:
+        value = backup.get(name)
+        if not isinstance(value, list) or len(value) > maximum:
+            raise ValueError("invalid collection")
+        return value
+
+    try:
+        required_text(backup.get("created_at"), 100)
+        profile = backup.get("profile")
+        if not isinstance(profile, dict):
+            raise ValueError("invalid profile")
+        profile_row = (
+            required_text(profile.get("agent_name"), 30),
+            required_text(profile.get("language"), 20),
+            required_text(profile.get("style"), 40),
+            required_text(profile.get("updated_at"), 100),
+        )
+
+        memory_rows = []
+        for item in collection("memories", 10000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid memory")
+            memory_rows.append((
+                record_id(item.get("id")),
+                required_text(item.get("content"), 1000),
+                required_text(item.get("category"), 40),
+                required_text(item.get("created_at"), 100),
+            ))
+
+        message_rows = []
+        for item in collection("messages", 20000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid message")
+            role = required_text(item.get("role"), 20)
+            if role not in {"user", "assistant"}:
+                raise ValueError("invalid message role")
+            message_rows.append((
+                record_id(item.get("id")),
+                role,
+                required_text(item.get("content"), 100000),
+                required_text(item.get("created_at"), 100),
+            ))
+
+        task_rows = []
+        allowed_task_statuses = {"queued", "running", "completed", "failed", "cancelled"}
+        for item in collection("tasks", 10000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid task")
+            kind = required_text(item.get("kind"), 40)
+            status = required_text(item.get("status"), 20)
+            if kind != "agent.draft" or status not in allowed_task_statuses:
+                raise ValueError("unsupported task")
+            # A worker process is not guaranteed to survive a restore. Re-queue
+            # interrupted draft work instead of leaving it permanently running.
+            if status == "running":
+                status = "queued"
+            task_rows.append((
+                record_uuid(item.get("id")),
+                kind,
+                required_text(item.get("title"), 120),
+                required_text(item.get("input_text"), 12000),
+                status,
+                optional_text(item.get("result"), 100000),
+                optional_text(item.get("error"), 4000),
+                required_text(item.get("created_at"), 100),
+                required_text(item.get("updated_at"), 100),
+                optional_text(item.get("started_at"), 100),
+                optional_text(item.get("finished_at"), 100),
+            ))
+
+        plan_rows = []
+        for item in collection("learning_plans", 1000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid learning plan")
+            steps = item.get("steps")
+            if not isinstance(steps, list) or not 1 <= len(steps) <= 50:
+                raise ValueError("invalid learning plan steps")
+            clean_steps = [required_text(step, 500) for step in steps]
+            status = required_text(item.get("status"), 20)
+            if status not in {"active", "paused", "completed"}:
+                raise ValueError("invalid learning plan status")
+            plan_rows.append((
+                record_uuid(item.get("id")),
+                required_text(item.get("title"), 120),
+                required_text(item.get("goal"), 2000),
+                json.dumps(clean_steps, ensure_ascii=False),
+                status,
+                required_text(item.get("created_at"), 100),
+                required_text(item.get("updated_at"), 100),
+            ))
+
+        preference_rows = []
+        preference_keys = set()
+        for item in collection("preferences", 5000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid preference")
+            category = required_text(item.get("category"), 40)
+            preference = required_text(item.get("preference"), 80)
+            key = (category, preference)
+            if key in preference_keys:
+                raise ValueError("duplicate preference")
+            preference_keys.add(key)
+            preference_rows.append((
+                record_id(item.get("id")),
+                category,
+                preference,
+                required_text(item.get("value"), 500),
+                required_text(item.get("source"), 40),
+                required_text(item.get("updated_at"), 100),
+            ))
+
+        for rows in (memory_rows, message_rows, preference_rows):
+            ids = [row[0] for row in rows]
+            if len(ids) != len(set(ids)):
+                raise ValueError("duplicate numeric id")
+        for rows in (task_rows, plan_rows):
+            ids = [row[0] for row in rows]
+            if len(ids) != len(set(ids)):
+                raise ValueError("duplicate uuid")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise HTTPException(status_code=422, detail="Záloha obsahuje neplatná nebo duplicitní data.")
+
+    try:
+        with database() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                db.execute(
+                    "UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1",
+                    profile_row,
+                )
+                db.execute("DELETE FROM memories")
+                db.execute("DELETE FROM messages")
+                db.execute("DELETE FROM tasks")
+                db.execute("DELETE FROM learning_plans")
+                db.execute("DELETE FROM preferences")
+                db.executemany(
+                    "INSERT INTO memories(id, content, category, created_at) VALUES (?, ?, ?, ?)",
+                    memory_rows,
+                )
+                db.executemany(
+                    "INSERT INTO messages(id, role, content, created_at) VALUES (?, ?, ?, ?)",
+                    message_rows,
+                )
+                db.executemany(
+                    """INSERT INTO tasks
+                       (id, kind, title, input_text, status, result, error, created_at, updated_at, started_at, finished_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    task_rows,
+                )
+                db.executemany(
+                    """INSERT INTO learning_plans
+                       (id, title, goal, steps_json, status, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    plan_rows,
+                )
+                db.executemany(
+                    """INSERT INTO preferences
+                       (id, category, preference, value, source, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    preference_rows,
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+    except sqlite3.Error:
+        raise HTTPException(
+            status_code=422,
+            detail="Zálohu se nepodařilo bezpečně obnovit; původní data zůstala zachována.",
+        )
+
+    restored = {
+        "memories": len(memory_rows),
+        "messages": len(message_rows),
+        "tasks": len(task_rows),
+        "learning_plans": len(plan_rows),
+        "preferences": len(preference_rows),
+    }
+    return JSONResponse(
+        content={"restored": restored, "message": "Záloha byla bezpečně obnovena."},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/v1/models")
