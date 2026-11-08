@@ -90,8 +90,8 @@ class RestoreBodyLimitMiddleware:
     def __init__(self, app, max_bytes: int):
         self.app = app
         self.max_bytes = max_bytes
-        self.too_large_body = b'{"detail":"Záloha je příliš velká (maximum 8 MiB)."}'
-        self.bad_length_body = b'{"detail":"Neplatná velikost požadavku."}'
+        self.too_large_body = '{"detail":"Záloha je příliš velká (maximum 8 MiB)."}'.encode("utf-8")
+        self.bad_length_body = '{"detail":"Neplatná velikost požadavku."}'.encode("utf-8")
 
     async def __call__(self, scope, receive, send):
         if (
