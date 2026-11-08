@@ -1788,11 +1788,17 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind: 'agent.draft', title, input_text }),
           });
+          $('status').textContent = 'Micro Helper začíná pracovat…';
           if (response.ok) {
+            const task = await response.json();
             $('taskTitle').value = '';
             $('taskInput').value = '';
-            $('status').textContent = 'Úkol zařazen';
-            refreshTasks();
+            $('status').textContent = task.status === 'completed'
+              ? 'Úkol dokončen'
+              : task.status === 'running'
+                ? 'Micro Helper právě pracuje'
+                : 'Úkol zůstává uložený a server jej zkusí znovu';
+            await refreshTasks();
           } else $('status').textContent = 'Úkol se nepodařilo zařadit';
         });
         refreshTasks();
