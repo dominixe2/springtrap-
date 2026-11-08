@@ -1,13 +1,16 @@
 """Local-first Micro Helper API with persistent private data and optional Ollama chat."""
 from __future__ import annotations
 
+import hashlib
 import ipaddress
+import json
 import os
 import re
+import secrets
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 from urllib.parse import urlsplit
@@ -17,6 +20,14 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+from micro_helper.trust_policy import (
+    Action,
+    Decision,
+    PermissionPolicy,
+    evaluate_action,
+    permission_key,
+)
 
 app = FastAPI(title="Micro Helper", version="0.3.0")
 STATIC = Path(__file__).parent / "static"
@@ -141,6 +152,29 @@ def database() -> Iterator[sqlite3.Connection]:
                 updated_at TEXT NOT NULL,
                 UNIQUE(category, preference)
             );
+            CREATE TABLE IF NOT EXISTS tool_confirmations (
+                token_hash TEXT PRIMARY KEY,
+                tool_id TEXT NOT NULL,
+                arguments_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                consumed_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_tool_confirmations_expiry
+                ON tool_confirmations(expires_at);
+            CREATE TABLE IF NOT EXISTS tool_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tool_id TEXT NOT NULL,
+                capability TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                target TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_tool_audit_created
+                ON tool_audit(created_at);
             """
         )
         connection.commit()
@@ -190,7 +224,98 @@ class ProfileRequest(BaseModel):
 
 class ToolExecuteRequest(BaseModel):
     arguments: dict[str, object] = Field(default_factory=dict)
-    confirmed: bool = False
+    confirmation_token: str | None = Field(default=None, min_length=32, max_length=200)
+
+
+class ToolConfirmationRequest(BaseModel):
+    arguments: dict[str, object] = Field(default_factory=dict)
+
+
+TOOL_ACTIONS = {
+    "profile.read": Action("profile", "read", "local"),
+    "memory.list": Action("memory", "read", "local"),
+    "memory.create": Action("memory", "create", "local", changes_external_state=True),
+}
+TOOL_POLICY = PermissionPolicy(
+    grants=frozenset({
+        permission_key(TOOL_ACTIONS["profile.read"]),
+        permission_key(TOOL_ACTIONS["memory.list"]),
+    })
+)
+
+
+def _normalize_tool_arguments(tool_id: str, arguments: dict[str, object]) -> dict[str, str]:
+    if tool_id in {"profile.read", "memory.list"}:
+        if arguments:
+            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
+        return {}
+    if tool_id == "memory.create":
+        if set(arguments) - {"content", "category"}:
+            raise HTTPException(status_code=422, detail="Nástroj obdržel nepovolené argumenty.")
+        content = arguments.get("content")
+        category = arguments.get("category", "context")
+        if not isinstance(content, str) or not content.strip() or len(content) > 1000:
+            raise HTTPException(status_code=422, detail="Obsah poznámky musí mít 1 až 1000 znaků.")
+        if not isinstance(category, str) or not category.strip() or len(category) > 40:
+            raise HTTPException(status_code=422, detail="Kategorie musí mít 1 až 40 znaků.")
+        return {"content": content.strip(), "category": category.strip()}
+    raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+
+
+def _tool_arguments_hash(arguments: dict[str, str]) -> str:
+    canonical = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _record_tool_audit(tool_id: str, action: Action, decision: Decision, reason: str, outcome: str) -> None:
+    # Deliberately omit arguments, confirmation tokens and tool results.
+    with database() as db:
+        db.execute(
+            """INSERT INTO tool_audit
+               (tool_id, capability, operation, target, decision, reason, outcome, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (tool_id, action.capability, action.operation, action.target,
+             decision.value, reason[:240], outcome, utc_now()),
+        )
+        db.commit()
+
+
+def _consume_tool_confirmation(token: str | None, tool_id: str, arguments: dict[str, str]) -> bool:
+    if not token:
+        return False
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = datetime.now(timezone.utc)
+    with database() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            """SELECT tool_id, arguments_hash, expires_at, consumed_at
+               FROM tool_confirmations WHERE token_hash=?""",
+            (token_hash,),
+        ).fetchone()
+        if (
+            row is None
+            or row["tool_id"] != tool_id
+            or row["arguments_hash"] != _tool_arguments_hash(arguments)
+            or row["consumed_at"] is not None
+        ):
+            db.rollback()
+            return False
+        try:
+            expires_at = datetime.fromisoformat(row["expires_at"])
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except ValueError:
+            db.rollback()
+            return False
+        if expires_at <= now:
+            db.rollback()
+            return False
+        cursor = db.execute(
+            "UPDATE tool_confirmations SET consumed_at=? WHERE token_hash=? AND consumed_at IS NULL",
+            (now.isoformat(), token_hash),
+        )
+        db.commit()
+        return cursor.rowcount == 1
 
 
 @app.get("/")
@@ -223,6 +348,7 @@ async def status():
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
             "capability_catalog", "browser_voice_input", "browser_voice_output",
+            "tool_policy_gate", "one_time_action_confirmation", "tool_audit_log",
         ],
         "not_yet_implemented": [
             "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
@@ -243,6 +369,8 @@ async def capabilities():
             "default": "deny",
             "external_side_effects_require_confirmation": True,
             "model_output_is_not_authorization": True,
+            "integrated_adapters": ["profile.read", "memory.list", "memory.create"],
+            "audit_log": True,
         },
         "available": [
             {
@@ -294,48 +422,110 @@ async def list_tools():
     return {
         "default_policy": "deny",
         "tools": [
-            {"id": "profile.read", "description": "Read the local assistant profile", "risk": "read", "confirmation_required": False},
-            {"id": "memory.list", "description": "List saved local memories", "risk": "read", "confirmation_required": False},
-            {"id": "memory.create", "description": "Create one local memory note", "risk": "local_write", "confirmation_required": True},
+            {"id": "profile.read", "description": "Read the local assistant profile", "risk": "read", "confirmation_required": False, "policy": "exact_builtin_grant"},
+            {"id": "memory.list", "description": "List saved local memories", "risk": "read", "confirmation_required": False, "policy": "exact_builtin_grant"},
+            {"id": "memory.create", "description": "Create one local memory note", "risk": "local_write", "confirmation_required": True, "confirmation_flow": "one_time_token", "confirmation_ttl_seconds": 60},
         ],
+        "audit": {"available": True, "stores_arguments": False, "stores_confirmation_tokens": False},
+    }
+
+
+@app.post("/v1/tools/{tool_id}/confirm")
+async def confirm_tool_action(tool_id: str, request: ToolConfirmationRequest):
+    """Issue a one-time, short-lived token only after the UI has obtained explicit user approval."""
+    action = TOOL_ACTIONS.get(tool_id)
+    if action is None:
+        raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+    arguments = _normalize_tool_arguments(tool_id, request.arguments)
+    result = evaluate_action(action, TOOL_POLICY)
+    if result.decision == Decision.DENY:
+        _record_tool_audit(tool_id, action, result.decision, result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+    if result.decision != Decision.CONFIRM:
+        raise HTTPException(status_code=409, detail="Tento nástroj nevyžaduje potvrzovací token.")
+
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=60)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with database() as db:
+        db.execute("DELETE FROM tool_confirmations WHERE expires_at < ?", (now.isoformat(),))
+        db.execute(
+            """INSERT INTO tool_confirmations
+               (token_hash, tool_id, arguments_hash, created_at, expires_at, consumed_at)
+               VALUES (?, ?, ?, ?, ?, NULL)""",
+            (token_hash, tool_id, _tool_arguments_hash(arguments), now.isoformat(), expires_at.isoformat()),
+        )
+        db.commit()
+    _record_tool_audit(tool_id, action, result.decision, result.reason, "confirmation_issued")
+    return {
+        "tool": tool_id,
+        "confirmation_token": token,
+        "expires_at": expires_at.isoformat(),
+        "message": "Potvrzení platí 60 sekund a pouze pro tuto přesnou akci.",
     }
 
 
 @app.post("/v1/tools/{tool_id}/execute")
 async def execute_tool(tool_id: str, request: ToolExecuteRequest):
-    """Execute only hard-coded local tools; never dispatch arbitrary code or shell commands."""
+    """Execute only registered tools after deterministic policy evaluation."""
+    action = TOOL_ACTIONS.get(tool_id)
+    if action is None:
+        raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+    arguments = _normalize_tool_arguments(tool_id, request.arguments)
+    policy_result = evaluate_action(action, TOOL_POLICY)
+    if policy_result.decision == Decision.DENY:
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+
+    if policy_result.decision == Decision.CONFIRM:
+        if not _consume_tool_confirmation(request.confirmation_token, tool_id, arguments):
+            reason = "Chybí platné čerstvé potvrzení, token vypršel, byl použit nebo neodpovídá akci."
+            _record_tool_audit(tool_id, action, policy_result.decision, reason, "confirmation_rejected")
+            raise HTTPException(status_code=403, detail="Akce vyžaduje čerstvé potvrzení pro přesný obsah.")
+    elif request.confirmation_token:
+        raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá potvrzovací token.")
+
     if tool_id == "profile.read":
-        if request.arguments:
-            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
         with database() as db:
             row = db.execute("SELECT agent_name, language, style, updated_at FROM profile WHERE id=1").fetchone()
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "succeeded")
         return {"tool": tool_id, "result": dict(row)}
 
     if tool_id == "memory.list":
-        if request.arguments:
-            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
         with database() as db:
             rows = db.execute("SELECT id, content, category, created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "succeeded")
         return {"tool": tool_id, "result": {"memories": [dict(row) for row in rows]}}
 
     if tool_id == "memory.create":
-        if not request.confirmed:
-            raise HTTPException(status_code=403, detail="Uložení poznámky vyžaduje potvrzení uživatele.")
-        if set(request.arguments) - {"content", "category"}:
-            raise HTTPException(status_code=422, detail="Nástroj obdržel nepovolené argumenty.")
-        content = request.arguments.get("content")
-        category = request.arguments.get("category", "context")
-        if not isinstance(content, str) or not content.strip() or len(content) > 1000:
-            raise HTTPException(status_code=422, detail="Obsah poznámky musí mít 1 až 1000 znaků.")
-        if not isinstance(category, str) or not category.strip() or len(category) > 40:
-            raise HTTPException(status_code=422, detail="Kategorie musí mít 1 až 40 znaků.")
         with database() as db:
-            cursor = db.execute("INSERT INTO memories(content, category, created_at) VALUES (?, ?, ?)", (content.strip(), category.strip(), utc_now()))
+            cursor = db.execute(
+                "INSERT INTO memories(content, category, created_at) VALUES (?, ?, ?)",
+                (arguments["content"], arguments["category"], utc_now()),
+            )
             db.commit()
-            row = db.execute("SELECT id, content, category, created_at FROM memories WHERE id=?", (cursor.lastrowid,)).fetchone()
+            row = db.execute(
+                "SELECT id, content, category, created_at FROM memories WHERE id=?",
+                (cursor.lastrowid,),
+            ).fetchone()
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "succeeded")
         return {"tool": tool_id, "result": dict(row)}
 
     raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+
+
+@app.get("/v1/audit")
+async def list_tool_audit(limit: int = 50):
+    """Return recent tool metadata without storing or exposing arguments and tokens."""
+    limit = max(1, min(limit, 200))
+    with database() as db:
+        rows = db.execute(
+            """SELECT id, tool_id, capability, operation, target, decision, reason, outcome, created_at
+               FROM tool_audit ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return {"events": [dict(row) for row in rows]}
 
 
 
