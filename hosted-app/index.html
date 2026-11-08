@@ -1714,6 +1714,22 @@
             const response = await apiFetch('/v1/tasks?limit=30');
             if (!response.ok) throw new Error();
             const data = await response.json();
+            const pending = JSON.parse(localStorage.getItem('mh_pending_task_notifications') || '[]');
+            const stillPending = [];
+            for (const task of data.tasks) {
+              if (!pending.includes(task.id)) continue;
+              if (task.status === 'completed') {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification('Micro Helper: úkol dokončen', {
+                    body: task.title,
+                    tag: 'mh-task-' + task.id
+                  });
+                }
+              } else if (!['cancelled', 'error'].includes(task.status)) {
+                stillPending.push(task.id);
+              }
+            }
+            localStorage.setItem('mh_pending_task_notifications', JSON.stringify(stillPending));
             root.replaceChildren();
             if (!data.tasks.length) {
               root.textContent = 'Zatím tu nejsou žádné úkoly.';
@@ -1783,23 +1799,41 @@
           const title = $('taskTitle').value.trim(),
             input_text = $('taskInput').value.trim();
           if (!title || !input_text) return;
+          if ('Notification' in window && Notification.permission === 'default') {
+            try { await Notification.requestPermission(); } catch {}
+          }
+          $('status').textContent = 'Micro Helper začíná pracovat hned…';
           const response = await apiFetch('/v1/tasks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind: 'agent.draft', title, input_text }),
           });
-          $('status').textContent = 'Micro Helper začíná pracovat…';
           if (response.ok) {
             const task = await response.json();
             $('taskTitle').value = '';
             $('taskInput').value = '';
-            $('status').textContent = task.status === 'completed'
-              ? 'Úkol dokončen'
-              : task.status === 'running'
+            if (task.status === 'completed') {
+              $('status').textContent = 'Úkol dokončen · výsledek je uložený';
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Micro Helper: úkol dokončen', {
+                  body: task.title,
+                  tag: 'mh-task-' + task.id
+                });
+              }
+            } else {
+              $('status').textContent = task.status === 'running'
                 ? 'Micro Helper právě pracuje'
-                : 'Úkol zůstává uložený a server jej zkusí znovu';
+                : 'Úkol zůstává uložený; server jej může zkusit znovu';
+              const pending = JSON.parse(localStorage.getItem('mh_pending_task_notifications') || '[]');
+              if (!pending.includes(task.id)) {
+                pending.push(task.id);
+                localStorage.setItem('mh_pending_task_notifications', JSON.stringify(pending.slice(-50)));
+              }
+            }
             await refreshTasks();
-          } else $('status').textContent = 'Úkol se nepodařilo zařadit';
+          } else {
+            $('status').textContent = 'Úkol se nepodařilo spustit';
+          }
         });
         refreshTasks();
         window.addEventListener('mh-cloud-update', refreshTasks);
