@@ -37,6 +37,7 @@
 
 - The local /v1/backup endpoint exports the profile, memories, conversation history, draft-task queue, learning plans and preferences as JSON.
 - Backup responses use Cache-Control: no-store; the browser offers a file download rather than placing the backup in browser storage.
-- Restore requires an explicit confirmation in the UI, validates every collection and identifier before opening a database transaction, and replaces the included collections atomically. Invalid input or a database error leaves the previous data intact.
+- Restore requires an explicit confirmation in the UI, validates every collection and identifier before opening a database transaction, and replaces the included collections atomically. Invalid input or a database error leaves the previous data intact. Tasks interrupted in the running state are re-queued.
+- Export and restore share an 8 MiB limit so every generated backup remains restorable by the same version.
 - The backup intentionally excludes transient confirmation/session tokens and tool audit records. It also does not include the browser-only offline fallback store.
 - A backup contains private notes and conversation history. Store it like a private document and do not add passwords, API keys or other secrets to Micro Helper notes.
