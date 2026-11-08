@@ -105,20 +105,23 @@
       "scheduled background worker",
       "task state persistence after app closure",
       "task cancellation before execution",
-      "bounded retry and recovery"
+      "bounded retry and recovery",
+      "immediate server-side task execution on submission",
+      "task result persisted before API response",
+      "targeted on-demand worker invocation"
     ],
-    "description": "Verifies a saved task can be run by the cloud AI and its completed result remains visible after refreshing the task list.",
+    "description": "Verifies submitting a task immediately invokes the server worker, persists its result, and leaves the scheduled worker as a recovery path.",
     "steps": [
       "Sign in to Micro Helper",
       "Create a task with a short title and a concrete text instruction",
-      "Verify the task is saved with queued status and remains visible after refreshing the page",
-      "Close the app or open the same account in a second client; verify the queued task remains available",
-      "Allow the scheduled server worker to run, then refresh the task list and verify the task reaches completed with a persisted Czech result",
-      "Create a second task and cancel it before the next worker run; verify its status remains cancelled and no result is generated",
-      "Verify a temporary processing failure is reported and the task remains eligible for the bounded retry policy",
+      "Verify the create request immediately starts the targeted server worker without waiting for the hourly schedule",
+      "Verify the response contains a persisted completed Czech result, or a queued retry state when a temporary AI failure occurs",
+      "Refresh the task list and verify the result or retry state remains persisted",
+      "Create a second task, cancel it before a recovery run, and verify its status remains cancelled",
+      "Verify a temporary processing failure follows the bounded retry policy",
       "Switch the chat response depth between quick and deep and save the setting"
     ],
-    "expected": "Task creation writes a durable per-user queue record; queued work survives client closure, the scheduled worker produces and persists a Czech result, cancellation is respected, and temporary failures follow the bounded retry policy."
+    "expected": "Task submission invokes the worker immediately for that user's task; a successful result is persisted before the API response, temporary failures remain queued for scheduled recovery, cancellation is respected, and retries are bounded."
   },
   {
     "name": "Use the refreshed Micro Helper identity and responsive interface",
