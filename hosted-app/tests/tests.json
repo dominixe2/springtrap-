@@ -100,18 +100,25 @@
       "AI task execution endpoint",
       "persisted task result",
       "retryable AI task failure",
-      "quick and deep chat response setting"
+      "quick and deep chat response setting",
+      "durable per-user task queue",
+      "scheduled background worker",
+      "task state persistence after app closure",
+      "task cancellation before execution",
+      "bounded retry and recovery"
     ],
     "description": "Verifies a saved task can be run by the cloud AI and its completed result remains visible after refreshing the task list.",
     "steps": [
       "Sign in to Micro Helper",
       "Create a task with a short title and a concrete text instruction",
-      "Select Run AI for the new task",
-      "Verify the task changes to completed and a useful result appears",
-      "Refresh the page and verify the completed result remains available",
+      "Verify the task is saved with queued status and remains visible after refreshing the page",
+      "Close the app or open the same account in a second client; verify the queued task remains available",
+      "Allow the scheduled server worker to run, then refresh the task list and verify the task reaches completed with a persisted Czech result",
+      "Create a second task and cancel it before the next worker run; verify its status remains cancelled and no result is generated",
+      "Verify a temporary processing failure is reported and the task remains eligible for the bounded retry policy",
       "Switch the chat response depth between quick and deep and save the setting"
     ],
-    "expected": "The authenticated task endpoint produces and persists a Czech result; failures are shown as retryable errors, and chat sends the selected response depth."
+    "expected": "Task creation writes a durable per-user queue record; queued work survives client closure, the scheduled worker produces and persists a Czech result, cancellation is respected, and temporary failures follow the bounded retry policy."
   },
   {
     "name": "Use the refreshed Micro Helper identity and responsive interface",
