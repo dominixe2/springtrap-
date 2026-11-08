@@ -20,7 +20,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 </style></head>
 <body><main>
 <header><div class="orb"></div><div><h1 id="title">Micro Helper</h1><small>Tvůj osobní lokální AI agent</small></div><span class="status" id="status">Připraven</span></header>
-<section id="setup"><label>Jméno agenta <input id="agentName" value="Mykla" maxlength="30"></label><label>Model <input id="model" value="llama3.2" maxlength="80"></label><button class="primary" id="save">Uložit nastavení</button></section>
+<section id="setup"><label>Jméno agenta <input id="agentName" value="Micro Helper" maxlength="30"></label><label>Model <input id="model" value="llama3.2" maxlength="80"></label><button class="primary" id="save">Uložit nastavení</button></section>
 <section id="messages"><div class="msg agent">Ahoj! Jsem Micro Helper. Zatím běžím v základním režimu. Připoj lokální Ollamu a můžeme spolu chatovat bez placeného API.</div></section>
 <form id="chat"><input id="prompt" autocomplete="off" placeholder="Napiš, co potřebuješ…" required><button class="primary">Odeslat</button></form>
 <div class="settings" id="voicePanel" aria-label="Hlasové ovládání">
@@ -72,7 +72,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 const $=id=>document.getElementById(id);let history=[];
 function add(text,who){const d=document.createElement('div');d.className='msg '+who;d.textContent=text;$('messages').append(d);$('messages').scrollTop=$('messages').scrollHeight;return d}
 $('save').onclick=()=>{localStorage.setItem('mh_name',$('agentName').value);localStorage.setItem('mh_model',$('model').value);$('title').textContent=$('agentName').value+' · Micro Helper';$('status').textContent='Nastavení uloženo'};
-$('agentName').value=localStorage.getItem('mh_name')||'Mykla';$('model').value=localStorage.getItem('mh_model')||'llama3.2';$('save').click();
+$('agentName').value=localStorage.getItem('mh_name')||'Micro Helper';$('model').value=localStorage.getItem('mh_model')||'llama3.2';$('save').click();
 $('check').onclick=async()=>{try{const r=await fetch('/v1/models');const j=await r.json();$('modelState').textContent='Ollama: '+(j.available?j.models.join(', '):'není dostupná');}catch(e){$('modelState').textContent='Ollama: chyba spojení'}};
 $('clear').onclick=async()=>{try{await fetch('/v1/conversations',{method:'DELETE'});}catch(e){}$('messages').innerHTML='';history=[];add('Konverzace vymazána.','agent')};
 (async()=>{try{const response=await fetch('/v1/conversations?limit=100');if(!response.ok)return;const data=await response.json();if(!Array.isArray(data.messages)||!data.messages.length)return;$('messages').replaceChildren();history=[];for(const message of data.messages){if(!['user','assistant'].includes(message.role)||typeof message.content!=='string')continue;add(message.content,message.role==='user'?'user':'agent');history.push({role:message.role,content:message.content});}history=history.slice(-20);}catch(e){/* Keep the welcome message if the API is unavailable. */}})();
@@ -105,7 +105,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 (() => {
   const nativeFetch = window.fetch.bind(window);
   const key = "micro_helper_offline_v1";
-  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } };
+  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Micro Helper",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Micro Helper",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } };
   const save = data => localStorage.setItem(key, JSON.stringify(data));
   const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
   window.fetch = async (input, init={}) => {
