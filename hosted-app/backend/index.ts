@@ -137,10 +137,9 @@ export const dailyReviewHandler = async (event: { type: "cron"; name: string; pa
  * after a worker timeout or restart; only one invocation can claim a given queued/expired job.
  */
 export const agentWorkerHandler = async (_event: { type: "cron"; name: string; payload: Record<string, never>; scheduledTime: string }) => {
-  const users = await db.list<{ userId: string }>("mh_users", { limit: 100 });
   let processed = 0;
   const maxPerTick = 5;
-  for (const entry of users.items) {
+  for await (const entry of registeredUsers()) {
     if (processed >= maxPerTick) break;
     const userId = entry.userId;
     const queueTable = jobsTableFor(userId);
