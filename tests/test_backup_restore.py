@@ -1,5 +1,8 @@
+import asyncio
+import json
 import uuid
 
+import httpx
 from fastapi.testclient import TestClient
 import pytest
 
@@ -199,3 +202,49 @@ def test_export_refuses_a_backup_larger_than_the_supported_restore_limit(monkeyp
 
     assert response.status_code == 413
     assert "8 MiB" in response.json()["detail"]
+
+
+
+def test_restore_rejects_chunked_body_over_limit_without_content_length():
+    async def request():
+        async def chunks():
+            yield b'{"backup":'
+            yield b" " * (api.MAX_BACKUP_BYTES + 1)
+
+        transport = httpx.ASGITransport(app=api.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8000") as async_client:
+            return await async_client.post(
+                "/v1/backup/restore",
+                content=chunks(),
+                headers={"content-type": "application/json"},
+            )
+
+    response = asyncio.run(request())
+
+    assert "content-length" not in response.request.headers
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Záloha je příliš velká (maximum 8 MiB)."
+
+
+def test_restore_replays_valid_chunked_body_without_content_length():
+    backup = valid_backup()
+    payload = json.dumps({"backup": backup, "confirm_replace": True}).encode("utf-8")
+
+    async def request():
+        async def chunks():
+            yield payload[:17]
+            yield payload[17:]
+
+        transport = httpx.ASGITransport(app=api.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8000") as async_client:
+            return await async_client.post(
+                "/v1/backup/restore",
+                content=chunks(),
+                headers={"content-type": "application/json"},
+            )
+
+    response = asyncio.run(request())
+
+    assert "content-length" not in response.request.headers
+    assert response.status_code == 200
+    assert client.get("/v1/profile").json()["agent_name"] == "Nova"
