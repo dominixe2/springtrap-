@@ -8,7 +8,7 @@
   },
   {
     "name": "agent-background-worker",
-    "cron": "*/15 * * * *",
+    "cron": "0 * * * *",
     "handler": "agentWorkerHandler",
     "timezone": "Europe/Prague",
     "payload": {}
