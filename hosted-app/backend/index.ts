@@ -252,6 +252,7 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
           console.error("Micro Helper job recovery checkpoint failed", recoveryError);
         }
       }
+      }
       queueCursor = page.nextToken;
       queuePages++;
     } while (queueCursor && queuePages < 10 && processed < maxPerTick);
