@@ -59,7 +59,15 @@ async function readState(userId: string): Promise<State> {
   const [registered] = await db.get<{ userId: string }>("mh_users", [userKey]);
   if (!registered) await db.tx.add("mh_users", [{ id: userKey, userId }]);
   const [saved] = await db.get<{ state: State }>(table, ["state"]);
-  if (saved?.state) return saved.state;
+  if (saved?.state) {
+    const state = saved.state;
+    // Migrate only the retired default; preserve any name explicitly chosen by the user.
+    if (state.profile?.agent_name === "Mykla") {
+      state.profile = { ...state.profile, agent_name: "Micro Helper" };
+      await writeState(userId, state);
+    }
+    return state;
+  }
   await db.tx.add(table, [{ id: "state", state: initialState() }]);
   const [created] = await db.get<{ state: State }>(table, ["state"], { consistent: true });
   if (!created?.state) throw new Error("Nepodařilo se inicializovat uživatelská data.");
