@@ -661,6 +661,9 @@ async def export_backup():
         "learning_plans": learning_plans,
         "preferences": preferences,
     }
+    serialized_size = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    if serialized_size > MAX_BACKUP_BYTES:
+        raise HTTPException(status_code=413, detail="Záloha přesahuje limit 8 MiB a nelze ji bezpečně obnovit.")
     return JSONResponse(
         content=payload,
         headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
@@ -758,6 +761,10 @@ async def restore_backup(request: RestoreBackupRequest):
             status = required_text(item.get("status"), 20)
             if kind != "agent.draft" or status not in allowed_task_statuses:
                 raise ValueError("unsupported task")
+            # A worker process is not guaranteed to survive a restore. Re-queue
+            # interrupted draft work instead of leaving it permanently running.
+            if status == "running":
+                status = "queued"
             task_rows.append((
                 record_uuid(item.get("id")),
                 kind,
