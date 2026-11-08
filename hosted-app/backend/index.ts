@@ -136,10 +136,13 @@ export const dailyReviewHandler = async (event: { type: "cron"; name: string; pa
  * This scheduled handler runs independently of browser/mobile sessions. A lease allows recovery
  * after a worker timeout or restart; only one invocation can claim a given queued/expired job.
  */
-export const agentWorkerHandler = async (_event: { type: "cron"; name: string; payload: Record<string, never>; scheduledTime: string }) => {
+export const agentWorkerHandler = async (_event: { type: "cron"; name: string; payload: { userId?: string; taskId?: string }; scheduledTime: string }) => {
   let processed = 0;
   const maxPerTick = 5;
-  for await (const entry of registeredUsers()) {
+  const userEntries = _event.payload.userId
+    ? [{ userId: _event.payload.userId }]
+    : registeredUsers();
+  for await (const entry of userEntries) {
     if (processed >= maxPerTick) break;
     const userId = entry.userId;
     const queueTable = jobsTableFor(userId);
@@ -158,6 +161,7 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
       }
       for (const candidate of page.items) {
       if (processed >= maxPerTick) break;
+      if (_event.payload.taskId && candidate.task_id !== _event.payload.taskId) continue;
       const now = Date.now();
       if (candidate.status === "failed" || candidate.status === "completed" || candidate.status === "cancelled") {
         // Task history is stored in user state; prune terminal queue records to keep this table bounded.
@@ -444,7 +448,14 @@ export const handler = router({
       await db.tx.update(queueTable, [{ id: task.id, if: { status: "queued" }, record: { status: "failed", error: "Task state save failed", updated_at: stamp() } }], { patch: true });
       throw err;
     }
-    return json(task, 201);
+    await agentWorkerHandler({
+      type: "cron",
+      name: "on-demand-task",
+      payload: { userId: user!.userId, taskId: task.id },
+      scheduledTime: stamp()
+    });
+    const latest = await readState(user!.userId);
+    return json(latest.tasks.find(item => item.id === task.id) || task, 201);
   }],
   "POST /api/v1/tasks/:id/run": [requireAuth(), async ({ user, params }) => {
     const state = await readState(user!.userId);
@@ -466,7 +477,14 @@ export const handler = router({
     if (!jobId) return error("Úkol se nepodařilo zařadit do fronty.", 503);
     task.status = "queued"; task.error = undefined; task.attempts = 0;
     await writeState(user!.userId, state);
-    return json({ ...task, queued: true });
+    await agentWorkerHandler({
+      type: "cron",
+      name: "on-demand-task",
+      payload: { userId: user!.userId, taskId: task.id },
+      scheduledTime: stamp()
+    });
+    const latest = await readState(user!.userId);
+    return json(latest.tasks.find(item => item.id === task.id) || task);
   }],
   "POST /api/v1/tasks/:id/cancel": [requireAuth(), async ({ user, params }) => {
     const state = await readState(user!.userId), task = state.tasks.find(x => x.id === params.id);
