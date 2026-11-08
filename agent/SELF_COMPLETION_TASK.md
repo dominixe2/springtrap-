@@ -26,6 +26,31 @@ Build Micro Helper into the Czech-first, phone-first personal assistant requeste
 7. Product identity is **Micro Helper**. Remove obsolete Mykla branding.
 8. Cloudflare is not a required dependency. Do not ask the owner for Cloudflare credentials.
 9. Keep JARVIS, GesturePilot, NOVA Learn and other projects separate.
+10. The owner can submit a project concept once, close the chat and the app, and have work continue server-side until a verified deliverable is ready or a clearly explained blocker requires input.
+
+## Persistent background execution: highest priority
+The user explicitly requires work to continue after the Android app, browser, or chat is closed. A foreground chat request or a loop running inside the phone app does not satisfy this requirement.
+
+### Required architecture
+- **API/control plane:** accepts a user brief, creates a durable project and task records, returns immediately with a task ID, and exposes status/pause/resume/cancel controls.
+- **Persistent database:** stores project brief, task graph, acceptance criteria, checkpoints, execution attempts, logs, costs/quotas, approvals, PRs, build artifacts and final deliverables. Use the existing configured persistent database/storage where verified; do not assume local SQLite or an ephemeral filesystem survives redeploys.
+- **Background worker:** runs independently of any client session. It claims queued work, executes bounded steps, saves checkpoints, and resumes after process restarts. Use a durable queue/worker or an equivalent managed job system with retry and lease semantics.
+- **Orchestrator:** breaks the brief into milestones, selects the next dependency-ready task, calls approved tools, evaluates results against acceptance criteria, and creates follow-up tasks when tests fail.
+- **Execution sandbox:** performs code edits and builds in isolated, temporary workspaces/CI runners. Do not run arbitrary model-generated shell commands on the production web server.
+- **Notification channel:** records progress and makes it visible on next app open; add push/email only if configured and explicitly authorized.
+- **Client independence:** Android and web clients are dashboards/controllers. Closing them must not cancel or interrupt server-side work.
+- **Recovery:** every step must be idempotent or safely resumable. Persist checkpoints before/after external side effects; recover abandoned worker leases and avoid duplicate commits/deployments.
+- **Resource governance:** enforce per-project concurrency, retry limits, runtime budgets, provider quotas and spend caps. Continue while the project is progressing and budget remains; pause with a clear reason when blocked, quota-limited, unsafe, or awaiting owner input. Never claim literally unlimited compute or free AI.
+
+### User experience
+1. User submits a concept and optional deadline/budget.
+2. Micro Helper confirms the goal, creates a project, and displays its acceptance criteria and planned milestones.
+3. User may close the app. The backend worker continues independently.
+4. The user can reopen the app to see live status, completed work, logs summarized in Czech, blockers, preview links and downloadable artifacts.
+5. Micro Helper runs tests and fixes failures in bounded iterations.
+6. It delivers only when acceptance criteria are met and build/test evidence is attached.
+7. If credentials, a product decision, a paid provider, or a privileged action is required, it pauses and asks only for that specific input.
+8. The user can pause, resume or cancel the project at any time.
 
 ## Required agent behavior
 This must become a real tool-using developer workflow, not merely an LLM prompt that writes plans.
@@ -62,10 +87,14 @@ This must become a real tool-using developer workflow, not merely an LLM prompt 
 
 ## Implementation milestones
 
-### M0: task foundation and observability
-- Durable task records: status, attempts, timestamps, logs, branch, PR and artifact references.
-- Read-only project status view in the app.
-- Pause/stop control and auditable event log.
+### M0: durable background foundation (first priority)
+- Inspect available database, storage, queue and hosting configuration.
+- Add durable project/task/job records, leases, heartbeats, attempts, timestamps, checkpoints and audit events.
+- Add a worker process that runs independently from web requests and client sessions.
+- Add recovery for worker restarts, expired leases and retryable failures.
+- Add per-project pause, resume and cancel controls.
+- Add a read-only project status view with last activity, current step and blocker.
+- Prove with an integration test that a task continues after the client disconnects and resumes after a worker restart.
 
 ### M1: GitHub developer integration
 - Server-side GitHub App integration with narrowly scoped installation permissions.
@@ -85,14 +114,16 @@ This must become a real tool-using developer workflow, not merely an LLM prompt 
 - Require acceptance criteria and tests before implementation.
 - Limit concurrency and retries; stop for human review on repeated failure.
 - Require approval before deployment or privilege expansion.
+- Continue automatically across safe tasks until the project is complete, exhausted of its configured budget, or blocked by a required human decision.
 
 ### M4: handoff
 - Publish verified Android debug APK and Windows Companion artifacts.
 - Provide install steps and checksums.
 - Explain what works offline, what needs a network/provider, and what needs real-device testing.
+- Present a completion report with acceptance criteria, test evidence, artifact links and remaining limitations.
 
 ## First execution task
-Inspect the existing Android and Windows workflows, current branch/PR state, and latest successful artifacts. Do not claim a fresh build until a new successful workflow run and its artifact are verified. Then implement a minimal authenticated task/status view and tests without changing the live hosted release. If GitHub App credentials or workflow execution permissions are missing, report the exact blocker; do not simulate access.
+Inspect the existing Android and Windows workflows, current branch/PR state, and latest successful artifacts. Inspect actual hosting/database configuration before choosing the worker/queue design. Do not claim a fresh build until a new successful workflow run and its artifact are verified. Then implement the durable background task foundation and a disconnect/restart integration test without changing the live hosted release. If persistent storage, worker hosting, GitHub App credentials or workflow execution permissions are missing, report the exact blocker; do not simulate access.
 
 ## Definition of done
-Micro Helper is complete only when Android and Windows builds are reproducible, the hosted release is independently verified, core authenticated flows pass end-to-end tests, data persistence behaves as documented, device pairing is explicit and revocable, and the bounded developer agent can create tested draft PRs from approved tasks. A roadmap or static check alone is not completion.
+Micro Helper is complete only when Android and Windows builds are reproducible, the hosted release is independently verified, core authenticated flows pass end-to-end tests, user data persists as documented, device pairing is explicit and revocable, and the background developer agent can continue work after all clients disconnect, recover after worker restart, create tested draft PRs from approved tasks, and deliver verifiable artifacts. A roadmap, chat-bound loop or successful static check alone is not completion.
