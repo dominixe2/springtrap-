@@ -41,3 +41,11 @@
 - Export and restore share an 8 MiB limit so every generated backup remains restorable by the same version.
 - The backup intentionally excludes transient confirmation/session tokens and tool audit records. It also does not include the browser-only offline fallback store.
 - A backup contains private notes and conversation history. Store it like a private document and do not add passwords, API keys or other secrets to Micro Helper notes.
+
+
+## Local Python API boundary
+
+- The local FastAPI service rejects non-loopback Host values on private API routes and applies Origin / Fetch Metadata checks to write requests.
+- These checks are CSRF and DNS-rebinding defenses, not authentication. The local Python API does not currently require a user login or bearer token.
+- Keep the local service bound to 127.0.0.1. Do not bind it to 0.0.0.0, publish it through a reverse proxy, or expose it directly to a LAN or the public internet.
+- This boundary does not protect against another process already running as the same OS user or someone with access to the local account.
