@@ -29,6 +29,19 @@ type AgentJob = { id: string; user_id: string; task_id: string; status: "queued"
 const MAX_AGENT_ATTEMPTS = 3;
 const AGENT_LEASE_MS = 4 * 60 * 1000;
 
+async function* registeredUsers() {
+  let nextToken: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const result = await db.list<{ userId: string }>("mh_users", {
+      limit: 100,
+      ...(nextToken ? { nextToken } : {})
+    });
+    for (const user of result.items) yield user;
+    if (!result.nextToken) return;
+    nextToken = result.nextToken;
+  }
+}
+
 async function notifySubscribers(userId: string) {
   const table = subscriptionsTableFor(userId);
   try {
@@ -92,8 +105,7 @@ function learnExplicitPreference(state: State, message: string) {
 }
 
 export const dailyReviewHandler = async (event: { type: "cron"; name: string; payload: Record<string, never>; scheduledTime: string }) => {
-  const users = await db.list<{ userId: string }>("mh_users", { limit: 100 });
-  for (const entry of users.items) {
+  for await (const entry of registeredUsers()) {
     try {
       const state = await readState(entry.userId);
       const activePlans = state.learningPlans.filter(plan => plan.status === "active");
@@ -132,14 +144,20 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
     if (processed >= maxPerTick) break;
     const userId = entry.userId;
     const queueTable = jobsTableFor(userId);
-    let page;
-    try {
-      page = await db.list<AgentJob>(queueTable, { limit: 20 });
-    } catch (err) {
-      console.error("Micro Helper queue read failed", err);
-      continue;
-    }
-    for (const candidate of page.items) {
+    let queueCursor: string | undefined;
+    let queuePages = 0;
+    do {
+      let page;
+      try {
+        page = await db.list<AgentJob>(queueTable, {
+          limit: 20,
+          ...(queueCursor ? { nextToken: queueCursor } : {})
+        });
+      } catch (err) {
+        console.error("Micro Helper queue read failed", err);
+        break;
+      }
+      for (const candidate of page.items) {
       if (processed >= maxPerTick) break;
       const now = Date.now();
       if (candidate.status === "failed" || candidate.status === "completed" || candidate.status === "cancelled") {
@@ -235,7 +253,9 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
           console.error("Micro Helper job recovery checkpoint failed", recoveryError);
         }
       }
-    }
+      queueCursor = page.nextToken;
+      queuePages++;
+    } while (queueCursor && queuePages < 10 && processed < maxPerTick);
   }
   return { statusCode: 200, processed };
 };
