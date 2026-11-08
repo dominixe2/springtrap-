@@ -134,13 +134,13 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
     for (const candidate of page.items) {
       if (processed >= maxPerTick) break;
       const now = Date.now();
-      const reclaimable = candidate.status === "running" && Number(candidate.lease_until || 0) < now;
-      if (candidate.status !== "queued" && !reclaimable) continue;
       if (candidate.status === "failed" || candidate.status === "completed" || candidate.status === "cancelled") {
         // Task history is stored in user state; prune terminal queue records to keep this table bounded.
         await db.delete(queueTable, [candidate.id]);
         continue;
       }
+      const reclaimable = candidate.status === "running" && Number(candidate.lease_until || 0) < now;
+      if (candidate.status !== "queued" && !reclaimable) continue;
       const token = crypto.randomUUID();
       const expected = candidate.status === "queued"
         ? { status: "queued" }
