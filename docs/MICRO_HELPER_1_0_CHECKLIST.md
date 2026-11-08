@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.9
+- **Checklist version:** 1.0.0-checklist.10
 - **Snapshot date:** 2026-11-08
-- **Snapshot source:** PR #23 trust-gateway head `e6714c7b94728e6419d66f25dea4c69440a86ff2` passed CI run #42512554196 using checkout/setup-python/setup-node v7 and read-only workflow permissions. Separate PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6` passed CI run #42512220640. The two PRs still target the same `micro-helper` base and have not yet been integrated together.
+- **Snapshot source:** PR #23 trust-gateway/checklist head `ccf1036b137a4b24947f50accc9042ab86fabb24` passed CI run #42512645801 using checkout/setup-python/setup-node v7 and read-only workflow permissions. Separate PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6` passed CI run #42512220640. Merged PRs #18 and #19 provide additional verified relay-session and local-origin protections. PRs #23 and #25 remain separate and are not yet integrated together.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -30,15 +30,17 @@ A level may be raised only when new implementation and evidence are linked in th
 | MH-04 | Czech speech input/output, permission/error state, cancellation and honest fallback | 8 | Partial | 0.50 | 4.00 | Browser speech controls are documented in the local UI and JARVIS README. Full-duplex streaming, interruption under real device conditions, and Android/Windows voice acceptance tests are not proven. |
 | MH-05 | Capability-based tools, bounded tasks, cancellation, visible results, extensible adapters | 12 | Partial | 0.50 | 6.00 | `src/micro_helper/api.py` now exposes three fixed local tools through the policy gateway (`profile.read`, `memory.list`, `memory.create`) and a bounded `agent.draft` queue with cancellation and persisted success/failure results. `tests/test_api.py` covers the API and worker paths; PR #23 CI passed 61 project tests. Pluggable adapters and web/file/image execution under one runtime remain unintegrated. |
 | MH-06 | Adaptive Trust Engine: explicit grants, deny precedence, fresh confirmation for high-impact actions, audit and revocation | 12 | Partial | 0.50 | 6.00 | `src/micro_helper/trust_policy.py`, `tests/test_trust_policy.py`, and the new local API gateway in `src/micro_helper/api.py`. The exact low-risk reads have fixed grants; `memory.create` requires a 60-second one-time token bound to normalized arguments; `/v1/audit` records metadata without payloads. API integration tests cover missing/forged boolean confirmation, argument mismatch, expiry, replay and audit privacy. Hosted and Windows/JARVIS adapters and user-managed grant revocation remain unintegrated. |
-| MH-07 | Authenticated phone/Windows pairing, encrypted sync, revocation, conflict handling and least privilege | 12 | Partial | 0.25 | 3.00 | `docs/SECURITY.md` documents a limited loopback Windows Companion with one-time pairing and session token. Full Android/Windows sync, encrypted transport/storage, conflict resolution, and device-level verification remain open. |
+| MH-07 | Authenticated phone/Windows pairing, encrypted sync, revocation, conflict handling and least privilege | 12 | Partial | 0.50 | 6.00 | Merged PR #18 adds Cloudflare Durable Object relay pairing/session protections in `cloudflare/worker.js`: hashed pairing/session tokens, one-time five-minute pairing claims, 12-hour sessions, revocation, fixed mobile action allowlist, per-IP pairing limits, per-session WebSocket limits (120/minute), 4 KiB message cap and expiry/revocation checks on every message. `cloudflare/worker.test.mjs` contains four regression tests; PR #18 CI #42376109737 passed. PR #19 is merged and adds local API Host/Origin/Fetch-Metadata guards with `tests/test_origin_security.py`. No live Cloudflare deployment, physical phone/Windows pairing, app-data sync, conflict resolution or full encrypted-sync acceptance is verified. |
 | MH-08 | Android package/install path, backup/restore and core workflows verified on a physical Android device | 8 | Partial | 0.50 | 4.00 | Android debug APK workflow and backup/restore tests exist. A debug wrapper is not a store release; no physical-device acceptance test is recorded. |
 | MH-09 | Windows companion with explicit approval, workspace scope, action log and tested restrictions | 8 | Partial | 0.50 | 4.00 | `windows-companion/tests/test_companion_security.py` and `docs/SECURITY.md` document a fixed allowlist (lock, Explorer, Notepad, Calculator). A general workspace-scoped coding agent and physical Windows acceptance test are not proven. |
 | MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 trust-gateway head `e6714c7b94728e6419d66f25dea4c69440a86ff2`, GitHub Actions run #42512554196: 61 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. The workflow uses actions/checkout@v7, setup-python@v7 and setup-node@v7, contents:read permissions and a 15-minute job timeout. **PASS (separate branch):** PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6`, run #42512220640: 68 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. The two runs validate separate PR heads, not a combined tree. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
-|  | **Total** | **100** | **Not release-ready** |  | **47.00** | **Evidence-weighted score: 47.00%.** This measures verified acceptance evidence, not a claim that 47% of all possible features exist. |
+|  | **Total** | **100** | **Not release-ready** |  | **50.00** | **Evidence-weighted score: 50.00%.** This measures verified acceptance evidence, not a claim that 50% of all possible features exist. |
 
 ## Current test evidence
 
-- **PASS:** PR #23 trust-gateway head `e6714c7b94728e6419d66f25dea4c69440a86ff2`, GitHub Actions run [#42512554196](https://github.com/dominixe2/springtrap-/actions/runs/42512554196): 61 project tests and 11 relay tests passed; embedded JavaScript syntax and Python compilation passed. The workflow uses v7 actions, read-only repository permissions and a 15-minute job timeout.
+- **PASS:** PR #23 trust-gateway/checklist head `ccf1036b137a4b24947f50accc9042ab86fabb24`, GitHub Actions run [#42512645801](https://github.com/dominixe2/springtrap-/actions/runs/42512645801): 61 project tests and 11 relay tests passed; embedded JavaScript syntax and Python compilation passed. The workflow uses v7 actions, read-only repository permissions and a 15-minute job timeout.
+- **PASS (merged relay guards):** PR #18 Cloudflare Relay Checks [#42376109737](https://github.com/dominixe2/springtrap-/actions/runs/42376109737), including JavaScript syntax, four Durable Object WebSocket guard tests and Wrangler dry-run.
+- **PASS (merged local API guards):** PR #19 Micro Helper checks [#42385818037](https://github.com/dominixe2/springtrap-/actions/runs/42385818037), including project/relay tests, embedded JavaScript syntax and Python compilation.
 - **PASS (separate branch):** PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6`, run [#42512220640](https://github.com/dominixe2/springtrap-/actions/runs/42512220640): 68 project tests and 11 relay tests passed. The two runs validate separate PR heads, not a combined tree.
 - **WARNING:** The two pytest suites each emitted one Starlette/httpx TestClient deprecation warning. No test failures occurred.
 - **PASS (historical baseline):** PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`, checks run [#270](https://github.com/dominixe2/springtrap-/actions/runs/42267396572) and hosted-source run [#19](https://github.com/dominixe2/springtrap-/actions/runs/42267396582).
@@ -49,11 +51,12 @@ A level may be raised only when new implementation and evidence are linked in th
 
 1. The trust policy is not yet enforced through every hosted and desktop tool/action path.
 2. JARVIS PR #5's LAN Ollama relay still needs authenticated pairing, request/concurrency limits and regression tests before it is safe for broader LAN use. Keep it chat-only and do not port-forward it.
-3. The current `micro-helper` base contains loopback/Origin/Fetch-Metadata checks for the local Python API; PR #13 remains open as a related hardening change. These checks are defense in depth, not authentication, and do not secure hosted routes or the JARVIS relay.
+3. The active `micro-helper` base includes the loopback/Origin/Fetch-Metadata protections from merged PR #19. PR #13 remains open against the older `main` API and should not be confused with the active product-branch fix. These checks are defense in depth, not authentication; the local API must remain loopback-only and they do not secure hosted routes or the JARVIS relay.
 4. Android/Windows physical-device acceptance tests are not recorded.
 5. The hosted source mirror and AppDeploy live snapshot need explicit parity evidence before a source change can be called deployed.
 6. Cross-device encrypted sync, conflict handling and device-session revocation are not yet proven end to end.
 7. PR #23 (Trust Engine gateway) and PR #25 (atomic backup/restore) both modify the local API and remain separate branches; they need reviewed sequential integration and a fresh combined CI run.
+8. The Cloudflare Durable Object relay is implemented and tested but is not deployed; no live WSS pairing or real phone-to-Windows action has been verified, and clients must not be switched to it before a successful staging health check.
 
 ## Next development order
 
@@ -65,6 +68,8 @@ A level may be raised only when new implementation and evidence are linked in th
 6. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.10 (2026-11-08):** raises MH-07 from evidence level 0.25 to 0.50 after verifying merged PR #18's authenticated pairing/session guard code and four regression tests, plus merged PR #19's local API origin/Host protection. Weighted score rises from 47.00% to 50.00%. This does not count live Cloudflare deployment, physical-device tests, app-data sync or conflict resolution.
 
 - **1.0.0-checklist.9 (2026-11-08):** records the hardened PR #23 CI workflow (v7 actions, contents:read and timeout) and passing run #42512554196 on head `e6714c7`. PR #25 remains a separate passing backup/restore branch; score remains 47.00% until both changes are integrated and target-device acceptance is recorded.
 
