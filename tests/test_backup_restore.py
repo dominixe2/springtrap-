@@ -176,3 +176,26 @@ def test_backup_controls_are_available_in_the_mobile_friendly_ui():
     assert 'id="backupFile"' in html
     assert 'fetch("/v1/backup/restore"' in html
     assert "window.confirm(" in html
+
+
+def test_restore_requeues_tasks_that_were_running_in_the_backup():
+    backup = valid_backup()
+    backup["tasks"][0]["status"] = "running"
+
+    response = client.post(
+        "/v1/backup/restore",
+        json={"backup": backup, "confirm_replace": True},
+    )
+
+    assert response.status_code == 200
+    assert client.get("/v1/tasks").json()["tasks"][0]["status"] == "queued"
+
+
+def test_export_refuses_a_backup_larger_than_the_supported_restore_limit(monkeypatch):
+    seed_existing_data()
+    monkeypatch.setattr(api, "MAX_BACKUP_BYTES", 1)
+
+    response = client.get("/v1/backup")
+
+    assert response.status_code == 413
+    assert "8 MiB" in response.json()["detail"]
