@@ -108,20 +108,23 @@
       "bounded retry and recovery",
       "immediate server-side task execution on submission",
       "task result persisted before API response",
-      "targeted on-demand worker invocation"
+      "targeted on-demand worker invocation",
+      "immediate targeted worker invocation",
+      "completion notification permission",
+      "persisted completion notification after reopening app"
     ],
     "description": "Verifies submitting a task immediately invokes the server worker, persists its result, and leaves the scheduled worker as a recovery path.",
     "steps": [
-      "Sign in to Micro Helper",
-      "Create a task with a short title and a concrete text instruction",
-      "Verify the create request immediately starts the targeted server worker without waiting for the hourly schedule",
-      "Verify the response contains a persisted completed Czech result, or a queued retry state when a temporary AI failure occurs",
-      "Refresh the task list and verify the result or retry state remains persisted",
-      "Create a second task, cancel it before a recovery run, and verify its status remains cancelled",
-      "Verify a temporary processing failure follows the bounded retry policy",
-      "Switch the chat response depth between quick and deep and save the setting"
+      "Sign in to Micro Helper and allow browser notifications when prompted",
+      "Create a task with a short title and concrete instruction",
+      "Verify the server immediately invokes the worker for that exact task without waiting for the hourly schedule",
+      "Verify the response contains a persisted result or a retryable queued state",
+      "If the task remains queued, close and reopen the app after processing and verify a completion notification is shown when notification permission is granted",
+      "Verify the result remains stored after refreshing the task list",
+      "Create a second task and cancel it before a recovery run; verify its status remains cancelled",
+      "Verify temporary failures follow the bounded retry policy"
     ],
-    "expected": "Task submission invokes the worker immediately for that user's task; a successful result is persisted before the API response, temporary failures remain queued for scheduled recovery, cancellation is respected, and retries are bounded."
+    "expected": "Task submission immediately targets the server worker. Completed results are persisted; the app notifies when it observes completion and notification permission is granted, including after reopening if a pending task was recorded. The hourly worker remains a recovery path."
   },
   {
     "name": "Use the refreshed Micro Helper identity and responsive interface",
