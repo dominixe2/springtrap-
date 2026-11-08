@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.7
-- **Snapshot date:** 2026-11-07
-- **Snapshot source:** PR #23 implementation head `3f5794837c60506761f9f76ebcd503dd849af701`; latest checklist head `c391f77e20e08eecc5c0949eaeeb21a4980d25b2` passed CI run #42400871649.
+- **Checklist version:** 1.0.0-checklist.8
+- **Snapshot date:** 2026-11-08
+- **Snapshot source:** PR #23 trust-gateway head `b2564743647b3d4850922f1ee7b6b3d71522d495` passed CI run #42401064557. Separate PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6` passed CI run #42512220640. The two PRs still target the same `micro-helper` base and have not yet been integrated together.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -25,7 +25,7 @@ A level may be raised only when new implementation and evidence are linked in th
 | ID | Acceptance criterion | Weight | State | Evidence level | Earned | Evidence and remaining gap |
 |---|---|---:|---|---:|---:|---|
 | MH-01 | Responsive, installable web/PWA UX on phone and desktop, with truthful loading/error states | 12 | Partial | 0.50 | 6.00 | `hosted-app/index.html`, `hosted-app/src/main.ts`, `hosted-app/public/manifest.webmanifest`; live page and latest AppDeploy QA were reported healthy on 2026-11-06. Signed-in end-to-end coverage and source-to-deployment parity are not proven by this PR. |
-| MH-02 | One identity, persistent chat history, user-controlled memory/preferences, export/import/delete | 12 | Partial | 0.50 | 6.00 | Local API and tests in `src/micro_helper/api.py`, `tests/`; hosted account-backed state is documented in `docs/SECURITY.md`. Cross-client persistence/sync and full user workflow tests remain unverified. |
+| MH-02 | One identity, persistent chat history, user-controlled memory/preferences, export/import/delete | 12 | Partial | 0.50 | 6.00 | Local API and tests in `src/micro_helper/api.py`, `tests/`; hosted account-backed state is documented in `docs/SECURITY.md`. Separate PR #25 adds full local backup/restore for profile, memories, messages, tasks, learning plans and preferences, with explicit UI confirmation, an 8 MiB streamed-body cap and atomic SQLite replacement. Its tests include forced database-write failure and full rollback. PR #25 has 68 Python tests and 11 relay tests passing, but is not yet integrated with PR #23. Cross-client persistence/sync and full user workflow tests remain unverified. |
 | MH-03 | Modular AI provider adapters, optional local inference, visible limits and tested no-charge fallback | 10 | Partial | 0.50 | 5.00 | Local Ollama path is documented in the Python edition and JARVIS PR #5. A unified provider router and tested quota-to-provider-to-local-to-offline fallback are not yet proven. |
 | MH-04 | Czech speech input/output, permission/error state, cancellation and honest fallback | 8 | Partial | 0.50 | 4.00 | Browser speech controls are documented in the local UI and JARVIS README. Full-duplex streaming, interruption under real device conditions, and Android/Windows voice acceptance tests are not proven. |
 | MH-05 | Capability-based tools, bounded tasks, cancellation, visible results, extensible adapters | 12 | Partial | 0.50 | 6.00 | `src/micro_helper/api.py` now exposes three fixed local tools through the policy gateway (`profile.read`, `memory.list`, `memory.create`) and a bounded `agent.draft` queue with cancellation and persisted success/failure results. `tests/test_api.py` covers the API and worker paths; PR #23 CI passed 61 project tests. Pluggable adapters and web/file/image execution under one runtime remain unintegrated. |
@@ -33,7 +33,7 @@ A level may be raised only when new implementation and evidence are linked in th
 | MH-07 | Authenticated phone/Windows pairing, encrypted sync, revocation, conflict handling and least privilege | 12 | Partial | 0.25 | 3.00 | `docs/SECURITY.md` documents a limited loopback Windows Companion with one-time pairing and session token. Full Android/Windows sync, encrypted transport/storage, conflict resolution, and device-level verification remain open. |
 | MH-08 | Android package/install path, backup/restore and core workflows verified on a physical Android device | 8 | Partial | 0.50 | 4.00 | Android debug APK workflow and backup/restore tests exist. A debug wrapper is not a store release; no physical-device acceptance test is recorded. |
 | MH-09 | Windows companion with explicit approval, workspace scope, action log and tested restrictions | 8 | Partial | 0.50 | 4.00 | `windows-companion/tests/test_companion_security.py` and `docs/SECURITY.md` document a fixed allowlist (lock, Explorer, Notepad, Calculator). A general workspace-scoped coding agent and physical Windows acceptance test are not proven. |
-| MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 implementation snapshot `3f5794837c60506761f9f76ebcd503dd849af701`, GitHub Actions run #42400456289. Project pytest: 61 passed; cloud-relay pytest: 11 passed; embedded browser JavaScript syntax and Python compilation passed. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
+| MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 trust-gateway head `b2564743647b3d4850922f1ee7b6b3d71522d495`, GitHub Actions run #42401064557: 61 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. **PASS (separate branch):** PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6`, run #42512220640: 68 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. The two runs validate separate PR heads, not a combined tree. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
 |  | **Total** | **100** | **Not release-ready** |  | **47.00** | **Evidence-weighted score: 47.00%.** This measures verified acceptance evidence, not a claim that 47% of all possible features exist. |
 
 ## Current test evidence
@@ -52,16 +52,20 @@ A level may be raised only when new implementation and evidence are linked in th
 4. Android/Windows physical-device acceptance tests are not recorded.
 5. The hosted source mirror and AppDeploy live snapshot need explicit parity evidence before a source change can be called deployed.
 6. Cross-device encrypted sync, conflict handling and device-session revocation are not yet proven end to end.
+7. PR #23 (Trust Engine gateway) and PR #25 (atomic backup/restore) both modify the local API and remain separate branches; they need reviewed sequential integration and a fresh combined CI run.
 
 ## Next development order
 
-1. Extend the policy gate to the first hosted action adapter only after its authenticated identity, explicit approval UI and audit boundary are covered by integration tests.
-2. Secure JARVIS's chat-only Ollama relay with per-launch pairing/authentication, bounded concurrent requests and rate limits.
-3. Add a single capability matrix shared by hosted tools, local Python, Android and Windows Companion.
-4. Run signed-in hosted end-to-end tests, then physical Android and Windows smoke tests.
-5. Recalculate this checklist only after updating the evidence links and levels.
+1. Review and integrate PR #23 and PR #25 sequentially into `micro-helper`, resolving their shared API changes without dropping either feature, then run the full suite on the combined tree.
+2. Extend the policy gate to the first hosted action adapter only after its authenticated identity, explicit approval UI and audit boundary are covered by integration tests.
+3. Secure JARVIS's chat-only Ollama relay with per-launch pairing/authentication, bounded concurrent requests and rate limits.
+4. Add a single capability matrix shared by hosted tools, local Python, Android and Windows Companion.
+5. Run signed-in hosted end-to-end tests, then physical Android and Windows smoke tests.
+6. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.8 (2026-11-08):** records the separate PR #25 full backup/restore implementation, database-failure rollback and default-identity regression tests, and passing CI run #42512220640 (68 project tests, 11 relay tests). PR #23 remains a separate trust-gateway branch; score remains 47.00% because no combined PR #23 + PR #25 tree or physical-device acceptance has been verified.
 
 - **1.0.0-checklist.7 (2026-11-07):** updates the checklist snapshot to PR #23 head `c391f77e20e08eecc5c0949eaeeb21a4980d25b2` and records its passing CI run #42400871649. Score remains 47.00%.
 
