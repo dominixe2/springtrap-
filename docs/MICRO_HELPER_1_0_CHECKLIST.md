@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.8
+- **Checklist version:** 1.0.0-checklist.9
 - **Snapshot date:** 2026-11-08
-- **Snapshot source:** PR #23 trust-gateway head `b2564743647b3d4850922f1ee7b6b3d71522d495` passed CI run #42401064557. Separate PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6` passed CI run #42512220640. The two PRs still target the same `micro-helper` base and have not yet been integrated together.
+- **Snapshot source:** PR #23 trust-gateway head `e6714c7b94728e6419d66f25dea4c69440a86ff2` passed CI run #42512554196 using checkout/setup-python/setup-node v7 and read-only workflow permissions. Separate PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6` passed CI run #42512220640. The two PRs still target the same `micro-helper` base and have not yet been integrated together.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -33,12 +33,13 @@ A level may be raised only when new implementation and evidence are linked in th
 | MH-07 | Authenticated phone/Windows pairing, encrypted sync, revocation, conflict handling and least privilege | 12 | Partial | 0.25 | 3.00 | `docs/SECURITY.md` documents a limited loopback Windows Companion with one-time pairing and session token. Full Android/Windows sync, encrypted transport/storage, conflict resolution, and device-level verification remain open. |
 | MH-08 | Android package/install path, backup/restore and core workflows verified on a physical Android device | 8 | Partial | 0.50 | 4.00 | Android debug APK workflow and backup/restore tests exist. A debug wrapper is not a store release; no physical-device acceptance test is recorded. |
 | MH-09 | Windows companion with explicit approval, workspace scope, action log and tested restrictions | 8 | Partial | 0.50 | 4.00 | `windows-companion/tests/test_companion_security.py` and `docs/SECURITY.md` document a fixed allowlist (lock, Explorer, Notepad, Calculator). A general workspace-scoped coding agent and physical Windows acceptance test are not proven. |
-| MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 trust-gateway head `b2564743647b3d4850922f1ee7b6b3d71522d495`, GitHub Actions run #42401064557: 61 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. **PASS (separate branch):** PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6`, run #42512220640: 68 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. The two runs validate separate PR heads, not a combined tree. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
+| MH-10 | Release security, dependency/config review, clean CI, deployment parity and rollback evidence | 6 | Partial | 0.50 | 3.00 | **PASS:** PR #23 trust-gateway head `e6714c7b94728e6419d66f25dea4c69440a86ff2`, GitHub Actions run #42512554196: 61 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. The workflow uses actions/checkout@v7, setup-python@v7 and setup-node@v7, contents:read permissions and a 15-minute job timeout. **PASS (separate branch):** PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6`, run #42512220640: 68 project tests and 11 relay tests passed, with embedded JavaScript syntax and Python compilation checks. The two runs validate separate PR heads, not a combined tree. One Starlette/httpx deprecation warning was emitted in each pytest suite. Hosted and Windows/JARVIS adapter coverage, physical-device tests, security review and release checks remain incomplete. |
 |  | **Total** | **100** | **Not release-ready** |  | **47.00** | **Evidence-weighted score: 47.00%.** This measures verified acceptance evidence, not a claim that 47% of all possible features exist. |
 
 ## Current test evidence
 
-- **PASS:** PR #23 latest checklist head `e3fbaa5fb15850122bfd3b43998841d8a2de6cd7`, GitHub Actions run [#42400687405](https://github.com/dominixe2/springtrap-/actions/runs/42400687405). Embedded browser JavaScript syntax and Python compilation passed; project pytest reported **61 passed**; cloud-relay pytest reported **11 passed**.
+- **PASS:** PR #23 trust-gateway head `e6714c7b94728e6419d66f25dea4c69440a86ff2`, GitHub Actions run [#42512554196](https://github.com/dominixe2/springtrap-/actions/runs/42512554196): 61 project tests and 11 relay tests passed; embedded JavaScript syntax and Python compilation passed. The workflow uses v7 actions, read-only repository permissions and a 15-minute job timeout.
+- **PASS (separate branch):** PR #25 backup/restore head `cf3cce1baa49c9c22f165312ba21aef23e1b27a6`, run [#42512220640](https://github.com/dominixe2/springtrap-/actions/runs/42512220640): 68 project tests and 11 relay tests passed. The two runs validate separate PR heads, not a combined tree.
 - **WARNING:** The two pytest suites each emitted one Starlette/httpx TestClient deprecation warning. No test failures occurred.
 - **PASS (historical baseline):** PR #15 head `24a5be5fb8b636818cec8b5245107df48d98e1cd`, checks run [#270](https://github.com/dominixe2/springtrap-/actions/runs/42267396572) and hosted-source run [#19](https://github.com/dominixe2/springtrap-/actions/runs/42267396582).
 - **NOT RUN:** Physical Android install/use, physical Windows use, signed-in end-to-end flows for hosted chat/sync/tasks/images/web search/voice, and full trust-policy integration across every action adapter.
@@ -64,6 +65,8 @@ A level may be raised only when new implementation and evidence are linked in th
 6. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.9 (2026-11-08):** records the hardened PR #23 CI workflow (v7 actions, contents:read and timeout) and passing run #42512554196 on head `e6714c7`. PR #25 remains a separate passing backup/restore branch; score remains 47.00% until both changes are integrated and target-device acceptance is recorded.
 
 - **1.0.0-checklist.8 (2026-11-08):** records the separate PR #25 full backup/restore implementation, database-failure rollback and default-identity regression tests, and passing CI run #42512220640 (68 project tests, 11 relay tests). PR #23 remains a separate trust-gateway branch; score remains 47.00% because no combined PR #23 + PR #25 tree or physical-device acceptance has been verified.
 
