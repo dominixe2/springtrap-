@@ -136,7 +136,11 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
       const now = Date.now();
       const reclaimable = candidate.status === "running" && Number(candidate.lease_until || 0) < now;
       if (candidate.status !== "queued" && !reclaimable) continue;
-      if (candidate.status === "failed" || candidate.status === "completed" || candidate.status === "cancelled") continue;
+      if (candidate.status === "failed" || candidate.status === "completed" || candidate.status === "cancelled") {
+        // Task history is stored in user state; prune terminal queue records to keep this table bounded.
+        await db.delete(queueTable, [candidate.id]);
+        continue;
+      }
       const token = crypto.randomUUID();
       const expected = candidate.status === "queued"
         ? { status: "queued" }
@@ -158,11 +162,11 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
         const state = await readState(userId);
         const task = state.tasks.find(item => item.id === candidate.task_id);
         if (!task || task.status === "cancelled") {
-          await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "cancelled", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+          await db.delete(queueTable, [candidate.id]);
           continue;
         }
         if (task.status === "completed" && task.result) {
-          await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "completed", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+          await db.delete(queueTable, [candidate.id]);
           continue;
         }
         task.status = "running";
@@ -183,7 +187,7 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
         const latest = await readState(userId);
         const latestTask = latest.tasks.find(item => item.id === candidate.task_id);
         if (!latestTask || latestTask.status === "cancelled") {
-          await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "cancelled", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+          await db.delete(queueTable, [candidate.id]);
           continue;
         }
         latestTask.status = "completed";
@@ -191,7 +195,7 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
         latestTask.error = undefined;
         latestTask.completed_at = stamp();
         await writeState(userId, latest);
-        await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "completed", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+        await db.delete(queueTable, [candidate.id]);
       } catch (err) {
         console.error("Micro Helper background task failed", err);
         const attempts = Number(candidate.attempts || 0) + 1;
@@ -204,18 +208,22 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
             task.error = retry ? "Dočasná chyba. Úkol bude automaticky zkusen znovu." : "Úkol se nepodařilo dokončit po třech pokusech.";
             await writeState(userId, state);
           }
-          await db.tx.update(queueTable, [{
-            id: candidate.id,
-            if: { status: "running", lease_token: token },
-            record: {
-              status: retry ? "queued" : "failed",
-              attempts,
-              error: String(err).slice(0, 500),
-              updated_at: stamp(),
-              lease_until: undefined,
-              lease_token: undefined
-            }
-          }], { patch: true });
+          if (retry) {
+            await db.tx.update(queueTable, [{
+              id: candidate.id,
+              if: { status: "running", lease_token: token },
+              record: {
+                status: "queued",
+                attempts,
+                error: String(err).slice(0, 500),
+                updated_at: stamp(),
+                lease_until: undefined,
+                lease_token: undefined
+              }
+            }], { patch: true });
+          } else {
+            await db.delete(queueTable, [candidate.id]);
+          }
         } catch (recoveryError) {
           console.error("Micro Helper job recovery checkpoint failed", recoveryError);
         }
