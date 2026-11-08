@@ -4,7 +4,7 @@ type Memory = { id: number; content: string; category: string; created_at: strin
 type Preference = { id: number; category: string; preference: string; value: string; source: string; updated_at: string };
 type Plan = { id: string; title: string; objective: string; status: string; steps: string[]; sources: string[]; version: number; created_at: string; updated_at: string };
 type Message = { id: number; role: "user" | "assistant"; content: string; created_at: string };
-type Task = { id: string; title: string; input_text: string; kind: string; status: string; result?: string; error?: string; created_at: string; completed_at?: string };
+type Task = { id: string; title: string; input_text: string; kind: string; status: string; result?: string; error?: string; created_at: string; completed_at?: string; attempts?: number };
 type Report = { id: string; created_at: string; summary: string; task_count: number; active_plan_count: number };
 type Subscription = { connection_id: string; user_id: string; entity_type: string; entity_id: string; created_at: string };
 type State = {
@@ -24,6 +24,10 @@ const initialState = (): State => ({
 });
 const tableFor = (userId: string) => "mh_" + userId.replace(/[^A-Za-z0-9_-]/g, "");
 const subscriptionsTableFor = (userId: string) => "mhs_" + userId.replace(/[^A-Za-z0-9_-]/g, "");
+const jobsTableFor = (userId: string) => "mhq_" + userId.replace(/[^A-Za-z0-9_-]/g, "");
+type AgentJob = { id: string; user_id: string; task_id: string; status: "queued" | "running" | "completed" | "failed" | "cancelled"; attempts: number; lease_until?: number; lease_token?: string; created_at: string; updated_at: string; error?: string };
+const MAX_AGENT_ATTEMPTS = 3;
+const AGENT_LEASE_MS = 4 * 60 * 1000;
 
 async function notifySubscribers(userId: string) {
   const table = subscriptionsTableFor(userId);
@@ -104,6 +108,121 @@ export const dailyReviewHandler = async (event: { type: "cron"; name: string; pa
     }
   }
   return { statusCode: 200 };
+};
+
+
+/**
+ * Durable, bounded background worker. The app creates a database job and returns immediately.
+ * This scheduled handler runs independently of browser/mobile sessions. A lease allows recovery
+ * after a worker timeout or restart; only one invocation can claim a given queued/expired job.
+ */
+export const agentWorkerHandler = async (_event: { type: "cron"; name: string; payload: Record<string, never>; scheduledTime: string }) => {
+  const users = await db.list<{ userId: string }>("mh_users", { limit: 100 });
+  let processed = 0;
+  const maxPerTick = 5;
+  for (const entry of users.items) {
+    if (processed >= maxPerTick) break;
+    const userId = entry.userId;
+    const queueTable = jobsTableFor(userId);
+    let page;
+    try {
+      page = await db.list<AgentJob>(queueTable, { limit: 20 });
+    } catch (err) {
+      console.error("Micro Helper queue read failed", err);
+      continue;
+    }
+    for (const candidate of page.items) {
+      if (processed >= maxPerTick) break;
+      const now = Date.now();
+      const reclaimable = candidate.status === "running" && Number(candidate.lease_until || 0) < now;
+      if (candidate.status !== "queued" && !reclaimable) continue;
+      if (candidate.status === "failed" || candidate.status === "completed" || candidate.status === "cancelled") continue;
+      const token = crypto.randomUUID();
+      const expected = candidate.status === "queued"
+        ? { status: "queued" }
+        : { status: "running", lease_until: candidate.lease_until };
+      const [claimed] = await db.tx.update(queueTable, [{
+        id: candidate.id,
+        if: expected,
+        record: {
+          status: "running",
+          lease_until: now + AGENT_LEASE_MS,
+          lease_token: token,
+          attempts: Number(candidate.attempts || 0) + 1,
+          updated_at: stamp()
+        }
+      }], { patch: true });
+      if (!claimed) continue;
+      processed++;
+      try {
+        const state = await readState(userId);
+        const task = state.tasks.find(item => item.id === candidate.task_id);
+        if (!task || task.status === "cancelled") {
+          await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "cancelled", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+          continue;
+        }
+        if (task.status === "completed" && task.result) {
+          await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "completed", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+          continue;
+        }
+        task.status = "running";
+        task.error = undefined;
+        task.attempts = Number(candidate.attempts || 0) + 1;
+        await writeState(userId, state);
+        const preferences = state.preferences.map(item => item.preference + ": " + item.value).join("\\n").slice(0, 3500);
+        const memories = state.memories.slice(-12).map(item => item.content).join("\\n").slice(0, 2500);
+        const generated = await ai.run({
+          system: "Jsi vykonavatel úkolů v Micro Helperu. Pracuj po krocích, ale používej pouze skutečně dostupné nástroje. V této verzi smíš vytvořit kvalitní textový výstup, rozpad úkolu a ověřovací plán; nesmíš tvrdit, že jsi upravil repozitář, spustil testy nebo nasadil aplikaci. Vrať konkrétní použitelný výsledek v češtině. Preference uživatele: " + (preferences || "neuvedeny") + "\\nPoznámky: " + (memories || "neuvedeny"),
+          prompt: "Úkol: " + task.title + "\\nZadání: " + task.input_text + "\\nVrať výsledek včetně konkrétních kroků a kritérií ověření.",
+          maxSteps: 3,
+          maxTokens: 1800,
+          thinkingMode: "DEEP"
+        });
+        const output = String(generated.text || "").trim();
+        if (!output) throw new Error("AI nevrátila žádný výsledek.");
+        const latest = await readState(userId);
+        const latestTask = latest.tasks.find(item => item.id === candidate.task_id);
+        if (!latestTask || latestTask.status === "cancelled") {
+          await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "cancelled", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+          continue;
+        }
+        latestTask.status = "completed";
+        latestTask.result = output.slice(0, 12000);
+        latestTask.error = undefined;
+        latestTask.completed_at = stamp();
+        await writeState(userId, latest);
+        await db.tx.update(queueTable, [{ id: candidate.id, if: { status: "running", lease_token: token }, record: { status: "completed", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+      } catch (err) {
+        console.error("Micro Helper background task failed", err);
+        const attempts = Number(candidate.attempts || 0) + 1;
+        const retry = attempts < MAX_AGENT_ATTEMPTS;
+        try {
+          const state = await readState(userId);
+          const task = state.tasks.find(item => item.id === candidate.task_id);
+          if (task && task.status !== "cancelled") {
+            task.status = retry ? "queued" : "error";
+            task.error = retry ? "Dočasná chyba. Úkol bude automaticky zkusen znovu." : "Úkol se nepodařilo dokončit po třech pokusech.";
+            await writeState(userId, state);
+          }
+          await db.tx.update(queueTable, [{
+            id: candidate.id,
+            if: { status: "running", lease_token: token },
+            record: {
+              status: retry ? "queued" : "failed",
+              attempts,
+              error: String(err).slice(0, 500),
+              updated_at: stamp(),
+              lease_until: undefined,
+              lease_token: undefined
+            }
+          }], { patch: true });
+        } catch (recoveryError) {
+          console.error("Micro Helper job recovery checkpoint failed", recoveryError);
+        }
+      }
+    }
+  }
+  return { statusCode: 200, processed };
 };
 
 export const handler = router({
@@ -271,54 +390,60 @@ export const handler = router({
     const state = await readState(user!.userId), data = bodyOf(body);
     const title = String(data.title || "").trim(), input_text = String(data.input_text || "").trim();
     if (!title || title.length > 120 || !input_text || input_text.length > 4000) return error("Úkol potřebuje název do 120 znaků a zadání do 4000 znaků.", 422);
-    const task: Task = { id: crypto.randomUUID(), title, input_text, kind: String(data.kind || "agent.draft"), status: "draft", created_at: stamp() };
+    const task: Task = { id: crypto.randomUUID(), title, input_text, kind: String(data.kind || "agent.draft"), status: "queued", created_at: stamp(), attempts: 0 };
+    const queueTable = jobsTableFor(user!.userId);
+    const [jobId] = await db.tx.add(queueTable, [{
+      id: task.id,
+      user_id: user!.userId,
+      task_id: task.id,
+      status: "queued",
+      attempts: 0,
+      created_at: stamp(),
+      updated_at: stamp()
+    }]);
+    if (!jobId) return error("Úkol se nepodařilo bezpečně zařadit do fronty.", 503);
     state.tasks.push(task); state.tasks = state.tasks.slice(-50);
-    await writeState(user!.userId, state); return json(task, 201);
+    try {
+      await writeState(user!.userId, state);
+    } catch (err) {
+      await db.tx.update(queueTable, [{ id: task.id, if: { status: "queued" }, record: { status: "failed", error: "Task state save failed", updated_at: stamp() } }], { patch: true });
+      throw err;
+    }
+    return json(task, 201);
   }],
   "POST /api/v1/tasks/:id/run": [requireAuth(), async ({ user, params }) => {
     const state = await readState(user!.userId);
     const task = state.tasks.find(item => item.id === params.id);
     if (!task) return error("Úkol nebyl nalezen.", 404);
-    if (task.status === "running") return error("Úkol se už zpracovává.", 409);
+    if (task.status === "running" || task.status === "queued") return json({ ...task, queued: true });
     if (task.status === "cancelled") return error("Zrušený úkol nelze spustit.", 409);
     if (task.status === "completed" && task.result) return json(task);
-
-    task.status = "running";
-    task.error = undefined;
+    const queueTable = jobsTableFor(user!.userId);
+    const [jobId] = await db.tx.add(queueTable, [{
+      id: task.id + "_" + crypto.randomUUID().slice(0, 8),
+      user_id: user!.userId,
+      task_id: task.id,
+      status: "queued",
+      attempts: 0,
+      created_at: stamp(),
+      updated_at: stamp()
+    }]);
+    if (!jobId) return error("Úkol se nepodařilo zařadit do fronty.", 503);
+    task.status = "queued"; task.error = undefined; task.attempts = 0;
     await writeState(user!.userId, state);
-
-    try {
-      const preferences = state.preferences
-        .map(item => item.preference + ": " + item.value)
-        .join("\n")
-        .slice(0, 3500);
-      const memories = state.memories.slice(-12).map(item => item.content).join("\n").slice(0, 2500);
-      const generated = await ai.generate({
-        system: "Jsi vykonavatel textových úkolů v Micro Helperu. Vždy vytvoř konkrétní použitelný výstup v češtině. Dodrž zadání, strukturu a omezení. Pokud chybí zásadní informace, stručně uveď předpoklady nebo polož cílenou otázku. Nikdy netvrď, že jsi provedl akci mimo aplikaci, neposlal zprávu, změnil soubor nebo ovládal zařízení, pokud jsi to skutečně neudělal. Uživatelské preference: " + (preferences || "neuvedeny") + "\nUživatelské poznámky: " + (memories || "neuvedeny"),
-        prompt: "Název úkolu: " + task.title + "\n\nZadání:\n" + task.input_text + "\n\nVrať hotový výsledek, ne pouze plán postupu.",
-        maxTokens: 1800,
-        thinkingMode: "DEEP"
-      });
-      const output = String(generated.text || "").trim();
-      if (!output) throw new Error("AI nevrátila žádný výsledek.");
-      task.status = "completed";
-      task.result = output.slice(0, 12000);
-      task.error = undefined;
-      task.completed_at = stamp();
-      await writeState(user!.userId, state);
-      return json(task);
-    } catch (err) {
-      console.error("Micro Helper task execution failed", err);
-      task.status = "error";
-      task.error = "Úkol se nepodařilo dokončit. Zkontroluj dostupný AI limit a zkus to znovu.";
-      await writeState(user!.userId, state);
-      return error(task.error, 503);
-    }
+    return json({ ...task, queued: true });
   }],
   "POST /api/v1/tasks/:id/cancel": [requireAuth(), async ({ user, params }) => {
     const state = await readState(user!.userId), task = state.tasks.find(x => x.id === params.id);
     if (!task) return error("Úkol nebyl nalezen.", 404);
-    task.status = "cancelled"; await writeState(user!.userId, state); return json({ cancelled: true });
+    task.status = "cancelled";
+    await writeState(user!.userId, state);
+    const queueTable = jobsTableFor(user!.userId);
+    const [job] = await db.get<AgentJob>(queueTable, [task.id]);
+    if (job && (job.status === "queued" || job.status === "running")) {
+      await db.tx.update(queueTable, [{ id: task.id, if: { status: job.status }, record: { status: "cancelled", updated_at: stamp(), lease_until: undefined, lease_token: undefined } }], { patch: true });
+    }
+    return json({ cancelled: true });
   }],
   "POST /api/v1/images/generate": [requireAuth(), async ({ body }) => {
     const data = bodyOf(body);
