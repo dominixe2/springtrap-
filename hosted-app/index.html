@@ -463,6 +463,10 @@
         <small
           >Zadání můžeš nechat zpracovat cloudovou AI. Výsledek se uloží do účtu a synchronizuje mezi telefonem a notebookem. Spuštění úkolu vyžaduje přihlášení a dostupný AI limit.</small
         >
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" id="enablePush" class="primary">🔔 Zapnout oznámení i po zavření aplikace</button>
+          <small id="pushStatus" aria-live="polite">Push oznámení jsou volitelná. Zapnou se až po tvém kliknutí.</small>
+        </div>
         <form
           id="taskForm"
           style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0"
@@ -1755,6 +1759,33 @@
         });
         refreshGitHubStatus();
         window.addEventListener('mh-cloud-update', refreshGitHubStatus);
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const button = document.getElementById('enablePush');
+        const status = document.getElementById('pushStatus');
+        if (!button || !status) return;
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          status.textContent = 'Připravuji bezpečné push oznámení…';
+          try {
+            const client = await window.appClientReady;
+            if (!client?.user) throw new Error('Nejdřív se přihlas do Micro Helperu.');
+            const environment = await client.notifications.getEnvironment();
+            if (!environment.isSupported) {
+              const guidance = await client.notifications.getEnableGuidance();
+              throw new Error(guidance.message || 'Tento prohlížeč push oznámení nepodporuje.');
+            }
+            await client.notifications.subscribe();
+            status.textContent = 'Push oznámení jsou zapnutá pro toto zařízení.';
+          } catch (error) {
+            status.textContent = error.message || 'Push oznámení se nepodařilo zapnout.';
+          } finally {
+            button.disabled = false;
+          }
+        });
       })();
     </script>
 
