@@ -1779,6 +1779,13 @@
                     tag: 'mh-task-' + task.id
                   });
                 }
+              } else if (task.status === 'needs_review') {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification('Micro Helper: změny čekají na kontrolu', {
+                    body: task.title,
+                    tag: 'mh-task-review-' + task.id
+                  });
+                }
               } else if (['queued', 'running'].includes(task.status)) {
                 stillPending.push(task.id);
               }
@@ -1800,6 +1807,16 @@
               if (task.result) {
                 const result = document.createElement('div');
                 result.textContent = task.result;
+                const prMatch = String(task.result).match(/https:\/\/github\.com\/dominixe2\/springtrap-\/pull\/\d+/);
+                if (prMatch) {
+                  result.textContent = String(task.result).replace(prMatch[0], '').trim();
+                  const link = document.createElement('a');
+                  link.href = prMatch[0];
+                  link.target = '_blank';
+                  link.rel = 'noopener';
+                  link.textContent = 'Otevřít draft pull request';
+                  result.append(document.createElement('br'), link);
+                }
                 row.append(result);
               }
               if (task.error) {
