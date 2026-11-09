@@ -16,10 +16,12 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+APP_ORIGIN = "https://micro-helper-ygeuyn.v2.appdeploy.ai"
+
 app = FastAPI(title="Micro Helper Relay", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://micro-helper-ygeuyn.v2.appdeploy.ai"],
+    allow_origins=[APP_ORIGIN],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -189,6 +191,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         role = identity[1] if identity else ""
     if session is None or role not in {"desktop", "mobile"}:
         await websocket.close(code=4401, reason="Invalid or expired relay token")
+        return
+    # The Windows Companion is a non-browser client and sends no Origin.
+    # Mobile access is the hosted browser app and must present its exact origin.
+    if role == "mobile" and origin != APP_ORIGIN:
+        await websocket.close(code=4403, reason="Official mobile origin required")
         return
     await websocket.send_json({"type": "ready", "role": role})
     async with session.lock:
