@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
-from app import app, sessions, tokens, digest, claim_attempts, register_attempts
+from app import app, sessions, tokens, digest, claim_attempts, register_attempts, MAX_PENDING, REGISTER_ATTEMPTS
 
 client = TestClient(app)
 
@@ -87,7 +87,7 @@ def test_pairing_claims_are_rate_limited():
 
 
 def test_pairing_registration_is_rate_limited():
-    for index in range(20):
+    for index in range(REGISTER_ATTEMPTS):
         response = client.post(
             "/v1/pair/register",
             json={
@@ -146,19 +146,19 @@ def test_pending_commands_are_bounded_and_results_must_match():
                     "type": "command", "action": "notepad", "request_id": f"req-{index}"
                 })
 
-            duplicate = mobile.send_json({
+            mobile.send_json({
                 "type": "command", "action": "notepad", "request_id": "req-0"
             })
             duplicate_error = mobile.receive_json()
             assert duplicate_error["error"] == "duplicate_request_id"
 
-            overflow = mobile.send_json({
+            mobile.send_json({
                 "type": "command", "action": "notepad", "request_id": "req-overflow"
             })
             overflow_error = mobile.receive_json()
             assert overflow_error["error"] == "too_many_pending"
 
-            for index in range(20):
+            for index in range(MAX_PENDING):
                 forwarded = desktop.receive_json()
                 assert forwarded["request_id"] == f"req-{index}"
 
