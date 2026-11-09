@@ -98,7 +98,8 @@
     "covers": [
       "authenticated task creation",
       "AI task execution endpoint",
-      "persisted task draft",
+      "persisted task result",
+      "draft status remains needs_execution until actual execution is verified",
       "retryable AI task failure",
       "quick and deep chat response setting",
       "durable per-user task queue",
