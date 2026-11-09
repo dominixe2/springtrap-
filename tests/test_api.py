@@ -1,9 +1,53 @@
 from fastapi.testclient import TestClient
+from urllib.parse import urlsplit
 import pytest
 import micro_helper.api as api
 
 
-client = TestClient(api.app, base_url="http://127.0.0.1:8000")
+raw_client = TestClient(api.app, base_url="http://127.0.0.1:8000")
+
+
+class PolicyAwareTestClient:
+    """Simulate the browser UI obtaining an action-bound token after approval."""
+
+    def request(self, method, url, **kwargs):
+        method = method.upper()
+        path = urlsplit(str(url)).path
+        exempt = path == "/v1/chat" or path == "/v1/actions/confirm" or path.startswith("/v1/tools/")
+        if method in {"POST", "PUT", "PATCH", "DELETE"} and path.startswith("/v1/") and not exempt:
+            arguments = kwargs.get("json")
+            if not isinstance(arguments, dict):
+                arguments = {}
+            confirmation = raw_client.post(
+                "/v1/actions/confirm",
+                json={"method": method, "path": path, "arguments": arguments},
+            )
+            if confirmation.status_code == 200:
+                headers = dict(kwargs.get("headers") or {})
+                headers["X-Micro-Helper-Confirmation"] = confirmation.json()["confirmation_token"]
+                kwargs["headers"] = headers
+        return raw_client.request(method, url, **kwargs)
+
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def put(self, url, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def patch(self, url, **kwargs):
+        return self.request("PATCH", url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self.request("DELETE", url, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(raw_client, name)
+
+
+client = PolicyAwareTestClient()
 
 
 @pytest.fixture(autouse=True)
@@ -408,3 +452,81 @@ def test_home_page_exposes_learning_plan_ui_and_offline_support():
     assert 'id="learningPlanFilter"' in html
     assert "Learning plans UI" in html
     assert 'url.pathname === "/v1/learning-plans" && method === "POST"' in html
+
+
+
+def test_direct_rest_memory_write_cannot_bypass_policy_with_forged_boolean():
+    response = raw_client.post(
+        "/v1/memories",
+        json={"content": "nepovolený zápis", "category": "context", "confirmed": True},
+    )
+    assert response.status_code == 403
+    assert raw_client.get("/v1/memories").json()["memories"] == []
+
+
+def test_rest_confirmation_is_bound_to_method_path_arguments_and_single_use():
+    arguments = {"content": "přesná poznámka", "category": "context"}
+    issued = raw_client.post(
+        "/v1/actions/confirm",
+        json={"method": "POST", "path": "/v1/memories", "arguments": arguments},
+    )
+    assert issued.status_code == 200
+    token = issued.json()["confirmation_token"]
+    headers = {"X-Micro-Helper-Confirmation": token}
+
+    mismatch = raw_client.post(
+        "/v1/memories",
+        json={"content": "jiná poznámka", "category": "context"},
+        headers=headers,
+    )
+    assert mismatch.status_code == 403
+
+    saved = raw_client.post("/v1/memories", json=arguments, headers=headers)
+    assert saved.status_code == 201
+    replay = raw_client.post("/v1/memories", json=arguments, headers=headers)
+    assert replay.status_code == 403
+
+
+def test_rest_confirmation_rejects_wrong_path_and_unknown_mutation():
+    issued = raw_client.post(
+        "/v1/actions/confirm",
+        json={"method": "POST", "path": "/v1/memories", "arguments": {"content": "x", "category": "context"}},
+    )
+    token = issued.json()["confirmation_token"]
+    wrong_path = raw_client.put(
+        "/v1/profile",
+        json={"agent_name": "Forged", "language": "cs-CZ", "style": "friendly"},
+        headers={"X-Micro-Helper-Confirmation": token},
+    )
+    assert wrong_path.status_code == 403
+    unknown = raw_client.post(
+        "/v1/actions/confirm",
+        json={"method": "POST", "path": "/v1/admin/reset", "arguments": {}},
+    )
+    assert unknown.status_code == 404
+
+
+def test_rest_policy_covers_every_state_changing_route():
+    routes = [
+        ("POST", "/v1/chat"),
+        ("POST", "/v1/tasks"),
+        ("POST", "/v1/tasks/123/cancel"),
+        ("POST", "/v1/learning-plans"),
+        ("PATCH", "/v1/learning-plans/plan-1/status"),
+        ("DELETE", "/v1/learning-plans/plan-1"),
+        ("PUT", "/v1/profile"),
+        ("POST", "/v1/memories"),
+        ("PUT", "/v1/memories/1"),
+        ("DELETE", "/v1/memories/1"),
+        ("POST", "/v1/preferences"),
+        ("DELETE", "/v1/preferences/1"),
+        ("DELETE", "/v1/conversations"),
+    ]
+    assert all(api._resolve_rest_action(method, path) is not None for method, path in routes)
+
+
+def test_home_page_exposes_rest_confirmation_flow():
+    html = client.get("/").text
+    assert "/v1/actions/confirm" in html
+    assert "X-Micro-Helper-Confirmation" in html
+    assert "localConfirmations" in html

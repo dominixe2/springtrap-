@@ -231,6 +231,12 @@ class ToolConfirmationRequest(BaseModel):
     arguments: dict[str, object] = Field(default_factory=dict)
 
 
+class RestActionConfirmationRequest(BaseModel):
+    method: str = Field(min_length=3, max_length=8)
+    path: str = Field(min_length=4, max_length=300)
+    arguments: dict[str, object] = Field(default_factory=dict)
+
+
 TOOL_ACTIONS = {
     "profile.read": Action("profile", "read", "local"),
     "memory.list": Action("memory", "read", "local"),
@@ -242,6 +248,57 @@ TOOL_POLICY = PermissionPolicy(
         permission_key(TOOL_ACTIONS["memory.list"]),
     })
 )
+
+# Chat submission is the one narrow built-in grant: the user explicitly presses
+# Send. Every other state-changing REST route requires fresh confirmation.
+CHAT_ACTION = Action("conversation", "append", "local")
+REST_POLICY = PermissionPolicy(grants=frozenset({permission_key(CHAT_ACTION)}))
+
+
+def _resolve_rest_action(method: str, path: str) -> tuple[str, Action] | None:
+    method = method.upper()
+    if method == "POST" and path == "/v1/chat":
+        return f"rest:{method}:{path}", CHAT_ACTION
+    if method == "POST" and path == "/v1/tasks":
+        return f"rest:{method}:{path}", Action("task", "create", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/tasks/([^/]+)/cancel", path)
+    if method == "POST" and match:
+        return f"rest:{method}:{path}", Action("task", "cancel", match.group(1), changes_external_state=True)
+    if method == "POST" and path == "/v1/learning-plans":
+        return f"rest:{method}:{path}", Action("learning_plan", "create", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/learning-plans/([^/]+)/status", path)
+    if method == "PATCH" and match:
+        return f"rest:{method}:{path}", Action("learning_plan", "set_status", match.group(1), changes_external_state=True)
+    match = re.fullmatch(r"/v1/learning-plans/([^/]+)", path)
+    if method == "DELETE" and match:
+        return f"rest:{method}:{path}", Action("learning_plan", "delete", match.group(1), destructive=True)
+    if method == "PUT" and path == "/v1/profile":
+        return f"rest:{method}:{path}", Action("profile", "update", "local", changes_external_state=True)
+    if method == "POST" and path == "/v1/memories":
+        return f"rest:{method}:{path}", Action("memory", "create", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/memories/(\d+)", path)
+    if method == "PUT" and match:
+        return f"rest:{method}:{path}", Action("memory", "update", match.group(1), changes_external_state=True)
+    if method == "DELETE" and match:
+        return f"rest:{method}:{path}", Action("memory", "delete", match.group(1), destructive=True)
+    if method == "POST" and path == "/v1/preferences":
+        return f"rest:{method}:{path}", Action("preferences", "upsert", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/preferences/(\d+)", path)
+    if method == "DELETE" and match:
+        return f"rest:{method}:{path}", Action("preferences", "delete", match.group(1), destructive=True)
+    if method == "DELETE" and path == "/v1/conversations":
+        return f"rest:{method}:{path}", Action("conversation", "clear", "local", destructive=True)
+    return None
+
+
+def _normalize_rest_arguments(arguments: dict[str, object]) -> dict[str, object]:
+    try:
+        encoded = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Obsah potvrzované akce není platný JSON.")
+    if len(encoded.encode("utf-8")) > 16384:
+        raise HTTPException(status_code=413, detail="Potvrzovaná akce je příliš velká.")
+    return arguments
 
 
 def _normalize_tool_arguments(tool_id: str, arguments: dict[str, object]) -> dict[str, str]:
@@ -262,7 +319,7 @@ def _normalize_tool_arguments(tool_id: str, arguments: dict[str, object]) -> dic
     raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
 
 
-def _tool_arguments_hash(arguments: dict[str, str]) -> str:
+def _tool_arguments_hash(arguments: dict[str, object]) -> str:
     canonical = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -318,6 +375,80 @@ def _consume_tool_confirmation(token: str | None, tool_id: str, arguments: dict[
         return cursor.rowcount == 1
 
 
+async def _authorize_rest_mutation(request: Request) -> None:
+    """Apply one shared trust-policy gate to every state-changing REST route."""
+    resolved = _resolve_rest_action(request.method, request.url.path)
+    if resolved is None:
+        raise HTTPException(status_code=403, detail="Tato změna není v bezpečnostní politice povolena.")
+    action_id, action = resolved
+    raw_body = await request.body()
+    try:
+        arguments = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(status_code=422, detail="Tělo požadavku není platný JSON.")
+    if not isinstance(arguments, dict):
+        raise HTTPException(status_code=422, detail="Tělo potvrzované akce musí být objekt JSON.")
+    arguments = _normalize_rest_arguments(arguments)
+    policy_result = evaluate_action(action, REST_POLICY)
+    if policy_result.decision == Decision.DENY:
+        _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+    token = request.headers.get("x-micro-helper-confirmation")
+    if policy_result.decision == Decision.CONFIRM:
+        if not _consume_tool_confirmation(token, action_id, arguments):
+            reason = "Chybí platné čerstvé potvrzení, token vypršel, byl použit nebo neodpovídá přesné akci."
+            _record_tool_audit(action_id, action, policy_result.decision, reason, "confirmation_rejected")
+            raise HTTPException(status_code=403, detail="Změna vyžaduje čerstvé potvrzení pro přesnou akci.")
+    elif token:
+        raise HTTPException(status_code=422, detail="Tato akce potvrzovací token nepřijímá.")
+    _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "authorized")
+
+
+@app.post("/v1/actions/confirm")
+async def confirm_rest_action(request: RestActionConfirmationRequest):
+    """Issue a one-time token after the UI has displayed the exact REST mutation."""
+    method = request.method.upper()
+    path = request.path
+    if (
+        method not in {"POST", "PUT", "PATCH", "DELETE"}
+        or not path.startswith("/v1/")
+        or "?" in path or "#" in path or "\\" in path
+        or "//" in path or "/../" in path
+    ):
+        raise HTTPException(status_code=422, detail="Neplatný cíl potvrzované akce.")
+    resolved = _resolve_rest_action(method, path)
+    if resolved is None:
+        raise HTTPException(status_code=404, detail="Neznámá nebo nepovolená změna.")
+    action_id, action = resolved
+    arguments = _normalize_rest_arguments(request.arguments)
+    policy_result = evaluate_action(action, REST_POLICY)
+    if policy_result.decision == Decision.DENY:
+        _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+    if policy_result.decision != Decision.CONFIRM:
+        raise HTTPException(status_code=409, detail="Tato akce nevyžaduje potvrzovací token.")
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=60)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with database() as db:
+        db.execute("DELETE FROM tool_confirmations WHERE expires_at < ?", (now.isoformat(),))
+        db.execute(
+            """INSERT INTO tool_confirmations
+               (token_hash, tool_id, arguments_hash, created_at, expires_at, consumed_at)
+               VALUES (?, ?, ?, ?, ?, NULL)""",
+            (token_hash, action_id, _tool_arguments_hash(arguments), now.isoformat(), expires_at.isoformat()),
+        )
+        db.commit()
+    _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "confirmation_issued")
+    return {
+        "confirmation_token": token,
+        "expires_at": expires_at.isoformat(),
+        "message": "Potvrzení platí 60 sekund pouze pro tuto metodu, cestu a přesný obsah.",
+    }
+
+
+
 @app.get("/")
 async def home():
     return FileResponse(STATIC / "index.html")
@@ -348,7 +479,7 @@ async def status():
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
             "capability_catalog", "browser_voice_input", "browser_voice_output",
-            "tool_policy_gate", "one_time_action_confirmation", "tool_audit_log",
+            "tool_policy_gate", "one_time_action_confirmation", "tool_audit_log", "rest_mutation_policy_gate",
         ],
         "not_yet_implemented": [
             "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
@@ -530,7 +661,8 @@ async def list_tool_audit(limit: int = 50):
 
 
 @app.post("/v1/tasks", status_code=201)
-async def create_task(request: TaskRequest):
+async def create_task(request: TaskRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     """Queue a bounded, non-side-effecting AI draft task for the local worker."""
     task_id = str(uuid.uuid4())
     now = utc_now()
@@ -562,7 +694,8 @@ async def get_task(task_id: str):
 
 
 @app.post("/v1/tasks/{task_id}/cancel")
-async def cancel_task(task_id: str):
+async def cancel_task(task_id: str, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     now = utc_now()
     with database() as db:
         cursor = db.execute(
@@ -600,7 +733,8 @@ def _learning_plan_dict(row: sqlite3.Row) -> dict[str, object]:
 
 
 @app.post("/v1/learning-plans", status_code=201)
-async def create_learning_plan(request: LearningPlanRequest):
+async def create_learning_plan(request: LearningPlanRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     import json
     title, goal = request.title.strip(), request.goal.strip()
     steps = [step.strip() for step in request.steps if step.strip()]
@@ -629,7 +763,8 @@ async def get_learning_plan(plan_id: str):
 
 
 @app.patch("/v1/learning-plans/{plan_id}/status")
-async def update_learning_plan_status(plan_id: str, request: LearningPlanStatusRequest):
+async def update_learning_plan_status(plan_id: str, request: LearningPlanStatusRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute(
             "UPDATE learning_plans SET status=?, updated_at=? WHERE id=?",
@@ -643,7 +778,8 @@ async def update_learning_plan_status(plan_id: str, request: LearningPlanStatusR
 
 
 @app.delete("/v1/learning-plans/{plan_id}")
-async def delete_learning_plan(plan_id: str):
+async def delete_learning_plan(plan_id: str, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute("DELETE FROM learning_plans WHERE id=?", (plan_id,))
         db.commit()
@@ -660,7 +796,8 @@ async def get_profile():
 
 
 @app.put("/v1/profile")
-async def update_profile(request: ProfileRequest):
+async def update_profile(request: ProfileRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         db.execute(
             "UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1",
@@ -681,7 +818,8 @@ async def list_memories():
 
 
 @app.post("/v1/memories", status_code=201)
-async def create_memory(request: MemoryRequest):
+async def create_memory(request: MemoryRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     content = request.content.strip()
     category = request.category.strip()
     if not content:
@@ -700,7 +838,8 @@ async def create_memory(request: MemoryRequest):
 
 
 @app.put("/v1/memories/{memory_id}")
-async def update_memory(memory_id: int, request: MemoryRequest):
+async def update_memory(memory_id: int, request: MemoryRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     content = request.content.strip()
     category = request.category.strip()
     if not content:
@@ -721,7 +860,8 @@ async def update_memory(memory_id: int, request: MemoryRequest):
 
 
 @app.delete("/v1/memories/{memory_id}")
-async def delete_memory(memory_id: int):
+async def delete_memory(memory_id: int, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute("DELETE FROM memories WHERE id=?", (memory_id,))
         db.commit()
@@ -741,7 +881,8 @@ async def list_preferences():
 
 
 @app.post("/v1/preferences", status_code=201)
-async def create_or_update_preference(request: PreferenceRequest):
+async def create_or_update_preference(request: PreferenceRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     category = request.category.strip()
     preference = request.preference.strip()
     value = request.value.strip()
@@ -764,7 +905,8 @@ async def create_or_update_preference(request: PreferenceRequest):
 
 
 @app.delete("/v1/preferences/{preference_id}")
-async def delete_preference(preference_id: int):
+async def delete_preference(preference_id: int, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute("DELETE FROM preferences WHERE id=?", (preference_id,))
         db.commit()
@@ -785,7 +927,8 @@ async def get_conversations(limit: int = 100):
 
 
 @app.delete("/v1/conversations")
-async def clear_conversations():
+async def clear_conversations(http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         db.execute("DELETE FROM messages")
         db.commit()
@@ -806,7 +949,8 @@ async def models():
 
 
 @app.post("/v1/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     model = request.model.strip()
     if not MODEL_PATTERN.fullmatch(model) or ".." in model or model.startswith("/") or model.endswith("/") or "//" in model:
         raise HTTPException(status_code=422, detail="Název modelu obsahuje nepovolené znaky.")

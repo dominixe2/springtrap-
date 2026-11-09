@@ -34,11 +34,20 @@ def test_cross_site_fetch_metadata_is_rejected_without_origin():
     assert client.get("/v1/memories").json()["memories"] == []
 
 
-def test_same_origin_profile_write_still_works():
+def test_same_origin_profile_write_still_works_after_explicit_action_confirmation():
+    arguments = {"agent_name": "Nova", "language": "cs-CZ", "style": "friendly"}
+    confirmation = client.post(
+        "/v1/actions/confirm",
+        json={"method": "PUT", "path": "/v1/profile", "arguments": arguments},
+    )
+    assert confirmation.status_code == 200
     response = client.put(
         "/v1/profile",
-        headers={"origin": "http://127.0.0.1:8000"},
-        json={"agent_name": "Nova", "language": "cs-CZ", "style": "friendly"},
+        headers={
+            "origin": "http://127.0.0.1:8000",
+            "X-Micro-Helper-Confirmation": confirmation.json()["confirmation_token"],
+        },
+        json=arguments,
     )
     assert response.status_code == 200
     assert response.json()["agent_name"] == "Nova"
