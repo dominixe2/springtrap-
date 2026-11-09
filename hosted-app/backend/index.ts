@@ -459,6 +459,28 @@ export const handler = router({
     const [deleted] = await db.delete(subscriptionsTableFor(user!.userId), [id]);
     return json({ unsubscribed: Boolean(deleted) });
   }],
+  "GET /api/v1/integrations/github/status": [requireAuth(), async ({ user }) => {
+    if (user!.userId !== MICRO_HELPER_OWNER_ID) return json({ available: false, configured: false });
+    const configured = await githubTokenReady();
+    if (!configured) return json({ available: true, configured: false, repository: MICRO_HELPER_REPO });
+    try {
+      const repo = await githubApi("/repos/" + MICRO_HELPER_REPO);
+      return json({ available: true, configured: true, connected: true, repository: repo.full_name, permissions: repo.permissions || {} });
+    } catch {
+      return json({ available: true, configured: true, connected: false, repository: MICRO_HELPER_REPO, message: "Token není platný nebo nemá potřebná oprávnění." });
+    }
+  }],
+  "POST /api/v1/integrations/github/test": [requireAuth(), async ({ user }) => {
+    if (user!.userId !== MICRO_HELPER_OWNER_ID) return error("GitHub propojení není pro tento účet povolené.", 403);
+    if (!(await githubTokenReady())) return error("GitHub token zatím není připojen.", 409);
+    try {
+      const repo = await githubApi("/repos/" + MICRO_HELPER_REPO);
+      const permissions = repo.permissions || {};
+      return json({ connected: true, repository: repo.full_name, can_read: Boolean(permissions.pull || permissions.push || permissions.admin), can_write: Boolean(permissions.push || permissions.admin), can_admin: Boolean(permissions.admin) });
+    } catch {
+      return error("GitHub token neumožňuje přístup k repozitáři. Zkontroluj rozsah oprávnění.", 403);
+    }
+  }],
   "GET /api/v1/status": [requireAuth(), async ({ user }) => json({
     product: "Micro Helper", mode: "cloud-ai", authenticated: true,
     storage: "private-per-user-cloud", userId: user!.userId
