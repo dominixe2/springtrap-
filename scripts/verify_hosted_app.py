@@ -46,6 +46,9 @@ def main() -> None:
     assert 'GITHUB_EDIT_PREFIXES' in backend and 'startsWith(".github/")' in backend, "Repository writes must stay inside approved source folders"
     assert 'github_dispatch_checks' in backend, "Agent must be able to dispatch allowlisted validation workflows"
     assert 'needs_review' in backend and 'needs_review' in html, "PR output must be distinct from verified completion"
+    assert "notifications.send" in backend, "Background task results must use server push notifications"
+    assert "notifications.subscribe" in html and "enablePush" in html, "Push notifications must require explicit user opt-in"
+
 
 
     for control in ("generateImage", "analyzeImage", "readImageText"):
