@@ -80,7 +80,12 @@
       "Android APK build workflow",
       "offline local persistence",
       "anonymous AI access denial",
-      "no fabricated offline AI output"
+      "no fabricated offline AI output",
+      "Micro Helper default identity",
+      "responsive phone layout",
+      "keyboard focus visibility",
+      "reduced-motion preference",
+      "user-editable assistant name"
     ],
     "description": "Verifies local data remains usable offline, cloud features are not faked, and the Android install path is available.",
     "steps": [
@@ -88,9 +93,14 @@
       "Create a local note and reload the page to verify local persistence",
       "After the first online visit, reload with the network disabled and verify the app shell plus JavaScript and CSS still load while cloud actions clearly report that they need a connection",
       "Open the browser install option when supported or use Chrome's Install app menu",
-      "Open the GitHub Android build workflow and verify a successful run produces an installable debug APK artifact"
+      "Open the GitHub Android build workflow and verify a successful run produces an installable debug APK artifact",
+      "Open Micro Helper in a fresh local profile and verify the assistant name defaults to Micro Helper",
+      "Resize or open the app on a narrow phone viewport and verify controls fit without horizontal overflow",
+      "Use keyboard navigation and verify visible focus indicators on inputs and buttons",
+      "Enable reduced motion at the operating-system level and verify transitions are disabled",
+      "Set a custom assistant name, reload the app, and verify the custom name remains"
     ],
-    "expected": "Local data persists, cloud AI and remote commands are not fabricated offline, PWA installation is available where supported, and the Android workflow builds an APK artifact."
+    "expected": "Local data persists, cloud AI and remote commands are not fabricated offline, PWA installation is available where supported, and the Android workflow builds an APK artifact. The default Micro Helper identity, editable agent name, keyboard focus and reduced-motion behavior are also verified."
   },
   {
     "name": "Create and execute an AI task",
@@ -99,38 +109,43 @@
       "authenticated task creation",
       "AI task execution endpoint",
       "persisted task result",
+      "draft status remains needs_execution until actual execution is verified",
       "retryable AI task failure",
-      "quick and deep chat response setting"
+      "quick and deep chat response setting",
+      "durable per-user task queue",
+      "scheduled background worker",
+      "task state persistence after app closure",
+      "task cancellation before execution",
+      "bounded retry and recovery",
+      "server-side draft generation on submission",
+      "task result persisted before API response",
+      "targeted on-demand worker invocation",
+      "targeted worker invocation",
+      "notification permission",
+      "no false completion notification for an unexecuted draft",
+      "owner-only GitHub repository integration",
+      "isolated GitHub working branch",
+      "draft pull request without automatic merge",
+      "GitHub Actions validation dispatch",
+      "explicit push notification opt-in",
+      "push notification after task result while app is closed"
     ],
-    "description": "Verifies a saved task can be run by the cloud AI and its completed result remains visible after refreshing the task list.",
+    "description": "Verifies submitting a task immediately invokes the server worker, persists its result, and leaves the scheduled worker as a recovery path.",
     "steps": [
-      "Sign in to Micro Helper",
-      "Create a task with a short title and a concrete text instruction",
-      "Select Run AI for the new task",
-      "Verify the task changes to completed and a useful result appears",
-      "Refresh the page and verify the completed result remains available",
-      "Switch the chat response depth between quick and deep and save the setting"
+      "Sign in to Micro Helper and allow browser notifications when prompted",
+      "Create a task with a short title and concrete instruction",
+      "Verify the server immediately invokes the worker for that exact task without waiting for the hourly schedule",
+      "Verify the response contains a persisted draft marked needs_execution, or a retryable queued state",
+      "If the task remains queued, close and reopen the app after processing and verify a completion notification is shown when notification permission is granted",
+      "Verify the draft remains stored as needs_execution after refreshing the task list",
+      "Create a second task and cancel it before a recovery run; verify its status remains cancelled",
+      "Verify temporary failures follow the bounded retry policy",
+      "Verify GitHub status is hidden for non-owner accounts and never exposes the token value",
+      "With the owner GitHub token configured, submit a repository task and verify changes are committed only to an isolated branch and delivered as a draft pull request",
+      "Verify the agent cannot modify the production branch, change workflows or secrets, or merge a pull request",
+      "Enable push notifications with the explicit device button and verify the app reports successful subscription",
+      "Submit a task, close the app, and verify a server push notification arrives when the task reaches needs_review or needs_execution"
     ],
-    "expected": "The authenticated task endpoint produces and persists a Czech result; failures are shown as retryable errors, and chat sends the selected response depth."
-  },
-  {
-    "name": "Use the refreshed Micro Helper identity and responsive interface",
-    "viewport": "mobile",
-    "covers": [
-      "Micro Helper default identity",
-      "responsive phone layout",
-      "keyboard focus visibility",
-      "reduced-motion preference",
-      "user-editable assistant name"
-    ],
-    "description": "Checks the refreshed phone-first design and confirms that the default identity is consistent without overwriting a name explicitly chosen by the user.",
-    "steps": [
-      "Open Micro Helper in a fresh local profile and verify the assistant name defaults to Micro Helper",
-      "Resize or open the app on a narrow phone viewport and verify controls fit without horizontal overflow",
-      "Use keyboard navigation and verify visible focus indicators on inputs and buttons",
-      "Enable reduced motion at the operating-system level and verify transitions are disabled",
-      "Set a custom assistant name, reload the app, and verify the custom name remains"
-    ],
-    "expected": "The default identity is Micro Helper, the layout remains usable on narrow phones, focus indicators are visible, reduced-motion is respected, and explicit user names persist."
+    "expected": "Task submission targets the server worker. Text-only drafts remain needs_execution and do not trigger a completion notification; notifications are reserved for tasks actually executed and verified. The hourly worker remains a recovery path. GitHub code tasks are owner-only, restricted to the configured repository and approved source folders, and delivered as an unmerged draft PR. Push notifications are registered only after explicit user action and are sent by the server after a task result is persisted."
   }
 ]

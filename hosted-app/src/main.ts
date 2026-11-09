@@ -1,5 +1,5 @@
 import './styles.css';
-import { api, auth, image, ws } from '@appdeploy/client';
+import { api, auth, image, notifications, ws } from '@appdeploy/client';
 
 const appClientReady = (async () => {
   const user = await auth.getUser();
@@ -114,7 +114,7 @@ const appClientReady = (async () => {
     await connectRealtime();
   }
 
-  return { api, auth, image, user, get connection() { return connection; } };
+  return { api, auth, image, notifications, user, get connection() { return connection; } };
 })().catch(() => null);
 
 Object.assign(window, { appClientReady });

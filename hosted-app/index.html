@@ -427,6 +427,17 @@
         <small><a href="https://github.com/dominixe2/springtrap-/actions/workflows/windows-companion.yml?query=branch%3Amicro-helper" target="_blank" rel="noopener">Stáhnout Windows EXE (GitHub Actions)</a> · <a href="https://raw.githubusercontent.com/dominixe2/springtrap-/micro-helper/windows-companion/companion.py" target="_blank" rel="noopener">Zdrojový skript</a> · <a href="https://github.com/dominixe2/springtrap-/blob/micro-helper/windows-companion/README.md" target="_blank" rel="noopener">Návod</a></small>
       </section>
 
+      <section class="settings" id="githubPanel" style="align-items:stretch;flex-direction:column">
+        <strong>🐙 GitHub vývojový přístup</strong>
+        <small>Micro Helper může pracovat pouze v repozitáři dominixe2/springtrap-. Změny vytváří na oddělené větvi a posílá jako draft pull request. Produkční větev nikdy neupravuje přímo a PR sám neslučuje.</small>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" id="githubCheck" class="primary">Ověřit GitHub připojení</button>
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Vytvořit omezený GitHub token</a>
+        </div>
+        <small id="githubStatus" aria-live="polite">Stav GitHub propojení se načítá…</small>
+        <small>Token musí mít přístup pouze k repozitáři springtrap- a oprávnění Contents: Read and write, Pull requests: Read and write, Actions: Read and write, Metadata: Read-only. Token vkládej pouze do zabezpečeného formuláře AppDeploy, nikdy do chatu.</small>
+      </section>
+
       <section class="settings" id="imageStudio" style="align-items:stretch;flex-direction:column">
         <strong>🎨 AI studio obrázků</strong>
         <small>Vytvářej obrázky z textu, upravuj je pomocí referenční fotografie, nech si obrázek popsat nebo z něj vytáhni text. AI obrazové funkce vyžadují přihlášení a dostupný limit cloudové AI. V místním režimu zůstává práce s obrázky vypnutá.</small>
@@ -452,6 +463,10 @@
         <small
           >Zadání můžeš nechat zpracovat cloudovou AI. Výsledek se uloží do účtu a synchronizuje mezi telefonem a notebookem. Spuštění úkolu vyžaduje přihlášení a dostupný AI limit.</small
         >
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" id="enablePush" class="primary">🔔 Zapnout oznámení i po zavření aplikace</button>
+          <small id="pushStatus" aria-live="polite">Push oznámení jsou volitelná. Zapnou se až po tvém kliknutí.</small>
+        </div>
         <form
           id="taskForm"
           style="display: flex; gap: 8px; flex-wrap: wrap; margin: 0"
@@ -1707,6 +1722,76 @@
     <script>
       (() => {
         const $ = id => document.getElementById(id);
+        const panel = $('githubPanel');
+        const status = $('githubStatus');
+        const button = $('githubCheck');
+        if (!panel || !status || !button) return;
+        async function refreshGitHubStatus() {
+          try {
+            const response = await apiFetch('/v1/integrations/github/status');
+            if (!response.ok) throw new Error('Stav propojení se nepodařilo načíst.');
+            const data = await response.json();
+            if (!data.available) {
+              panel.hidden = true;
+              return;
+            }
+            panel.hidden = false;
+            if (!data.configured) status.textContent = 'GitHub token zatím není uložen v zabezpečeném nastavení AppDeploy.';
+            else if (data.connected) status.textContent = 'GitHub je připojen: ' + data.repository + '. Přístup ověřen.';
+            else status.textContent = 'Token je uložen, ale přístup k repozitáři se nepodařilo ověřit. Zkontroluj oprávnění tokenu.';
+          } catch (error) {
+            status.textContent = error.message || 'GitHub stav není dostupný.';
+          }
+        }
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          status.textContent = 'Ověřuji oprávnění GitHubu…';
+          try {
+            const response = await apiFetch('/v1/integrations/github/test', { method: 'POST' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'GitHub propojení se nepodařilo ověřit.');
+            status.textContent = 'GitHub připojen: ' + data.repository + ' · čtení ' + (data.can_read ? 'ano' : 'ne') + ' · zápis ' + (data.can_write ? 'ano' : 'ne') + '.';
+          } catch (error) {
+            status.textContent = error.message || 'GitHub propojení se nepodařilo ověřit.';
+          } finally {
+            button.disabled = false;
+          }
+        });
+        refreshGitHubStatus();
+        window.addEventListener('mh-cloud-update', refreshGitHubStatus);
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const button = document.getElementById('enablePush');
+        const status = document.getElementById('pushStatus');
+        if (!button || !status) return;
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          status.textContent = 'Připravuji bezpečné push oznámení…';
+          try {
+            const client = await window.appClientReady;
+            if (!client?.user) throw new Error('Nejdřív se přihlas do Micro Helperu.');
+            const environment = await client.notifications.getEnvironment();
+            if (!environment.isSupported) {
+              const guidance = await client.notifications.getEnableGuidance();
+              throw new Error(guidance.message || 'Tento prohlížeč push oznámení nepodporuje.');
+            }
+            await client.notifications.subscribe();
+            status.textContent = 'Push oznámení jsou zapnutá pro toto zařízení.';
+          } catch (error) {
+            status.textContent = error.message || 'Push oznámení se nepodařilo zapnout.';
+          } finally {
+            button.disabled = false;
+          }
+        });
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const $ = id => document.getElementById(id);
         async function refreshTasks() {
           const root = $('taskList');
           if (!root) return;
@@ -1714,6 +1799,29 @@
             const response = await apiFetch('/v1/tasks?limit=30');
             if (!response.ok) throw new Error();
             const data = await response.json();
+            const pending = JSON.parse(localStorage.getItem('mh_pending_task_notifications') || '[]');
+            const stillPending = [];
+            for (const task of data.tasks) {
+              if (!pending.includes(task.id)) continue;
+              if (task.status === 'completed') {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification('Micro Helper: úkol dokončen', {
+                    body: task.title,
+                    tag: 'mh-task-' + task.id
+                  });
+                }
+              } else if (task.status === 'needs_review') {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification('Micro Helper: změny čekají na kontrolu', {
+                    body: task.title,
+                    tag: 'mh-task-review-' + task.id
+                  });
+                }
+              } else if (['queued', 'running'].includes(task.status)) {
+                stillPending.push(task.id);
+              }
+            }
+            localStorage.setItem('mh_pending_task_notifications', JSON.stringify(stillPending));
             root.replaceChildren();
             if (!data.tasks.length) {
               root.textContent = 'Zatím tu nejsou žádné úkoly.';
@@ -1724,11 +1832,22 @@
               row.style.cssText =
                 'padding:10px 0;border-top:1px solid var(--line);display:grid;gap:5px';
               const title = document.createElement('strong');
-              title.textContent = task.title + ' · ' + task.status;
+              const taskLabels = { queued: 'čeká ve frontě', running: 'probíhá', needs_execution: 'textový návrh · čeká na provedení', needs_review: 'PR připraven · čeká na kontrolu', completed: 'dokončeno a ověřeno', error: 'chyba', cancelled: 'zrušeno', draft: 'koncept' };
+              title.textContent = task.title + ' · ' + (taskLabels[task.status] || task.status);
               row.append(title);
               if (task.result) {
                 const result = document.createElement('div');
                 result.textContent = task.result;
+                const prMatch = String(task.result).match(/https:\/\/github\.com\/dominixe2\/springtrap-\/pull\/\d+/);
+                if (prMatch) {
+                  result.textContent = String(task.result).replace(prMatch[0], '').trim();
+                  const link = document.createElement('a');
+                  link.href = prMatch[0];
+                  link.target = '_blank';
+                  link.rel = 'noopener';
+                  link.textContent = 'Otevřít draft pull request';
+                  result.append(document.createElement('br'), link);
+                }
                 row.append(result);
               }
               if (task.error) {
@@ -1736,36 +1855,48 @@
                 error.textContent = task.error;
                 row.append(error);
               }
+              if (task.status === 'needs_execution') {
+                const note = document.createElement('small');
+                note.textContent = 'Toto je pouze textový návrh. Micro Helper zatím neprovedl změny v projektu ani nespustil testy.';
+                row.append(note);
+              } else if (task.status === 'needs_review') {
+                const note = document.createElement('small');
+                note.textContent = 'Změny jsou připravené v oddělené větvi. PR nebyl sloučen ani nasazen.';
+                row.append(note);
+              }
               if (task.status === 'draft' || task.status === 'error') {
                 const run = document.createElement('button');
                 run.type = 'button';
                 run.textContent = signedInUser
-                  ? (task.status === 'error' ? 'Zkusit znovu' : 'Spustit AI')
+                  ? (task.status === 'error' ? 'Zařadit znovu' : 'Zařadit na server')
                   : 'Přihlásit pro AI';
                 run.disabled = !signedInUser;
                 if (!signedInUser) run.title = 'Pro zpracování úkolu se přihlas ke cloudové AI.';
                 run.onclick = async () => {
                   run.disabled = true;
-                  run.textContent = 'Zpracovávám…';
-                  $('status').textContent = 'AI zpracovává úkol';
+                  run.textContent = 'Zařazuji…';
                   try {
                     const response = await apiFetch(
                       '/v1/tasks/' + encodeURIComponent(task.id) + '/run',
                       { method: 'POST' }
                     );
                     const data = await response.json();
-                    if (!response.ok) throw new Error(data.detail || 'Úkol se nepodařilo dokončit.');
-                    $('status').textContent = 'Úkol dokončen';
+                    if (!response.ok) throw new Error(data.detail || 'Úkol se nepodařilo zařadit.');
+                    $('status').textContent = 'Úkol čeká na serverový worker';
                   } catch (error) {
-                    $('status').textContent = error.message || 'Úkol se nepodařilo dokončit';
+                    $('status').textContent = error.message || 'Úkol se nepodařilo zařadit';
                   } finally {
                     await refreshTasks();
                   }
                 };
                 row.append(run);
+              } else if (task.status === 'queued') {
+                const progress = document.createElement('small');
+                progress.textContent = 'Ve frontě serveru. Zpracování pokračuje i po zavření aplikace.';
+                row.append(progress);
               } else if (task.status === 'running') {
                 const progress = document.createElement('small');
-                progress.textContent = 'AI právě připravuje výsledek…';
+                progress.textContent = 'Server právě zpracovává úkol…';
                 row.append(progress);
               }
               root.append(row);
@@ -1780,20 +1911,47 @@
           const title = $('taskTitle').value.trim(),
             input_text = $('taskInput').value.trim();
           if (!title || !input_text) return;
+          if ('Notification' in window && Notification.permission === 'default') {
+            try { await Notification.requestPermission(); } catch {}
+          }
+          $('status').textContent = 'Micro Helper začíná pracovat hned…';
           const response = await apiFetch('/v1/tasks', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ kind: 'agent.draft', title, input_text }),
           });
           if (response.ok) {
+            const task = await response.json();
             $('taskTitle').value = '';
             $('taskInput').value = '';
-            $('status').textContent = 'Úkol zařazen';
-            refreshTasks();
-          } else $('status').textContent = 'Úkol se nepodařilo zařadit';
+            if (task.status === 'completed') {
+              $('status').textContent = 'Úkol dokončen a ověřen · výsledek je uložený';
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Micro Helper: úkol dokončen', {
+                  body: task.title,
+                  tag: 'mh-task-' + task.id
+                });
+              }
+            } else if (task.status === 'needs_execution') {
+              $('status').textContent = 'Textový návrh připraven; skutečné provedení zatím není dostupné';
+            } else {
+              $('status').textContent = task.status === 'running'
+                ? 'Micro Helper právě pracuje'
+                : 'Úkol zůstává uložený; server jej může zkusit znovu';
+              const pending = JSON.parse(localStorage.getItem('mh_pending_task_notifications') || '[]');
+              if (!pending.includes(task.id)) {
+                pending.push(task.id);
+                localStorage.setItem('mh_pending_task_notifications', JSON.stringify(pending.slice(-50)));
+              }
+            }
+            await refreshTasks();
+          } else {
+            $('status').textContent = 'Úkol se nepodařilo spustit';
+          }
         });
         refreshTasks();
         window.addEventListener('mh-cloud-update', refreshTasks);
+        window.setInterval(() => { if (signedInUser) refreshTasks(); }, 30000);
       })();
     </script>
 

@@ -5,5 +5,12 @@
     "handler": "dailyReviewHandler",
     "timezone": "Europe/Prague",
     "payload": {}
+  },
+  {
+    "name": "agent-background-worker",
+    "cron": "0 * * * *",
+    "handler": "agentWorkerHandler",
+    "timezone": "Europe/Prague",
+    "payload": {}
   }
 ]
