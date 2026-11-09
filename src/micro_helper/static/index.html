@@ -20,7 +20,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 </style></head>
 <body><main>
 <header><div class="orb"></div><div><h1 id="title">Micro Helper</h1><small>Tvůj osobní lokální AI agent</small></div><span class="status" id="status">Připraven</span></header>
-<section id="setup"><label>Jméno agenta <input id="agentName" value="Mykla" maxlength="30"></label><label>Model <input id="model" value="llama3.2" maxlength="80"></label><button class="primary" id="save">Uložit nastavení</button></section>
+<section id="setup"><label>Jméno agenta <input id="agentName" value="Micro Helper" maxlength="30"></label><label>Model <input id="model" value="llama3.2" maxlength="80"></label><button class="primary" id="save">Uložit nastavení</button></section>
 <section id="messages"><div class="msg agent">Ahoj! Jsem Micro Helper. Zatím běžím v základním režimu. Připoj lokální Ollamu a můžeme spolu chatovat bez placeného API.</div></section>
 <form id="chat"><input id="prompt" autocomplete="off" placeholder="Napiš, co potřebuješ…" required><button class="primary">Odeslat</button></form>
 <div class="settings" id="voicePanel" aria-label="Hlasové ovládání">
@@ -52,7 +52,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
   <div id="taskList" class="muted" aria-live="polite">Načítám úkoly…</div>
 </section>
 <section class="settings"><span>Režim: lokální</span><span id="modelState">Model: neověřen</span><button id="check">Ověřit Ollamu</button><button id="clear">Vymazat konverzaci</button></section>
-<section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><button id="exportMemory" type="button">Exportovat poznámky</button></div><form id="memoryForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0"><input id="memoryText" maxlength="1000" placeholder="Např. Odpovídej mi stručně a česky…" aria-label="Nová poznámka do paměti" required><select id="memoryCategory" aria-label="Kategorie paměti"><option value="preference">Preference</option><option value="project">Projekt</option><option value="context">Kontext</option><option value="goal">Cíl</option></select><button class="primary" type="submit">Uložit poznámku</button></form><div id="memoryList" class="muted" aria-live="polite">Načítám paměť…</div><small>Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani tajné klíče.</small></section>
+<section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="exportMemory" type="button">Exportovat poznámky</button><button id="exportBackup" type="button">Exportovat úplnou zálohu</button><button id="importBackup" type="button">Obnovit ze zálohy</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div></div><form id="memoryForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0"><input id="memoryText" maxlength="1000" placeholder="Např. Odpovídej mi stručně a česky…" aria-label="Nová poznámka do paměti" required><select id="memoryCategory" aria-label="Kategorie paměti"><option value="preference">Preference</option><option value="project">Projekt</option><option value="context">Kontext</option><option value="goal">Cíl</option></select><button class="primary" type="submit">Uložit poznámku</button></form><div id="memoryList" class="muted" aria-live="polite">Načítám paměť…</div><small>Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani tajné klíče.</small></section>
 
 <section class="settings" style="align-items:stretch;flex-direction:column">
   <strong>🎛️ Jak se mám přizpůsobit</strong>
@@ -72,7 +72,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 const $=id=>document.getElementById(id);let history=[];
 function add(text,who){const d=document.createElement('div');d.className='msg '+who;d.textContent=text;$('messages').append(d);$('messages').scrollTop=$('messages').scrollHeight;return d}
 $('save').onclick=()=>{localStorage.setItem('mh_name',$('agentName').value);localStorage.setItem('mh_model',$('model').value);$('title').textContent=$('agentName').value+' · Micro Helper';$('status').textContent='Nastavení uloženo'};
-$('agentName').value=localStorage.getItem('mh_name')||'Mykla';$('model').value=localStorage.getItem('mh_model')||'llama3.2';$('save').click();
+$('agentName').value=localStorage.getItem('mh_name')||'Micro Helper';$('model').value=localStorage.getItem('mh_model')||'llama3.2';$('save').click();
 $('check').onclick=async()=>{try{const r=await fetch('/v1/models');const j=await r.json();$('modelState').textContent='Ollama: '+(j.available?j.models.join(', '):'není dostupná');}catch(e){$('modelState').textContent='Ollama: chyba spojení'}};
 $('clear').onclick=async()=>{try{await fetch('/v1/conversations',{method:'DELETE'});}catch(e){}$('messages').innerHTML='';history=[];add('Konverzace vymazána.','agent')};
 (async()=>{try{const response=await fetch('/v1/conversations?limit=100');if(!response.ok)return;const data=await response.json();if(!Array.isArray(data.messages)||!data.messages.length)return;$('messages').replaceChildren();history=[];for(const message of data.messages){if(!['user','assistant'].includes(message.role)||typeof message.content!=='string')continue;add(message.content,message.role==='user'?'user':'agent');history.push({role:message.role,content:message.content});}history=history.slice(-20);}catch(e){/* Keep the welcome message if the API is unavailable. */}})();
@@ -85,9 +85,13 @@ byId("memoryForm")?.addEventListener("submit",async event=>{event.preventDefault
 const originalChat=byId("chat");if(originalChat){originalChat.onsubmit=async event=>{event.preventDefault();const field=byId("prompt"),message=field.value.trim();if(!message)return;field.value="";const user=document.createElement("div");user.className="msg user";user.textContent=message;byId("messages").append(user);const pending=document.createElement("div");pending.className="msg agent";pending.textContent="Přemýšlím…";byId("messages").append(pending);byId("messages").scrollTop=byId("messages").scrollHeight;byId("status").textContent="Pracuji";const submit=originalChat.querySelector("button");submit.disabled=true;try{const response=await fetch("/v1/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message,model:byId("model").value,history})});const data=await response.json();pending.textContent=data.reply||data.error||data.detail||"Nepodařilo se získat odpověď.";if(data.reply){history.push({role:"user",content:message},{role:"assistant",content:data.reply});history=history.slice(-20)}}catch(error){pending.textContent="Backend není dostupný. Zkontroluj, že běží místní server."}finally{submit.disabled=false;byId("status").textContent="Připraven"}}}
 const clear=byId("clear");if(clear)clear.onclick=async()=>{if(!window.confirm("Smazat uloženou historii konverzace?"))return;const response=await fetch("/v1/conversations",{method:"DELETE"});if(response.ok){byId("messages").replaceChildren();const message=document.createElement("div");message.className="msg agent";message.textContent="Historie konverzace smazána. Uložené poznámky zůstaly.";byId("messages").append(message)}};
 async function loadSavedConversation(){try{const response=await fetch("/v1/conversations");const data=await response.json();if(!data.messages.length)return;byId("messages").replaceChildren();for(const item of data.messages){const message=document.createElement("div");message.className="msg "+(item.role==="user"?"user":"agent");message.textContent=item.content;byId("messages").append(message)}byId("messages").scrollTop=byId("messages").scrollHeight}catch(error){}}
-byId("save").onclick=async()=>{const name=byId("agentName").value.trim()||"Mykla";try{const response=await fetch("/v1/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({agent_name:name,language:"cs-CZ",style:"friendly"})});if(!response.ok)throw new Error();byId("title").textContent=name+" · Micro Helper";localStorage.setItem("mh_name",name);localStorage.setItem("mh_model",byId("model").value);byId("status").textContent="Nastavení uloženo"}catch(error){byId("status").textContent="Nastavení se nepodařilo uložit"}};
+byId("save").onclick=async()=>{const name=byId("agentName").value.trim()||"Micro Helper";try{const response=await fetch("/v1/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({agent_name:name,language:"cs-CZ",style:"friendly"})});if(!response.ok)throw new Error();byId("title").textContent=name+" · Micro Helper";localStorage.setItem("mh_name",name);localStorage.setItem("mh_model",byId("model").value);byId("status").textContent="Nastavení uloženo"}catch(error){byId("status").textContent="Nastavení se nepodařilo uložit"}};
 async function restoreProfile(){try{const response=await fetch("/v1/profile");if(!response.ok)return;const data=await response.json();byId("agentName").value=data.agent_name;byId("title").textContent=data.agent_name+" · Micro Helper";byId("model").value=localStorage.getItem("mh_model")||"llama3.2"}catch(error){}}
-byId("exportMemory")?.addEventListener("click",async()=>{try{const response=await fetch("/v1/memories");if(!response.ok)throw new Error();const data=await response.json();const blob=new Blob([JSON.stringify({format:"micro-helper-memory",version:1,exportedAt:new Date().toISOString(),memories:data.memories},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="micro-helper-memory.json";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);byId("status").textContent="Poznámky exportovány"}catch(error){byId("status").textContent="Export se nepodařil"}});restoreProfile();renderMemories();loadSavedConversation();
+byId("exportMemory")?.addEventListener("click",async()=>{try{const response=await fetch("/v1/memories");if(!response.ok)throw new Error();const data=await response.json();const blob=new Blob([JSON.stringify({format:"micro-helper-memory",version:1,exportedAt:new Date().toISOString(),memories:data.memories},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="micro-helper-memory.json";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);byId("status").textContent="Poznámky exportovány"}catch(error){byId("status").textContent="Export se nepodařil"}});
+byId("exportBackup")?.addEventListener("click",async()=>{try{const response=await fetch("/v1/backup",{cache:"no-store"});if(!response.ok)throw new Error("Úplnou zálohu se nepodařilo vytvořit.");const data=await response.json();const blob=new Blob([JSON.stringify(data)],{type:"application/json"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download="micro-helper-backup.json";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);byId("status").textContent="Úplná záloha exportována"}catch(error){byId("status").textContent=error instanceof Error?error.message:"Export zálohy selhal"}});
+byId("importBackup")?.addEventListener("click",()=>byId("backupFile")?.click());
+byId("backupFile")?.addEventListener("change",async(event)=>{const input=event.currentTarget;if(!(input instanceof HTMLInputElement)||!input.files?.length)return;const file=input.files[0];try{if(file.size>8*1024*1024)throw new Error("Soubor je větší než 8 MiB.");const backup=JSON.parse(await file.text());const response=await fetch("/v1/backup/restore",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backup,confirm_replace:true})});let result={};try{result=await response.json()}catch{}if(!response.ok)throw new Error(result.detail||"Obnova zálohy selhala.");byId("status").textContent="Záloha obnovena. Obnovuji zobrazení…";window.location.reload()}catch(error){byId("status").textContent=error instanceof Error?error.message:"Obnova zálohy selhala"}finally{input.value=""}});
+restoreProfile();renderMemories();loadSavedConversation();
 })();
 </script>
 <script>
@@ -115,7 +119,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     (method === "POST" && /^\/v1\/tasks\/[^/]+\/cancel$/.test(path)) ||
     (method === "PATCH" && /^\/v1\/learning-plans\/[^/]+\/status$/.test(path)) ||
     (method === "DELETE" && /^\/v1\/learning-plans\/[^/]+$/.test(path));
-  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } };
+  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Micro Helper",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Micro Helper",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } };
   const save = data => localStorage.setItem(key, JSON.stringify(data));
   const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
   window.fetch = async (input, init={}) => {
@@ -207,9 +211,33 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     if (!bodyText && input instanceof Request) bodyText = await input.clone().text();
     let argumentsValue = {};
     try { argumentsValue = bodyText ? JSON.parse(bodyText) : {}; } catch {}
-    const details = JSON.stringify(argumentsValue, null, 2);
-    const prompt = "Micro Helper žádá výslovné potvrzení změny.\n\n" +
-      method + " " + url.pathname + "\n\n" + details + "\n\nPovolit právě tuto změnu?";
+    let confirmationArguments = argumentsValue;
+    let prompt;
+    if (method === "POST" && url.pathname === "/v1/backup/restore") {
+      if (!bodyText || !window.crypto || !window.crypto.subtle) {
+        return new Response(JSON.stringify({detail:"Bezpečné potvrzení obnovy vyžaduje podporu Web Crypto. Otevři aplikaci přes localhost."}), {
+          status:503, headers:{"Content-Type":"application/json"}
+        });
+      }
+      const bodyBytes = new TextEncoder().encode(bodyText);
+      const digest = await window.crypto.subtle.digest("SHA-256", bodyBytes);
+      const bodySha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+      confirmationArguments = {body_sha256:bodySha256};
+      const backup = argumentsValue && argumentsValue.backup && typeof argumentsValue.backup === "object" ? argumentsValue.backup : {};
+      const counts = ["memories","messages","tasks","learning_plans","preferences"]
+        .map(name => name + ": " + (Array.isArray(backup[name]) ? backup[name].length : 0))
+        .join(", ");
+      prompt = "Micro Helper žádá výslovné potvrzení obnovy úplné zálohy.\n\n" +
+        "POST /v1/backup/restore\n" +
+        "Velikost: " + bodyBytes.length + " bajtů\n" +
+        "Záznamy: " + counts + "\n\n" +
+        "Tato operace nahradí současný profil, paměť, historii, úkoly, učební plány a preference. " +
+        "Povolit právě tuto obnovu?";
+    } else {
+      const details = JSON.stringify(argumentsValue, null, 2);
+      prompt = "Micro Helper žádá výslovné potvrzení změny.\n\n" +
+        method + " " + url.pathname + "\n\n" + details + "\n\nPovolit právě tuto změnu?";
+    }
     if (!window.confirm(prompt)) {
       return new Response(JSON.stringify({detail:"Změna byla zrušena uživatelem."}), {
         status:409, headers:{"Content-Type":"application/json"}
@@ -218,7 +246,7 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
     const confirmation = await baseFetch("/v1/actions/confirm", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({method,path:url.pathname,arguments:argumentsValue})
+      body:JSON.stringify({method,path:url.pathname,arguments:confirmationArguments})
     });
     if (!confirmation.ok) return confirmation;
     const confirmationData = await confirmation.json();

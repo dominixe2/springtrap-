@@ -51,3 +51,12 @@
 - The browser UI displays the exact method, path and request body before requesting a token. The offline localStorage fallback uses an in-memory, one-time token with the same method/path/body binding; reloading the page invalidates outstanding offline confirmations.
 - Audit events store action metadata only, never private request bodies or confirmation tokens.
 - These tokens are an explicit-action/replay guard, **not authentication**. The local API must remain loopback-only. This branch is stacked on PR #23; the separate PR #25 backup-restore endpoint must be brought through this same gate when the two branches are integrated.
+
+
+## Full local backup/restore policy gate (2026-11-09)
+
+- Full backup export uses `Cache-Control: no-store` and is capped at the same 8 MiB format limit accepted by restore.
+- Restore is classified as a destructive `backup.restore` action and passes through the shared Adaptive Trust Engine route gate before database replacement.
+- The browser displays a restore-specific summary (collection counts and byte size). It hashes the exact request bytes with Web Crypto; only the SHA-256 digest is sent to the confirmation endpoint, so the private backup body is not copied into confirmation storage or audit events.
+- The resulting token is short-lived, single-use and bound to the exact restore body bytes. The ASGI body-limit middleware enforces 8 MiB on both declared and chunked requests before JSON parsing.
+- The local API remains loopback-only. The confirmation token is an action/replay guard, not authentication.
