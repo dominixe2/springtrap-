@@ -1,4 +1,4 @@
-import { router, json, error, requireAuth, ai, db, ws } from "@appdeploy/sdk";
+import { router, json, error, requireAuth, ai, db, ws, secrets } from "@appdeploy/sdk";
 
 type Memory = { id: number; content: string; category: string; created_at: string };
 type Preference = { id: number; category: string; preference: string; value: string; source: string; updated_at: string };
@@ -104,6 +104,160 @@ function learnExplicitPreference(state: State, message: string) {
   state.preferences = state.preferences.slice(-100);
 }
 
+
+const MICRO_HELPER_OWNER_ID = "t81TcaSyFEZzExHpNxCZ3u52TCs1";
+const MICRO_HELPER_REPO = "dominixe2/springtrap-";
+const MICRO_HELPER_BASE_BRANCH = "micro-helper";
+const GITHUB_EDIT_PREFIXES = ["hosted-app/", "windows-companion/", "android-wrapper/", "cloud-relay/", "cloudflare/", "scripts/", "docs/"];
+const GITHUB_ALLOWED_WORKFLOWS = ["hosted-app-checks.yml", "android-apk.yml", "windows-companion.yml"];
+
+function safeRepoPath(path: string) {
+  const normalized = String(path || "").replace(/^\/+/, "");
+  if (!normalized || normalized.includes("..") || normalized.includes("\\") || normalized.startsWith(".github/") || !GITHUB_EDIT_PREFIXES.some(prefix => normalized.startsWith(prefix))) {
+    throw new Error("Cesta souboru není v povolené oblasti repozitáře.");
+  }
+  return normalized;
+}
+function encodeBase64Utf8(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+function decodeBase64Utf8(value: string) {
+  const binary = atob(value.replace(/\s/g, ""));
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+async function githubApi(path: string, init: RequestInit = {}) {
+  const token = await secrets.readSecret("GITHUB_TOKEN");
+  const response = await fetch("https://api.github.com" + path, {
+    ...init,
+    headers: {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer " + token,
+      "X-GitHub-Api-Version": "2022-11-28",
+      "Content-Type": "application/json",
+      ...(init.headers || {})
+    }
+  });
+  const raw = await response.text();
+  if (!response.ok) throw new Error("GitHub API " + response.status + ": " + raw.slice(0, 700));
+  return raw ? JSON.parse(raw) : {};
+}
+async function githubTokenReady() {
+  try { return (await secrets.listSecretNames()).includes("GITHUB_TOKEN"); }
+  catch { return false; }
+}
+async function runGitHubTaskAgent(userId: string, task: Task, state: State) {
+  if (userId !== MICRO_HELPER_OWNER_ID || !(await githubTokenReady())) return null;
+  let branchName = "";
+  let changedFiles: string[] = [];
+  let pullRequestUrl = "";
+  let pullRequestNumber = 0;
+  const toolList = [
+    { name: "github_list_files", description: "List relevant source files in the connected Micro Helper repository. Only the configured repository is accessible.", parameters: { type: "object", properties: { path_prefix: { type: "string" }, ref: { type: "string" } }, required: [] } },
+    { name: "github_read_file", description: "Read one source file from the configured repository. Only approved project folders are readable.", parameters: { type: "object", properties: { path: { type: "string" }, ref: { type: "string" } }, required: ["path"] } },
+    { name: "github_create_branch", description: "Create a new isolated working branch from the production branch. Never write to the production branch.", parameters: { type: "object", properties: {}, required: [] } },
+    { name: "github_update_file", description: "Commit a complete replacement for one approved project file on the agent working branch. Requires the current file SHA from github_read_file or github_list_files.", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" }, sha: { type: "string" }, message: { type: "string" } }, required: ["path", "content", "sha", "message"] } },
+    { name: "github_open_pull_request", description: "Open a draft pull request from the agent branch to micro-helper. Never merge it.", parameters: { type: "object", properties: { title: { type: "string" }, body: { type: "string" } }, required: ["title", "body"] } },
+    { name: "github_dispatch_checks", description: "Dispatch an allowlisted GitHub Actions validation or build workflow on the agent branch.", parameters: { type: "object", properties: { workflow: { type: "string", enum: GITHUB_ALLOWED_WORKFLOWS } }, required: ["workflow"] } },
+    { name: "github_check_commit", description: "Read GitHub check-run status for a commit SHA. This does not change repository state.", parameters: { type: "object", properties: { sha: { type: "string" } }, required: ["sha"] } }
+  ];
+  const preferences = state.preferences.map(item => item.preference + ": " + item.value).join("\n").slice(0, 2500);
+  const memories = state.memories.slice(-10).map(item => item.content).join("\n").slice(0, 1800);
+  const result = await ai.run({
+    system: "Jsi autonomní vývojový agent Micro Helperu. Pracuješ výhradně v repozitáři " + MICRO_HELPER_REPO + ". Pokud zadání vyžaduje změny kódu, nejprve prozkoumej relevantní soubory, vytvoř vlastní pracovní branch z micro-helper, proveď malé cílené změny, otevři draft pull request a spusť odpovídající ověřovací workflow. Nikdy neupravuj produkční branch micro-helper přímo, nikdy nemergeuj PR, nemaž repozitáře, soubory ani data a nikdy neměň GitHub Actions workflow, bezpečnostní konfiguraci, secrets nebo oprávnění. Neprováděj změny mimo povolené cesty. Neoznačuj práci za dokončenou, dokud nejsou změny a ověření skutečně potvrzené. Pokud chybí oprávnění nebo workflow není dostupné, přesně popiš blokaci. Pokud úkol není vývojový, odpověz běžným použitelným výsledkem bez změn repozitáře. Piš česky. Preference: " + (preferences || "neuvedeny") + ". Poznámky: " + (memories || "neuvedeny"),
+    prompt: "Název úkolu: " + task.title + "\nZadání uživatele:\n" + task.input_text + "\n\nPracuj skutečnými nástroji, ne pouze plánem. Pokud provádíš změny, vytvoř draft PR a spusť kontroly. V závěru uveď konkrétní změněné soubory, branch, PR a stav kontrol. Neuváděj testy jako úspěšné, pokud to potvrzuje GitHub.",
+    tools: toolList,
+    maxSteps: 10,
+    maxTokens: 2600,
+    thinkingMode: "DEEP",
+    onToolCall: async (name, args) => {
+      if (name === "github_list_files") {
+        const ref = String(args.ref || MICRO_HELPER_BASE_BRANCH).slice(0, 120);
+        const tree = await githubApi("/repos/" + MICRO_HELPER_REPO + "/git/trees/" + encodeURIComponent(ref) + "?recursive=1");
+        const prefix = String(args.path_prefix || "");
+        return { truncated: Boolean(tree.truncated), files: (tree.tree || []).filter((item: any) => item.type === "blob" && GITHUB_EDIT_PREFIXES.some(p => String(item.path).startsWith(p)) && (!prefix || String(item.path).startsWith(prefix))).slice(0, 160).map((item: any) => ({ path: item.path, sha: item.sha, size: item.size })) };
+      }
+      if (name === "github_read_file") {
+        const path = safeRepoPath(String(args.path || ""));
+        const ref = String(args.ref || branchName || MICRO_HELPER_BASE_BRANCH).slice(0, 120);
+        const file = await githubApi("/repos/" + MICRO_HELPER_REPO + "/contents/" + path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(ref));
+        if (file.encoding !== "base64" || typeof file.content !== "string") throw new Error("GitHub nevrátil textový obsah souboru.");
+        return { path, sha: file.sha, content: decodeBase64Utf8(file.content).slice(0, 24000), truncated: Number(file.size || 0) > 24000 };
+      }
+      if (name === "github_create_branch") {
+        if (branchName) return { branch: branchName, already_created: true };
+        const base = await githubApi("/repos/" + MICRO_HELPER_REPO + "/git/ref/heads/" + MICRO_HELPER_BASE_BRANCH);
+        branchName = "micro-helper/agent-" + task.id.replace(/-/g, "").slice(0, 12);
+        try {
+          await githubApi("/repos/" + MICRO_HELPER_REPO + "/git/refs", { method: "POST", body: JSON.stringify({ ref: "refs/heads/" + branchName, sha: base.object.sha }) });
+        } catch (err) {
+          if (!String(err).includes("422")) throw err;
+          await githubApi("/repos/" + MICRO_HELPER_REPO + "/git/ref/heads/" + branchName);
+        }
+        return { branch: branchName, base: MICRO_HELPER_BASE_BRANCH, base_sha: base.object.sha };
+      }
+      if (name === "github_update_file") {
+        if (!branchName || !branchName.startsWith("micro-helper/agent-")) throw new Error("Nejdřív vytvoř pracovní branch.");
+        const path = safeRepoPath(String(args.path || ""));
+        const content = String(args.content || "");
+        const sha = String(args.sha || "");
+        if (!sha || content.length > 90000) throw new Error("Chybí SHA souboru nebo je obsah příliš velký.");
+        const message = String(args.message || "feat(micro-helper): implement task").slice(0, 120);
+        const saved = await githubApi("/repos/" + MICRO_HELPER_REPO + "/contents/" + path.split("/").map(encodeURIComponent).join("/"), {
+          method: "PUT",
+          body: JSON.stringify({ message, content: encodeBase64Utf8(content), branch: branchName, sha })
+        });
+        if (!changedFiles.includes(path)) changedFiles.push(path);
+        return { path, commit_sha: saved.commit?.sha, content_sha: saved.content?.sha, branch: branchName };
+      }
+      if (name === "github_open_pull_request") {
+        if (!branchName || !changedFiles.length) throw new Error("Nelze otevřít PR bez změn na pracovní branch.");
+        const pr = await githubApi("/repos/" + MICRO_HELPER_REPO + "/pulls", {
+          method: "POST",
+          body: JSON.stringify({
+            title: String(args.title || "Micro Helper autonomous update").slice(0, 240),
+            body: String(args.body || "Automaticky připravené změny Micro Helperu.").slice(0, 12000),
+            head: branchName,
+            base: MICRO_HELPER_BASE_BRANCH,
+            draft: true
+          })
+        });
+        pullRequestUrl = String(pr.html_url || "");
+        pullRequestNumber = Number(pr.number || 0);
+        return { number: pullRequestNumber, url: pullRequestUrl, draft: true, head_sha: pr.head?.sha, changed_files: changedFiles };
+      }
+      if (name === "github_dispatch_checks") {
+        if (!branchName) throw new Error("Nejdřív vytvoř pracovní branch.");
+        const workflow = String(args.workflow || "");
+        if (!GITHUB_ALLOWED_WORKFLOWS.includes(workflow)) throw new Error("Workflow není povolen.");
+        await githubApi("/repos/" + MICRO_HELPER_REPO + "/actions/workflows/" + encodeURIComponent(workflow) + "/dispatches", {
+          method: "POST",
+          body: JSON.stringify({ ref: branchName })
+        });
+        return { dispatched: true, workflow, branch: branchName };
+      }
+      if (name === "github_check_commit") {
+        const commitSha = String(args.sha || "");
+        if (!/^[0-9a-f]{40}$/i.test(commitSha)) throw new Error("Neplatné SHA commitu.");
+        const checks = await githubApi("/repos/" + MICRO_HELPER_REPO + "/commits/" + commitSha + "/check-runs?per_page=50");
+        const statuses = await githubApi("/repos/" + MICRO_HELPER_REPO + "/commits/" + commitSha + "/statuses");
+        return {
+          check_runs: (checks.check_runs || []).map((item: any) => ({ name: item.name, status: item.status, conclusion: item.conclusion, html_url: item.html_url })),
+          statuses: (statuses || []).map((item: any) => ({ context: item.context, state: item.state, target_url: item.target_url }))
+        };
+      }
+      throw new Error("Neznámý GitHub nástroj.");
+    }
+  });
+  const output = String(result.text || "").trim();
+  return { output, branch: branchName, changedFiles, pullRequestUrl, pullRequestNumber, steps: result.steps };
+}
+
 export const dailyReviewHandler = async (event: { type: "cron"; name: string; payload: Record<string, never>; scheduledTime: string }) => {
   for await (const entry of registeredUsers()) {
     try {
@@ -204,13 +358,14 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
         await writeState(userId, state);
         const preferences = state.preferences.map(item => item.preference + ": " + item.value).join("\\n").slice(0, 3500);
         const memories = state.memories.slice(-12).map(item => item.content).join("\\n").slice(0, 2500);
-        const generated = await ai.generate({
-          system: "Jsi vykonavatel úkolů v Micro Helperu. Pracuj po krocích, ale používej pouze skutečně dostupné nástroje. V této verzi smíš vytvořit kvalitní textový výstup, rozpad úkolu a ověřovací plán; nesmíš tvrdit, že jsi upravil repozitář, spustil testy nebo nasadil aplikaci. Vrať konkrétní použitelný výsledek v češtině. Preference uživatele: " + (preferences || "neuvedeny") + "\\nPoznámky: " + (memories || "neuvedeny"),
+        const repoExecution = await runGitHubTaskAgent(userId, task, state);
+        const generated = repoExecution ? null : await ai.generate({
+          system: "Jsi vykonavatel úkolů v Micro Helperu. Pokud nejsou dostupné skutečné nástroje, vytvoř pouze textový návrh a výslovně řekni, co nebylo provedeno. Nikdy netvrď, že jsi upravil repozitář, spustil testy nebo nasadil aplikaci bez ověření. Vrať konkrétní použitelný výsledek v češtině. Preference uživatele: " + (preferences || "neuvedeny") + "\\nPoznámky: " + (memories || "neuvedeny"),
           prompt: "Úkol: " + task.title + "\\nZadání: " + task.input_text + "\\nVrať výsledek včetně konkrétních kroků a kritérií ověření.",
           maxTokens: 1800,
           thinkingMode: "DEEP"
         });
-        const output = String(generated.text || "").trim();
+        const output = String(repoExecution?.output || generated?.text || "").trim();
         if (!output) throw new Error("AI nevrátila žádný výsledek.");
         const latest = await readState(userId);
         const latestTask = latest.tasks.find(item => item.id === candidate.task_id);
@@ -218,11 +373,18 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
           await db.delete(queueTable, [candidate.id]);
           continue;
         }
-        // This worker currently produces a text draft only. Never represent that as
-        // a completed execution: repository edits, builds and tests are not available here.
-        latestTask.status = "needs_execution";
-        latestTask.result = output.slice(0, 12000);
-        latestTask.error = "Textový návrh je připraven. Skutečné provedení, úpravy souborů a testy zatím nejsou dostupné.";
+        // Repository changes are delivered as an unmerged draft PR. Never imply production completion.
+        if (repoExecution?.pullRequestUrl) {
+          latestTask.status = "needs_review";
+          latestTask.result = (output + "\\n\\nDraft PR: " + repoExecution.pullRequestUrl + "\\nBranch: " + repoExecution.branch + "\\nZměněné soubory: " + repoExecution.changedFiles.join(", ") + "\\nPR nebyl sloučen ani nasazen.").slice(0, 12000);
+          latestTask.error = "Změny jsou připravené v draft PR. Čekají na kontrolu a sloučení.";
+        } else {
+          latestTask.status = "needs_execution";
+          latestTask.result = output.slice(0, 12000);
+          latestTask.error = repoExecution?.changedFiles?.length
+            ? "Změny existují na pracovní větvi, ale nebylo potvrzeno vytvoření pull requestu."
+            : "Textový návrh je připraven. Skutečné změny v repozitáři ani ověřené testy nebyly provedeny.";
+        }
         latestTask.completed_at = undefined;
         await writeState(userId, latest);
         await db.delete(queueTable, [candidate.id]);
