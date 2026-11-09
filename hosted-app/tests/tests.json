@@ -112,7 +112,11 @@
       "targeted on-demand worker invocation",
       "targeted worker invocation",
       "notification permission",
-      "no false completion notification for an unexecuted draft"
+      "no false completion notification for an unexecuted draft",
+      "owner-only GitHub repository integration",
+      "isolated GitHub working branch",
+      "draft pull request without automatic merge",
+      "GitHub Actions validation dispatch"
     ],
     "description": "Verifies submitting a task immediately invokes the server worker, persists its result, and leaves the scheduled worker as a recovery path.",
     "steps": [
@@ -123,9 +127,12 @@
       "If the task remains queued, close and reopen the app after processing and verify a completion notification is shown when notification permission is granted",
       "Verify the draft remains stored as needs_execution after refreshing the task list",
       "Create a second task and cancel it before a recovery run; verify its status remains cancelled",
-      "Verify temporary failures follow the bounded retry policy"
+      "Verify temporary failures follow the bounded retry policy",
+      "Verify GitHub status is hidden for non-owner accounts and never exposes the token value",
+      "With the owner GitHub token configured, submit a repository task and verify changes are committed only to an isolated branch and delivered as a draft pull request",
+      "Verify the agent cannot modify the production branch, change workflows or secrets, or merge a pull request"
     ],
-    "expected": "Task submission targets the server worker. Text-only drafts remain needs_execution and do not trigger a completion notification; notifications are reserved for tasks actually executed and verified. The hourly worker remains a recovery path."
+    "expected": "Task submission targets the server worker. Text-only drafts remain needs_execution and do not trigger a completion notification; notifications are reserved for tasks actually executed and verified. The hourly worker remains a recovery path. GitHub code tasks are owner-only, restricted to the configured repository and approved source folders, and delivered as an unmerged draft PR."
   },
   {
     "name": "Use the refreshed Micro Helper identity and responsive interface",
