@@ -253,6 +253,7 @@ def test_backup_controls_are_available_in_the_mobile_friendly_ui():
     assert 'fetch("/v1/backup/restore"' in html
     assert 'id="exportBackup"' in html
     assert "body_sha256" in html
+    assert "link.download=\"micro-helper-backup.json\"" in html
     assert "window.confirm(" in html
 
 
