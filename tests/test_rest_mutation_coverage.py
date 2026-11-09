@@ -5,7 +5,13 @@ trust-policy action or be explicitly listed as using a separate gate.
 """
 import re
 
-from micro_helper.api import app, _resolve_rest_action
+from micro_helper.api import (
+    CHAT_ACTION,
+    REST_POLICY,
+    app,
+    _resolve_rest_action,
+)
+from micro_helper.trust_policy import permission_key
 
 
 SEPARATE_GATES = {
@@ -59,9 +65,9 @@ def test_every_state_changing_local_rest_route_has_an_explicit_policy_gate():
 
 
 def test_chat_is_the_only_builtin_allow_grant():
+    assert REST_POLICY.grants == frozenset({permission_key(CHAT_ACTION)})
+    assert CHAT_ACTION.capability == "conversation"
+    assert CHAT_ACTION.operation == "append"
     resolved = _resolve_rest_action("POST", "/v1/chat")
     assert resolved is not None
-    action_id, action = resolved
-    assert action_id == "rest:POST:/v1/chat"
-    assert action.capability == "conversation"
-    assert action.operation == "append"
+    assert resolved[0] == "rest:POST:/v1/chat"
