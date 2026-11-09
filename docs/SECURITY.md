@@ -41,3 +41,13 @@
 - The `/v1/audit` endpoint records tool ID, capability, operation, policy decision, reason and outcome. It deliberately does not store tool arguments, results, or confirmation tokens.
 - This integration covers only the three registered local API tools. It does not yet protect every hosted, Windows Companion, or JARVIS adapter. There is no user-managed grant editor/revocation UI yet; do not imply otherwise.
 - The confirmation endpoint must only be called after the client has displayed the exact action and received explicit user approval. The token is a short-lived server-side replay guard, not authentication. The local API must remain bound to loopback; Origin/Fetch-Metadata checks are defense in depth, not a substitute for authentication.
+
+
+## Shared REST mutation authorization (2026-11-09)
+
+- Every state-changing local REST route present in the trust-gateway branch is classified by one shared route resolver and evaluated by the deterministic trust policy.
+- Profile, memory, preference, learning-plan, task-queue and conversation-clear writes require a short-lived, single-use confirmation token bound to the exact HTTP method, path and canonical JSON body. The token is stored only as a SHA-256 hash and is consumed atomically.
+- Chat submission has one narrow built-in grant because the user explicitly presses Send; it does not authorize any other conversation or memory mutation.
+- The browser UI displays the exact method, path and request body before requesting a token. The offline localStorage fallback uses an in-memory, one-time token with the same method/path/body binding; reloading the page invalidates outstanding offline confirmations.
+- Audit events store action metadata only, never private request bodies or confirmation tokens.
+- These tokens are an explicit-action/replay guard, **not authentication**. The local API must remain loopback-only. This branch is stacked on PR #23; the separate PR #25 backup-restore endpoint must be brought through this same gate when the two branches are integrated.

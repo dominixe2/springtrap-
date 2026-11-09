@@ -105,6 +105,16 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 (() => {
   const nativeFetch = window.fetch.bind(window);
   const key = "micro_helper_offline_v1";
+  const localConfirmations = new Map();
+  const isOfflineProtectedMutation = (method, path) =>
+    (method === "PUT" && path === "/v1/profile") ||
+    (method === "POST" && ["/v1/tasks", "/v1/learning-plans", "/v1/memories", "/v1/preferences"].includes(path)) ||
+    ((method === "PUT" || method === "DELETE") && /^\/v1\/memories\/\d+$/.test(path)) ||
+    (method === "DELETE" && /^\/v1\/preferences\/\d+$/.test(path)) ||
+    (method === "DELETE" && path === "/v1/conversations") ||
+    (method === "POST" && /^\/v1\/tasks\/[^/]+\/cancel$/.test(path)) ||
+    (method === "PATCH" && /^\/v1\/learning-plans\/[^/]+\/status$/.test(path)) ||
+    (method === "DELETE" && /^\/v1\/learning-plans\/[^/]+$/.test(path));
   const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Mykla",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } };
   const save = data => localStorage.setItem(key, JSON.stringify(data));
   const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
@@ -116,6 +126,25 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
       const method = (init.method || (typeof input !== "string" && input.method) || "GET").toUpperCase();
       let body = {}; try { body = JSON.parse(init.body || "{}"); } catch {}
       const db = load();
+      if (url.pathname === "/v1/actions/confirm" && method === "POST") {
+        const requestedMethod = String(body.method || "").toUpperCase();
+        const requestedPath = String(body.path || "");
+        if (!isOfflineProtectedMutation(requestedMethod, requestedPath)) return reply({detail:"Neznámá nebo nepovolená změna."},404);
+        const token = crypto.randomUUID() + crypto.randomUUID();
+        const expiresAt = Date.now() + 60000;
+        localConfirmations.set(token, {method:requestedMethod,path:requestedPath,arguments:JSON.stringify(body.arguments || {}),expiresAt});
+        return reply({confirmation_token:token,expires_at:new Date(expiresAt).toISOString()});
+      }
+      if (isOfflineProtectedMutation(method, url.pathname)) {
+        const headers = new Headers(init.headers || (typeof input !== "string" ? input.headers : undefined));
+        const token = headers.get("X-Micro-Helper-Confirmation");
+        const confirmation = localConfirmations.get(token);
+        if (!confirmation || confirmation.method !== method || confirmation.path !== url.pathname ||
+            confirmation.expiresAt <= Date.now() || confirmation.arguments !== JSON.stringify(body)) {
+          return reply({detail:"Offline změna vyžaduje čerstvé potvrzení pro přesný obsah."},403);
+        }
+        localConfirmations.delete(token);
+      }
       if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);
       db.plans = db.plans || [];
       if (url.pathname === "/v1/learning-plans" && method === "GET") { const status=url.searchParams.get("status"); if(status&&!["active","paused","completed"].includes(status))return reply({detail:"Neplatný stav plánu."},422); return reply({plans:[...db.plans].filter(p=>!status||p.status===status).sort((a,b)=>b.updated_at.localeCompare(a.updated_at))}); }
@@ -162,6 +191,48 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 })();
 </script>
 
+<script>
+(() => {
+  const baseFetch = window.fetch.bind(window);
+  window.fetch = async (input, init = {}) => {
+    const url = new URL(typeof input === "string" ? input : input.url, location.href);
+    const method = (init.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+    if (url.origin !== location.origin || !url.pathname.startsWith("/v1/") ||
+        !["POST","PUT","PATCH","DELETE"].includes(method) ||
+        url.pathname === "/v1/chat" || url.pathname === "/v1/actions/confirm" ||
+        url.pathname.startsWith("/v1/tools/")) {
+      return baseFetch(input, init);
+    }
+    let bodyText = typeof init.body === "string" ? init.body : "";
+    if (!bodyText && input instanceof Request) bodyText = await input.clone().text();
+    let argumentsValue = {};
+    try { argumentsValue = bodyText ? JSON.parse(bodyText) : {}; } catch {}
+    const details = JSON.stringify(argumentsValue, null, 2);
+    const prompt = "Micro Helper žádá výslovné potvrzení změny.\n\n" +
+      method + " " + url.pathname + "\n\n" + details + "\n\nPovolit právě tuto změnu?";
+    if (!window.confirm(prompt)) {
+      return new Response(JSON.stringify({detail:"Změna byla zrušena uživatelem."}), {
+        status:409, headers:{"Content-Type":"application/json"}
+      });
+    }
+    const confirmation = await baseFetch("/v1/actions/confirm", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({method,path:url.pathname,arguments:argumentsValue})
+    });
+    if (!confirmation.ok) return confirmation;
+    const confirmationData = await confirmation.json();
+    if (!confirmationData.confirmation_token) {
+      return new Response(JSON.stringify({detail:"Server nevydal potvrzení akce."}), {
+        status:403, headers:{"Content-Type":"application/json"}
+      });
+    }
+    const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+    headers.set("X-Micro-Helper-Confirmation", confirmationData.confirmation_token);
+    return baseFetch(input, {...init,headers});
+  };
+})();
+</script>
 
 <script>
 /* Browser voice bridge: Czech speech input/output with hands-free turn taking. */
