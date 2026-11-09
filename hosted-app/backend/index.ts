@@ -1,4 +1,4 @@
-import { router, json, error, requireAuth, ai, db, ws, secrets } from "@appdeploy/sdk";
+import { router, json, error, requireAuth, ai, db, ws, secrets, notifications } from "@appdeploy/sdk";
 
 type Memory = { id: number; content: string; category: string; created_at: string };
 type Preference = { id: number; category: string; preference: string; value: string; source: string; updated_at: string };
@@ -146,6 +146,27 @@ async function githubApi(path: string, init: RequestInit = {}) {
   const raw = await response.text();
   if (!response.ok) throw new Error("GitHub API " + response.status + ": " + raw.slice(0, 700));
   return raw ? JSON.parse(raw) : {};
+}
+async function sendTaskPush(userId: string, task: Task) {
+  const title = task.status === "needs_review"
+    ? "Micro Helper: změny čekají na kontrolu"
+    : task.status === "completed"
+      ? "Micro Helper: úkol dokončen a ověřen"
+      : "Micro Helper: návrh připraven";
+  try {
+    await notifications.send({
+      userIds: [userId],
+      notification: {
+        title,
+        body: String(task.title || "Aktualizace úkolu").slice(0, 120),
+        url: "/"
+      },
+      data: { kind: "task-status", taskId: task.id, status: task.status },
+      ttlSeconds: 86400
+    });
+  } catch (err) {
+    console.error("Micro Helper push notification failed", err);
+  }
 }
 async function githubTokenReady() {
   try { return (await secrets.listSecretNames()).includes("GITHUB_TOKEN"); }
@@ -389,6 +410,7 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
         }
         latestTask.completed_at = undefined;
         await writeState(userId, latest);
+        await sendTaskPush(userId, latestTask);
         await db.delete(queueTable, [candidate.id]);
       } catch (err) {
         console.error("Micro Helper background task failed", err);
