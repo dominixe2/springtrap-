@@ -16,10 +16,12 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+APP_ORIGIN = "https://micro-helper-ygeuyn.v2.appdeploy.ai"
+
 app = FastAPI(title="Micro Helper Relay", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://micro-helper-ygeuyn.v2.appdeploy.ai"],
+    allow_origins=[APP_ORIGIN],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -28,10 +30,30 @@ ALLOWED_ACTIONS = {"lock", "explorer", "notepad", "calculator"}
 PAIR_TTL = 300
 SESSION_TTL = 12 * 60 * 60
 MAX_PENDING = 20
+PENDING_TTL = 120
+COMMANDS_PER_MINUTE = 30
+REGISTER_ATTEMPTS = 20
+CLAIM_ATTEMPTS = 8
+ATTEMPT_WINDOW = 300
+MAX_TRACKED_IPS = 10_000
 
 
 def digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def allow_attempt(store: dict[str, list[float]], client_ip: str, limit: int) -> bool:
+    """Apply a bounded per-IP sliding-window limit without unbounded map growth."""
+    now = time.monotonic()
+    attempts = [stamp for stamp in store.get(client_ip, []) if now - stamp < ATTEMPT_WINDOW]
+    if len(attempts) >= limit:
+        store[client_ip] = attempts
+        return False
+    attempts.append(now)
+    store[client_ip] = attempts
+    while len(store) > MAX_TRACKED_IPS:
+        store.pop(next(iter(store)))
+    return True
 
 
 @dataclass
@@ -44,6 +66,8 @@ class Session:
     claimed: bool = False
     desktop: WebSocket | None = None
     mobile: WebSocket | None = None
+    pending: dict[str, float] = field(default_factory=dict)
+    command_timestamps: list[float] = field(default_factory=list)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -87,7 +111,10 @@ async def health() -> dict[str, str]:
 
 
 @app.post("/v1/pair/register")
-async def register(body: RegisterRequest) -> dict[str, Any]:
+async def register(body: RegisterRequest, request: Request) -> dict[str, Any]:
+    client_ip = request.client.host if request.client else "unknown"
+    if not allow_attempt(register_attempts, client_ip, REGISTER_ATTEMPTS):
+        raise HTTPException(429, "Too many registration attempts. Try again later.")
     async with registry_lock:
         prune()
         code_hash = digest(body.pairing_code)
@@ -105,12 +132,8 @@ async def register(body: RegisterRequest) -> dict[str, Any]:
 @app.post("/v1/pair/claim")
 async def claim(body: ClaimRequest, request: Request) -> dict[str, Any]:
     client_ip = request.client.host if request.client else "unknown"
-    now = time.time()
-    attempts = [stamp for stamp in claim_attempts.get(client_ip, []) if now - stamp < 300]
-    if len(attempts) >= 8:
+    if not allow_attempt(claim_attempts, client_ip, CLAIM_ATTEMPTS):
         raise HTTPException(429, "Too many pairing attempts. Try again later.")
-    attempts.append(now)
-    claim_attempts[client_ip] = attempts
     async with registry_lock:
         prune()
         code_hash = digest(body.pairing_code)
@@ -169,6 +192,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     if session is None or role not in {"desktop", "mobile"}:
         await websocket.close(code=4401, reason="Invalid or expired relay token")
         return
+    # The Windows Companion is a non-browser client and sends no Origin.
+    # Mobile access is the hosted browser app and must present its exact origin.
+    if role == "mobile" and origin != APP_ORIGIN:
+        await websocket.close(code=4403, reason="Official mobile origin required")
+        return
     await websocket.send_json({"type": "ready", "role": role})
     async with session.lock:
         if role == "desktop":
@@ -183,6 +211,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     try:
         while True:
             message = await websocket.receive_json()
+            async with registry_lock:
+                prune()
+                active = (
+                    sessions.get(session.session_id) is session
+                    and tokens.get(token_hash) == (session.session_id, role)
+                )
+            if not active:
+                await websocket.close(code=4401, reason="Pairing revoked or expired")
+                return
             if not isinstance(message, dict):
                 await websocket.send_json({"type": "error", "error": "object_required"})
                 continue
@@ -199,13 +236,46 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 if desktop is None:
                     await websocket.send_json({"type": "error", "request_id": request_id, "error": "desktop_offline"})
                     continue
-                await desktop.send_json({"type": "command", "action": action, "request_id": request_id})
+                now = time.monotonic()
+                session.pending = {
+                    pending_id: created_at
+                    for pending_id, created_at in session.pending.items()
+                    if now - created_at < PENDING_TTL
+                }
+                session.command_timestamps = [
+                    stamp for stamp in session.command_timestamps if now - stamp < 60
+                ]
+                if request_id in session.pending:
+                    await websocket.send_json({"type": "error", "request_id": request_id, "error": "duplicate_request_id"})
+                    continue
+                if len(session.pending) >= MAX_PENDING:
+                    await websocket.send_json({"type": "error", "request_id": request_id, "error": "too_many_pending"})
+                    continue
+                if len(session.command_timestamps) >= COMMANDS_PER_MINUTE:
+                    await websocket.send_json({"type": "error", "request_id": request_id, "error": "rate_limited"})
+                    continue
+                session.pending[request_id] = now
+                session.command_timestamps.append(now)
+                try:
+                    await desktop.send_json({"type": "command", "action": action, "request_id": request_id})
+                except Exception:
+                    session.pending.pop(request_id, None)
+                    await websocket.send_json({"type": "error", "request_id": request_id, "error": "desktop_offline"})
             else:
                 if message.get("type") != "result":
                     await websocket.send_json({"type": "error", "error": "message_not_allowed"})
                     continue
                 request_id = message.get("request_id")
                 if not isinstance(request_id, str) or not (1 <= len(request_id) <= 80):
+                    continue
+                now = time.monotonic()
+                session.pending = {
+                    pending_id: created_at
+                    for pending_id, created_at in session.pending.items()
+                    if now - created_at < PENDING_TTL
+                }
+                if session.pending.pop(request_id, None) is None:
+                    await websocket.send_json({"type": "error", "request_id": request_id, "error": "unknown_request"})
                     continue
                 mobile = session.mobile
                 if mobile is not None:

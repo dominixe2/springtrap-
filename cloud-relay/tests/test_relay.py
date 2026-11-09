@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
-from app import app, sessions, tokens, digest, claim_attempts, register_attempts
+from app import app, sessions, tokens, digest, claim_attempts, register_attempts, MAX_PENDING, REGISTER_ATTEMPTS
 
 client = TestClient(app)
 
@@ -68,7 +68,10 @@ def test_allowlisted_command_routes_between_paired_devices():
     with client.websocket_connect("/v1/ws") as desktop:
         desktop.send_json({"type": "auth", "token": desktop_token})
         assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
-        with client.websocket_connect("/v1/ws") as mobile:
+        with client.websocket_connect(
+            "/v1/ws",
+            headers={"Origin": "https://micro-helper-ygeuyn.v2.appdeploy.ai"},
+        ) as mobile:
             mobile.send_json({"type": "auth", "token": mobile_token})
             assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
             mobile.send_json({"type": "command", "action": "notepad", "request_id": "req-1"})
@@ -84,6 +87,106 @@ def test_pairing_claims_are_rate_limited():
         assert response.status_code == 404
     response = client.post("/v1/pair/claim", json={"pairing_code": "999999"})
     assert response.status_code == 429
+
+
+def test_pairing_registration_is_rate_limited():
+    for index in range(REGISTER_ATTEMPTS):
+        response = client.post(
+            "/v1/pair/register",
+            json={
+                "pairing_code": f"{index:06d}",
+                "desktop_token": f"d{index:039d}",
+            },
+        )
+        assert response.status_code == 200
+    blocked = client.post(
+        "/v1/pair/register",
+        json={"pairing_code": "999999", "desktop_token": "z" * 40},
+    )
+    assert blocked.status_code == 429
+
+
+def test_mobile_websocket_requires_official_browser_origin():
+    assert register().status_code == 200
+    mobile_token = client.post(
+        "/v1/pair/claim", json={"pairing_code": "123456"}
+    ).json()["token"]
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/v1/ws") as mobile:
+            mobile.send_json({"type": "auth", "token": mobile_token})
+            mobile.receive_json()
+
+
+def test_revoked_token_is_rechecked_before_next_websocket_message():
+    assert register().status_code == 200
+    desktop_token = "d" * 40
+    mobile_token = client.post(
+        "/v1/pair/claim", json={"pairing_code": "123456"}
+    ).json()["token"]
+
+    with client.websocket_connect("/v1/ws") as desktop:
+        desktop.send_json({"type": "auth", "token": desktop_token})
+        assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
+        with client.websocket_connect(
+            "/v1/ws",
+            headers={"Origin": "https://micro-helper-ygeuyn.v2.appdeploy.ai"},
+        ) as mobile:
+            mobile.send_json({"type": "auth", "token": mobile_token})
+            assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
+
+            # Simulate revocation after authentication but before the next
+            # message. A previously authenticated socket must not stay trusted.
+            tokens.pop(digest(mobile_token))
+            mobile.send_json({
+                "type": "command", "action": "notepad", "request_id": "after-revoke"
+            })
+            with pytest.raises(WebSocketDisconnect):
+                mobile.receive_json()
+
+
+def test_pending_commands_are_bounded_and_results_must_match():
+    assert register().status_code == 200
+    desktop_token = "d" * 40
+    mobile_token = client.post(
+        "/v1/pair/claim", json={"pairing_code": "123456"}
+    ).json()["token"]
+
+    with client.websocket_connect("/v1/ws") as desktop:
+        desktop.send_json({"type": "auth", "token": desktop_token})
+        assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
+        with client.websocket_connect(
+            "/v1/ws",
+            headers={"Origin": "https://micro-helper-ygeuyn.v2.appdeploy.ai"},
+        ) as mobile:
+            mobile.send_json({"type": "auth", "token": mobile_token})
+            assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
+
+            for index in range(20):
+                mobile.send_json({
+                    "type": "command", "action": "notepad", "request_id": f"req-{index}"
+                })
+
+            mobile.send_json({
+                "type": "command", "action": "notepad", "request_id": "req-0"
+            })
+            duplicate_error = mobile.receive_json()
+            assert duplicate_error["error"] == "duplicate_request_id"
+
+            mobile.send_json({
+                "type": "command", "action": "notepad", "request_id": "req-overflow"
+            })
+            overflow_error = mobile.receive_json()
+            assert overflow_error["error"] == "too_many_pending"
+
+            for index in range(MAX_PENDING):
+                forwarded = desktop.receive_json()
+                assert forwarded["request_id"] == f"req-{index}"
+
+            desktop.send_json({
+                "type": "result", "request_id": "not-requested", "ok": True, "message": "ignored"
+            })
+            unknown = desktop.receive_json()
+            assert unknown["error"] == "unknown_request"
 
 
 def test_mobile_can_revoke_entire_pairing():
