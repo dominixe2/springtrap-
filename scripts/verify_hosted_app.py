@@ -39,6 +39,14 @@ def main() -> None:
     assert "client.image.resizeIfNeeded" in html, "Image uploads must be resized before AI calls"
     assert "POST /api/v1/tasks/:id/run" in backend, "Saved AI tasks need an executable backend route"
     assert "thinkingMode = data.thinkingMode" in backend, "Chat must honor the selected response depth"
+    assert 'secrets.readSecret("GITHUB_TOKEN")' in backend, "GitHub token must be read only from encrypted app secrets"
+    assert 'user!.userId !== MICRO_HELPER_OWNER_ID' in backend, "GitHub integration must be restricted to the app owner"
+    assert 'MICRO_HELPER_BASE_BRANCH = "micro-helper"' in backend, "Agent base branch must remain explicit"
+    assert 'branch: branchName' in backend and 'draft: true' in backend, "Repository changes must be isolated and delivered as a draft PR"
+    assert 'GITHUB_EDIT_PREFIXES' in backend and 'startsWith(".github/")' in backend, "Repository writes must stay inside approved source folders"
+    assert 'github_dispatch_checks' in backend, "Agent must be able to dispatch allowlisted validation workflows"
+    assert 'needs_review' in backend and 'needs_review' in html, "PR output must be distinct from verified completion"
+
 
     for control in ("generateImage", "analyzeImage", "readImageText"):
         assert f"getElementById('{control}')" in html, f"Missing image studio control: {control}"
