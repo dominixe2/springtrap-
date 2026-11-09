@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.11
+- **Checklist version:** 1.0.0-checklist.12
 - **Snapshot date:** 2026-11-09
-- **Snapshot source:** Stacked PR #34 trust-gateway + full backup/restore head `3d517d92a5fa3ee885baaa4be6ce89e7ff990f7b` passed CI run #42679331114: 86 project tests, 11 relay tests, embedded browser JavaScript syntax and Python compilation. PR #34 is based on PR #32 → PR #31 → PR #23 and remains unmerged. PR #25 remains a separate backup/restore implementation reference. Merged PRs #18 and #19 provide additional verified relay-session and local-origin protections.
+- **Snapshot source:** Stacked PR #34 trust-gateway + full backup/restore head `3d517d92a5fa3ee885baaa4be6ce89e7ff990f7b` passed CI run #42679331114: 86 project tests, 11 relay tests, embedded browser JavaScript syntax and Python compilation. PR #34 is based on PR #32 → PR #31 → PR #23 and remains unmerged. PR #25 remains a separate backup/restore implementation reference. Separate PR #33 (`security/render-relay-session-guards`) adds protections to the active Render relay source and passed Micro Helper run #42636316961 plus Cloudflare Relay Checks run #42636316955. Merged PRs #18 and #19 provide additional verified Cloudflare-session and local-origin protections.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
@@ -56,18 +56,21 @@ A level may be raised only when new implementation and evidence are linked in th
 5. The hosted source mirror and AppDeploy live snapshot need explicit parity evidence before a source change can be called deployed.
 6. Cross-device encrypted sync, conflict handling and device-session revocation are not yet proven end to end.
 7. PR #23 → #31 → #32 → #34 now form a passing stacked trust-gateway/backup-restore branch, but remain unmerged. Compare PR #34 against PR #25, then integrate the stack sequentially and run CI on the resulting `micro-helper` branch.
-8. The Cloudflare Durable Object relay is implemented and tested but is not deployed; no live WSS pairing or real phone-to-Windows action has been verified, and clients must not be switched to it before a successful staging health check.
+8. The active Windows Companion endpoint is Render, while the Cloudflare Durable Object relay is a separate replacement. PR #33 hardens the Render source but remains unmerged and undeployed. The Cloudflare Worker is also not deployed; no live WSS pairing or real phone-to-Windows action has been verified, and clients must not be switched between endpoints before a successful staging health check.
 
 ## Next development order
 
 1. Review the passing PR #23 → #31 → #32 → #34 stack against PR #25, then integrate the trust gateway and policy-gated backup/restore sequentially into `micro-helper`; run a fresh full suite on the integrated branch.
-2. Extend the policy gate to the first hosted action adapter only after its authenticated identity, explicit approval UI and audit boundary are covered by integration tests.
-3. Secure JARVIS's chat-only Ollama relay with per-launch pairing/authentication, bounded concurrent requests and rate limits.
-4. Add a single capability matrix shared by hosted tools, local Python, Android and Windows Companion.
-5. Run signed-in hosted end-to-end tests, then physical Android and Windows smoke tests.
-6. Recalculate this checklist only after updating the evidence links and levels.
+2. Review PR #33's active Render relay hardening, integrate it separately, then run a staging pairing test before any live endpoint change.
+3. Extend the policy gate to the first hosted action adapter only after its authenticated identity, explicit approval UI and audit boundary are covered by integration tests.
+4. Secure JARVIS's chat-only Ollama relay with per-launch pairing/authentication, bounded concurrent requests and rate limits.
+5. Add a single capability matrix shared by hosted tools, local Python, Android and Windows Companion.
+6. Run signed-in hosted end-to-end tests, then physical Android and Windows smoke tests.
+7. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.12 (2026-11-09):** adds the separate PR #33 hardening of the active Render relay source and its passing Micro Helper/relay CI runs #42636316961 and #42636316955. No live relay deployment or physical pairing credit is added; the evidence-weighted score remains 50.00%.
 
 - **1.0.0-checklist.11 (2026-11-09):** records PR #34's policy-gated full backup/restore port on top of PR #23/#31/#32, the compact export-size correction, and passing CI run #42679331114 (86 project tests, 11 relay tests, embedded JavaScript syntax and Python compilation). The score remains 50.00% because the stack is still unmerged and physical Android/Windows acceptance, hosted/desktop adapter coverage and release verification remain incomplete.
 
