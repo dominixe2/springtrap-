@@ -14,6 +14,7 @@ SEPARATE_GATES = {
     ("POST", "/v1/actions/confirm"),
     # Uses the dedicated capability/tool confirmation flow instead of REST
     # mutation confirmation.
+    ("POST", "/v1/tools/{tool_id}/confirm"),
     ("POST", "/v1/tools/{tool_id}/execute"),
 }
 
@@ -28,7 +29,7 @@ PLACEHOLDER_VALUES = {
 
 def sample_path(route_path: str) -> str:
     return re.sub(
-        r"\\{([^{}]+)\\}",
+        r"\{([^{}]+)\}",
         lambda match: PLACEHOLDER_VALUES[match.group(1)],
         route_path,
     )
@@ -62,5 +63,5 @@ def test_chat_is_the_only_builtin_allow_grant():
     assert resolved is not None
     action_id, action = resolved
     assert action_id == "rest:POST:/v1/chat"
-    assert action.resource == "conversation"
+    assert action.capability == "conversation"
     assert action.operation == "append"
