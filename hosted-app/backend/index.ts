@@ -218,10 +218,12 @@ export const agentWorkerHandler = async (_event: { type: "cron"; name: string; p
           await db.delete(queueTable, [candidate.id]);
           continue;
         }
-        latestTask.status = "completed";
+        // This worker currently produces a text draft only. Never represent that as
+        // a completed execution: repository edits, builds and tests are not available here.
+        latestTask.status = "needs_execution";
         latestTask.result = output.slice(0, 12000);
-        latestTask.error = undefined;
-        latestTask.completed_at = stamp();
+        latestTask.error = "Textový návrh je připraven. Skutečné provedení, úpravy souborů a testy zatím nejsou dostupné.";
+        latestTask.completed_at = undefined;
         await writeState(userId, latest);
         await db.delete(queueTable, [candidate.id]);
       } catch (err) {
