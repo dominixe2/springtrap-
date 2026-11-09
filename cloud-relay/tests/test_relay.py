@@ -68,7 +68,10 @@ def test_allowlisted_command_routes_between_paired_devices():
     with client.websocket_connect("/v1/ws") as desktop:
         desktop.send_json({"type": "auth", "token": desktop_token})
         assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
-        with client.websocket_connect("/v1/ws") as mobile:
+        with client.websocket_connect(
+            "/v1/ws",
+            headers={"Origin": "https://micro-helper-ygeuyn.v2.appdeploy.ai"},
+        ) as mobile:
             mobile.send_json({"type": "auth", "token": mobile_token})
             assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
             mobile.send_json({"type": "command", "action": "notepad", "request_id": "req-1"})
@@ -103,6 +106,17 @@ def test_pairing_registration_is_rate_limited():
     assert blocked.status_code == 429
 
 
+def test_mobile_websocket_requires_official_browser_origin():
+    assert register().status_code == 200
+    mobile_token = client.post(
+        "/v1/pair/claim", json={"pairing_code": "123456"}
+    ).json()["token"]
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/v1/ws") as mobile:
+            mobile.send_json({"type": "auth", "token": mobile_token})
+            mobile.receive_json()
+
+
 def test_revoked_token_is_rechecked_before_next_websocket_message():
     assert register().status_code == 200
     desktop_token = "d" * 40
@@ -113,7 +127,10 @@ def test_revoked_token_is_rechecked_before_next_websocket_message():
     with client.websocket_connect("/v1/ws") as desktop:
         desktop.send_json({"type": "auth", "token": desktop_token})
         assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
-        with client.websocket_connect("/v1/ws") as mobile:
+        with client.websocket_connect(
+            "/v1/ws",
+            headers={"Origin": "https://micro-helper-ygeuyn.v2.appdeploy.ai"},
+        ) as mobile:
             mobile.send_json({"type": "auth", "token": mobile_token})
             assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
 
@@ -137,7 +154,10 @@ def test_pending_commands_are_bounded_and_results_must_match():
     with client.websocket_connect("/v1/ws") as desktop:
         desktop.send_json({"type": "auth", "token": desktop_token})
         assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
-        with client.websocket_connect("/v1/ws") as mobile:
+        with client.websocket_connect(
+            "/v1/ws",
+            headers={"Origin": "https://micro-helper-ygeuyn.v2.appdeploy.ai"},
+        ) as mobile:
             mobile.send_json({"type": "auth", "token": mobile_token})
             assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
 
