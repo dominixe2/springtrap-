@@ -178,7 +178,9 @@ async function runGitHubTaskAgent(userId: string, task: Task, state: State) {
     onToolCall: async (name, args) => {
       if (name === "github_list_files") {
         const ref = String(args.ref || MICRO_HELPER_BASE_BRANCH).slice(0, 120);
-        const tree = await githubApi("/repos/" + MICRO_HELPER_REPO + "/git/trees/" + encodeURIComponent(ref) + "?recursive=1");
+        const refPath = ref.split("/").map(encodeURIComponent).join("/");
+        const branchRef = await githubApi("/repos/" + MICRO_HELPER_REPO + "/git/ref/heads/" + refPath);
+        const tree = await githubApi("/repos/" + MICRO_HELPER_REPO + "/git/trees/" + branchRef.object.sha + "?recursive=1");
         const prefix = String(args.path_prefix || "");
         return { truncated: Boolean(tree.truncated), files: (tree.tree || []).filter((item: any) => item.type === "blob" && GITHUB_EDIT_PREFIXES.some(p => String(item.path).startsWith(p)) && (!prefix || String(item.path).startsWith(prefix))).slice(0, 160).map((item: any) => ({ path: item.path, sha: item.sha, size: item.size })) };
       }
