@@ -427,6 +427,17 @@
         <small><a href="https://github.com/dominixe2/springtrap-/actions/workflows/windows-companion.yml?query=branch%3Amicro-helper" target="_blank" rel="noopener">Stáhnout Windows EXE (GitHub Actions)</a> · <a href="https://raw.githubusercontent.com/dominixe2/springtrap-/micro-helper/windows-companion/companion.py" target="_blank" rel="noopener">Zdrojový skript</a> · <a href="https://github.com/dominixe2/springtrap-/blob/micro-helper/windows-companion/README.md" target="_blank" rel="noopener">Návod</a></small>
       </section>
 
+      <section class="settings" id="githubPanel" style="align-items:stretch;flex-direction:column">
+        <strong>🐙 GitHub vývojový přístup</strong>
+        <small>Micro Helper může pracovat pouze v repozitáři dominixe2/springtrap-. Změny vytváří na oddělené větvi a posílá jako draft pull request. Produkční větev nikdy neupravuje přímo a PR sám neslučuje.</small>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button type="button" id="githubCheck" class="primary">Ověřit GitHub připojení</button>
+          <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Vytvořit omezený GitHub token</a>
+        </div>
+        <small id="githubStatus" aria-live="polite">Stav GitHub propojení se načítá…</small>
+        <small>Token musí mít přístup pouze k repozitáři springtrap- a oprávnění Contents: Read and write, Pull requests: Read and write, Actions: Read and write, Metadata: Read-only. Token vkládej pouze do zabezpečeného formuláře AppDeploy, nikdy do chatu.</small>
+      </section>
+
       <section class="settings" id="imageStudio" style="align-items:stretch;flex-direction:column">
         <strong>🎨 AI studio obrázků</strong>
         <small>Vytvářej obrázky z textu, upravuj je pomocí referenční fotografie, nech si obrázek popsat nebo z něj vytáhni text. AI obrazové funkce vyžadují přihlášení a dostupný limit cloudové AI. V místním režimu zůstává práce s obrázky vypnutá.</small>
@@ -1707,6 +1718,49 @@
     <script>
       (() => {
         const $ = id => document.getElementById(id);
+        const panel = $('githubPanel');
+        const status = $('githubStatus');
+        const button = $('githubCheck');
+        if (!panel || !status || !button) return;
+        async function refreshGitHubStatus() {
+          try {
+            const response = await apiFetch('/v1/integrations/github/status');
+            if (!response.ok) throw new Error('Stav propojení se nepodařilo načíst.');
+            const data = await response.json();
+            if (!data.available) {
+              panel.hidden = true;
+              return;
+            }
+            panel.hidden = false;
+            if (!data.configured) status.textContent = 'GitHub token zatím není uložen v zabezpečeném nastavení AppDeploy.';
+            else if (data.connected) status.textContent = 'GitHub je připojen: ' + data.repository + '. Přístup ověřen.';
+            else status.textContent = 'Token je uložen, ale přístup k repozitáři se nepodařilo ověřit. Zkontroluj oprávnění tokenu.';
+          } catch (error) {
+            status.textContent = error.message || 'GitHub stav není dostupný.';
+          }
+        }
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          status.textContent = 'Ověřuji oprávnění GitHubu…';
+          try {
+            const response = await apiFetch('/v1/integrations/github/test', { method: 'POST' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || 'GitHub propojení se nepodařilo ověřit.');
+            status.textContent = 'GitHub připojen: ' + data.repository + ' · čtení ' + (data.can_read ? 'ano' : 'ne') + ' · zápis ' + (data.can_write ? 'ano' : 'ne') + '.';
+          } catch (error) {
+            status.textContent = error.message || 'GitHub propojení se nepodařilo ověřit.';
+          } finally {
+            button.disabled = false;
+          }
+        });
+        refreshGitHubStatus();
+        window.addEventListener('mh-cloud-update', refreshGitHubStatus);
+      })();
+    </script>
+
+    <script>
+      (() => {
+        const $ = id => document.getElementById(id);
         async function refreshTasks() {
           const root = $('taskList');
           if (!root) return;
@@ -1740,7 +1794,7 @@
               row.style.cssText =
                 'padding:10px 0;border-top:1px solid var(--line);display:grid;gap:5px';
               const title = document.createElement('strong');
-              const taskLabels = { queued: 'čeká ve frontě', running: 'probíhá', needs_execution: 'návrh připraven · čeká na provedení', completed: 'dokončeno a ověřeno', error: 'chyba', cancelled: 'zrušeno', draft: 'koncept' };
+              const taskLabels = { queued: 'čeká ve frontě', running: 'probíhá', needs_execution: 'textový návrh · čeká na provedení', needs_review: 'PR připraven · čeká na kontrolu', completed: 'dokončeno a ověřeno', error: 'chyba', cancelled: 'zrušeno', draft: 'koncept' };
               title.textContent = task.title + ' · ' + (taskLabels[task.status] || task.status);
               row.append(title);
               if (task.result) {
@@ -1756,6 +1810,10 @@
               if (task.status === 'needs_execution') {
                 const note = document.createElement('small');
                 note.textContent = 'Toto je pouze textový návrh. Micro Helper zatím neprovedl změny v projektu ani nespustil testy.';
+                row.append(note);
+              } else if (task.status === 'needs_review') {
+                const note = document.createElement('small');
+                note.textContent = 'Změny jsou připravené v oddělené větvi. PR nebyl sloučen ani nasazen.';
                 row.append(note);
               }
               if (task.status === 'draft' || task.status === 'error') {
