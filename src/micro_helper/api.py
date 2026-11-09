@@ -1078,8 +1078,8 @@ async def export_backup():
 
 @app.post("/v1/backup/restore")
 async def restore_backup(request: RestoreBackupRequest, http_request: Request):
-    await _authorize_rest_mutation(http_request)
     """Validate the entire backup before replacing local data in one transaction."""
+    await _authorize_rest_mutation(http_request)
     if request.confirm_replace is not True:
         raise HTTPException(status_code=403, detail="Obnova vyžaduje výslovné potvrzení nahrazení místních dat.")
 
