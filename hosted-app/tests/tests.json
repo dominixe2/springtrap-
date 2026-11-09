@@ -98,7 +98,7 @@
     "covers": [
       "authenticated task creation",
       "AI task execution endpoint",
-      "persisted task result",
+      "persisted task draft",
       "retryable AI task failure",
       "quick and deep chat response setting",
       "durable per-user task queue",
@@ -106,25 +106,25 @@
       "task state persistence after app closure",
       "task cancellation before execution",
       "bounded retry and recovery",
-      "immediate server-side task execution on submission",
+      "server-side draft generation on submission",
       "task result persisted before API response",
       "targeted on-demand worker invocation",
-      "immediate targeted worker invocation",
-      "completion notification permission",
-      "persisted completion notification after reopening app"
+      "targeted worker invocation",
+      "notification permission",
+      "no false completion notification for an unexecuted draft"
     ],
     "description": "Verifies submitting a task immediately invokes the server worker, persists its result, and leaves the scheduled worker as a recovery path.",
     "steps": [
       "Sign in to Micro Helper and allow browser notifications when prompted",
       "Create a task with a short title and concrete instruction",
       "Verify the server immediately invokes the worker for that exact task without waiting for the hourly schedule",
-      "Verify the response contains a persisted result or a retryable queued state",
+      "Verify the response contains a persisted draft marked needs_execution, or a retryable queued state",
       "If the task remains queued, close and reopen the app after processing and verify a completion notification is shown when notification permission is granted",
-      "Verify the result remains stored after refreshing the task list",
+      "Verify the draft remains stored as needs_execution after refreshing the task list",
       "Create a second task and cancel it before a recovery run; verify its status remains cancelled",
       "Verify temporary failures follow the bounded retry policy"
     ],
-    "expected": "Task submission immediately targets the server worker. Completed results are persisted; the app notifies when it observes completion and notification permission is granted, including after reopening if a pending task was recorded. The hourly worker remains a recovery path."
+    "expected": "Task submission targets the server worker. Text-only drafts remain needs_execution and do not trigger a completion notification; notifications are reserved for tasks actually executed and verified. The hourly worker remains a recovery path."
   },
   {
     "name": "Use the refreshed Micro Helper identity and responsive interface",
