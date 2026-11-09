@@ -1725,7 +1725,7 @@
                     tag: 'mh-task-' + task.id
                   });
                 }
-              } else if (!['cancelled', 'error'].includes(task.status)) {
+              } else if (['queued', 'running'].includes(task.status)) {
                 stillPending.push(task.id);
               }
             }
@@ -1740,7 +1740,8 @@
               row.style.cssText =
                 'padding:10px 0;border-top:1px solid var(--line);display:grid;gap:5px';
               const title = document.createElement('strong');
-              title.textContent = task.title + ' · ' + task.status;
+              const taskLabels = { queued: 'čeká ve frontě', running: 'probíhá', needs_execution: 'návrh připraven · čeká na provedení', completed: 'dokončeno a ověřeno', error: 'chyba', cancelled: 'zrušeno', draft: 'koncept' };
+              title.textContent = task.title + ' · ' + (taskLabels[task.status] || task.status);
               row.append(title);
               if (task.result) {
                 const result = document.createElement('div');
@@ -1751,6 +1752,11 @@
                 const error = document.createElement('small');
                 error.textContent = task.error;
                 row.append(error);
+              }
+              if (task.status === 'needs_execution') {
+                const note = document.createElement('small');
+                note.textContent = 'Toto je pouze textový návrh. Micro Helper zatím neprovedl změny v projektu ani nespustil testy.';
+                row.append(note);
               }
               if (task.status === 'draft' || task.status === 'error') {
                 const run = document.createElement('button');
@@ -1813,13 +1819,15 @@
             $('taskTitle').value = '';
             $('taskInput').value = '';
             if (task.status === 'completed') {
-              $('status').textContent = 'Úkol dokončen · výsledek je uložený';
+              $('status').textContent = 'Úkol dokončen a ověřen · výsledek je uložený';
               if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('Micro Helper: úkol dokončen', {
                   body: task.title,
                   tag: 'mh-task-' + task.id
                 });
               }
+            } else if (task.status === 'needs_execution') {
+              $('status').textContent = 'Textový návrh připraven; skutečné provedení zatím není dostupné';
             } else {
               $('status').textContent = task.status === 'running'
                 ? 'Micro Helper právě pracuje'
