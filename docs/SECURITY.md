@@ -61,4 +61,5 @@
 - Restore is classified as a destructive `backup.restore` action and passes through the shared Adaptive Trust Engine route gate before database replacement.
 - The browser displays a restore-specific summary (collection counts and byte size). It hashes the exact request bytes with Web Crypto; only the SHA-256 digest is sent to the confirmation endpoint, so the private backup body is not copied into confirmation storage or audit events.
 - The resulting token is short-lived, single-use and bound to the exact restore body bytes. The ASGI body-limit middleware enforces 8 MiB on both declared and chunked requests before JSON parsing.
+- All `/v1` local API responses, including private reads and rejected requests, use `Cache-Control: no-store` and `Pragma: no-cache` to reduce retention of profile, memory, history and backup data by browsers or intermediaries.
 - The local API remains loopback-only. The confirmation token is an action/replay guard, not authentication.
