@@ -160,6 +160,7 @@ class RestoreBodyLimitMiddleware:
                 (b"content-type", b"application/json"),
                 (b"content-length", str(len(body)).encode("ascii")),
                 (b"cache-control", b"no-store"),
+                (b"pragma", b"no-cache"),
             ],
         })
         await send({"type": "http.response.body", "body": body})
