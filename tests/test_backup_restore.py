@@ -302,6 +302,10 @@ def test_restore_rejects_chunked_body_over_limit_without_content_length():
     assert "content-length" not in response.request.headers
     assert response.status_code == 413
     assert response.json()["detail"] == "Záloha je příliš velká (maximum 8 MiB)."
+    # The outer body-limit middleware can reject before the FastAPI cache
+    # middleware runs, so it must set both privacy headers itself.
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
 
 
 def test_restore_replays_valid_chunked_body_without_content_length():
