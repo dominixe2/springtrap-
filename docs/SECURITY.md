@@ -56,7 +56,10 @@
 ## Full local backup/restore policy gate (2026-11-09)
 
 - Full backup export uses `Cache-Control: no-store` and is capped at the same 8 MiB format limit accepted by restore.
+- Exported backups are plaintext JSON, not encrypted by the app, and contain the complete local profile, memories, conversation history, tasks, learning plans and preferences. The UI must warn before download; users should store the file privately and never send it as a public attachment.
+- The separate memory-notes export is also plaintext JSON and contains private notes; the UI must warn before downloading it as well.
 - Restore is classified as a destructive `backup.restore` action and passes through the shared Adaptive Trust Engine route gate before database replacement.
 - The browser displays a restore-specific summary (collection counts and byte size). It hashes the exact request bytes with Web Crypto; only the SHA-256 digest is sent to the confirmation endpoint, so the private backup body is not copied into confirmation storage or audit events.
 - The resulting token is short-lived, single-use and bound to the exact restore body bytes. The ASGI body-limit middleware enforces 8 MiB on both declared and chunked requests before JSON parsing.
+- All `/v1` local API responses, including private reads and rejected requests, use `Cache-Control: no-store` and `Pragma: no-cache` to reduce retention of profile, memory, history and backup data by browsers or intermediaries.
 - The local API remains loopback-only. The confirmation token is an action/replay guard, not authentication.

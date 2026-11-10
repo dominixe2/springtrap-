@@ -255,6 +255,8 @@ def test_backup_controls_are_available_in_the_mobile_friendly_ui():
     assert "body_sha256" in html
     assert "link.download=\"micro-helper-backup.json\"" in html
     assert "window.confirm(" in html
+    assert "Stažený JSON soubor není šifrovaný" in html
+    assert "Export poznámek vytvoří nešifrovaný JSON" in html
 
 
 def test_restore_requeues_tasks_that_were_running_in_the_backup():
@@ -300,6 +302,10 @@ def test_restore_rejects_chunked_body_over_limit_without_content_length():
     assert "content-length" not in response.request.headers
     assert response.status_code == 413
     assert response.json()["detail"] == "Záloha je příliš velká (maximum 8 MiB)."
+    # The outer body-limit middleware can reject before the FastAPI cache
+    # middleware runs, so it must set both privacy headers itself.
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
 
 
 def test_restore_replays_valid_chunked_body_without_content_length():
