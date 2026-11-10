@@ -49,25 +49,32 @@ def _is_loopback_hostname(hostname: str | None) -> bool:
 
 @app.middleware("http")
 async def protect_local_api(request: Request, call_next):
-    """Defend local private API reads and writes against DNS rebinding and CSRF.
+    """Defend private API traffic against DNS rebinding, CSRF and cache retention.
 
     This is not authentication. The local service must remain bound to loopback.
     """
-    if request.url.path == "/v1" or request.url.path.startswith("/v1/"):
-        if not _is_loopback_hostname(request.url.hostname):
-            return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
+    is_private_api = request.url.path == "/v1" or request.url.path.startswith("/v1/")
+
+    def private_response(response):
+        if is_private_api:
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+    if is_private_api and not _is_loopback_hostname(request.url.hostname):
+        return private_response(JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."}))
 
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         request_host = request.headers.get("host", "").lower()
         fetch_site = request.headers.get("sec-fetch-site", "").lower()
         origin = request.headers.get("origin")
         if fetch_site == "cross-site":
-            return JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."})
+            return private_response(JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."}))
         if origin:
             try:
                 parsed_origin = urlsplit(origin)
             except ValueError:
-                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+                return private_response(JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."}))
             if (
                 parsed_origin.scheme.lower() != request.url.scheme.lower()
                 or not parsed_origin.netloc
@@ -77,8 +84,8 @@ async def protect_local_api(request: Request, call_next):
                 or bool(parsed_origin.path or parsed_origin.query or parsed_origin.fragment)
                 or not _is_loopback_hostname(parsed_origin.hostname)
             ):
-                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
-    return await call_next(request)
+                return private_response(JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."}))
+    return private_response(await call_next(request))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
 
