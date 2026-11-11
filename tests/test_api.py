@@ -412,6 +412,58 @@ def test_worker_marks_task_failed_when_model_is_unavailable(monkeypatch):
 
 
 
+@pytest.mark.parametrize(
+    ("failure_kind", "expected_error"),
+    [
+        ("timeout", "Ollama neodpověděla v časovém limitu."),
+        ("http_status", "Ollama vrátila HTTP 502."),
+        ("unexpected", "Úloha selhala (RuntimeError)."),
+    ],
+)
+def test_worker_persists_safe_error_categories_without_request_details(
+    monkeypatch, failure_kind, expected_error
+):
+    from micro_helper import worker
+    import httpx
+
+    created = client.post("/v1/tasks", json={
+        "kind": "agent.draft", "title": "Návrh", "input_text": "Napiš návrh."
+    })
+    task_id = created.json()["id"]
+    request = httpx.Request(
+        "POST", "https://user:secret@example.invalid/api/chat?token=hidden"
+    )
+
+    if failure_kind == "timeout":
+        failure = httpx.ReadTimeout(
+            "timeout https://user:secret@example.invalid/?token=hidden",
+            request=request,
+        )
+    elif failure_kind == "http_status":
+        response = httpx.Response(502, request=request)
+        failure = httpx.HTTPStatusError(
+            "upstream failure https://user:secret@example.invalid/?token=hidden",
+            request=request,
+            response=response,
+        )
+    else:
+        failure = RuntimeError(
+            "unexpected failure https://user:secret@example.invalid/?token=hidden"
+        )
+
+    def fail(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(worker.httpx, "post", fail)
+    assert worker.run_once() is True
+    task = client.get(f"/v1/tasks/{task_id}").json()
+    assert task["status"] == "failed"
+    assert task["error"] == expected_error
+    for sensitive_fragment in ("secret", "hidden", "example.invalid", "user:"):
+        assert sensitive_fragment not in task["error"]
+
+
+
 def test_preferences_api_and_ui():
     created = client.post('/v1/preferences', json={'category':'communication','preference':'tone','value':'friendly Czech'})
     assert created.status_code == 201
