@@ -1,9 +1,10 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.14
+- **Checklist version:** 1.0.0-checklist.15
 - **Snapshot date:** 2026-11-11
 - **Snapshot source:** Stacked PR #34 trust-gateway + full backup/restore head `3d517d92a5fa3ee885baaa4be6ce89e7ff990f7b` passed CI run #42679331114: 86 project tests, 11 relay tests, embedded browser JavaScript syntax and Python compilation. PR #34 is based on PR #32 → PR #31 → PR #23 and remains unmerged. PR #25 remains a separate backup/restore implementation reference. Separate PR #33 (`security/render-relay-session-guards`) adds protections to the active Render relay source and passed Micro Helper run #42636316961 plus Cloudflare Relay Checks run #42636316955. PR #35 (`security/backup-export-warning-20261110`) extends the stack with explicit plaintext-export warnings and no-cache headers; its head `d90e2cb632070ddfca41cd222301045bd112997a` passed run #42885578401 with 91 project tests and 11 relay tests. PR #36 (`fix/worker-prompt-and-error-redaction-20261111`) corrects worker preference line breaks and stores categorized task failures instead of raw exception text; head `8e898fe493d7a901bb3c38e2f3da2df803973a01` passed run #43079790199 with 94 project tests and 11 relay tests, embedded JavaScript syntax and Python compilation. Merged PRs #18 and #19 provide additional verified Cloudflare-session and local-origin protections.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
+- **Integration snapshot:** PR #36 has been retargeted from the stacked PR #35 base to the active `micro-helper` branch. The exact comparison is 47 commits ahead, 0 behind, 12 changed files. A fresh CI run on the retargeted combined PR is required before integration.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
 - **Weights:** total 100 points.
 - **No criterion is marked complete.** Source presence or a passing static test alone is not release acceptance.
@@ -71,6 +72,8 @@ A level may be raised only when new implementation and evidence are linked in th
 7. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.15 (2026-11-11):** records the consolidation of PR #23/#31/#32/#34/#35/#36 into a single review candidate targeting `micro-helper` (47 commits ahead, 0 behind, 12 changed files). A fresh CI run after the base retarget is pending; the 50.00% score is unchanged.
 
 - **1.0.0-checklist.14 (2026-11-11):** records PR #36 worker prompt-format and exception-redaction fixes plus passing CI run #43079790199 (94 project tests, 11 relay tests, JavaScript syntax and Python compilation). The evidence-weighted score remains 50.00%; worker improvements do not substitute for integrated user workflows or physical platform acceptance.
 
