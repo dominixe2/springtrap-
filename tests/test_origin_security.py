@@ -34,11 +34,20 @@ def test_cross_site_fetch_metadata_is_rejected_without_origin():
     assert client.get("/v1/memories").json()["memories"] == []
 
 
-def test_same_origin_profile_write_still_works():
+def test_same_origin_profile_write_still_works_after_explicit_action_confirmation():
+    arguments = {"agent_name": "Nova", "language": "cs-CZ", "style": "friendly"}
+    confirmation = client.post(
+        "/v1/actions/confirm",
+        json={"method": "PUT", "path": "/v1/profile", "arguments": arguments},
+    )
+    assert confirmation.status_code == 200
     response = client.put(
         "/v1/profile",
-        headers={"origin": "http://127.0.0.1:8000"},
-        json={"agent_name": "Nova", "language": "cs-CZ", "style": "friendly"},
+        headers={
+            "origin": "http://127.0.0.1:8000",
+            "X-Micro-Helper-Confirmation": confirmation.json()["confirmation_token"],
+        },
+        json=arguments,
     )
     assert response.status_code == 200
     assert response.json()["agent_name"] == "Nova"
@@ -113,3 +122,23 @@ def test_loopback_hostname_helper_accepts_localhost(hostname):
 @pytest.mark.parametrize("hostname", ["attacker.example", "192.0.2.10", "0.0.0.0", ""])
 def test_loopback_hostname_helper_rejects_non_loopback(hostname):
     assert api._is_loopback_hostname(hostname) is False
+
+@pytest.mark.parametrize(
+    "path",
+    ["/v1/profile", "/v1/memories", "/v1/conversations", "/v1/backup"],
+)
+def test_private_api_responses_are_never_cached(path):
+    response = client.get(path)
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+
+
+def test_blocked_private_api_response_is_also_not_cacheable():
+    response = client.get(
+        "/v1/profile",
+        headers={"host": "attacker.example:8000"},
+    )
+    assert response.status_code == 403
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"

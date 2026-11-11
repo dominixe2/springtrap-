@@ -1,13 +1,16 @@
 """Local-first Micro Helper API with persistent private data and optional Ollama chat."""
 from __future__ import annotations
 
+import hashlib
 import ipaddress
+import json
 import os
 import re
+import secrets
 import sqlite3
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 from urllib.parse import urlsplit
@@ -17,6 +20,14 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+from micro_helper.trust_policy import (
+    Action,
+    Decision,
+    PermissionPolicy,
+    evaluate_action,
+    permission_key,
+)
 
 app = FastAPI(title="Micro Helper", version="0.3.0")
 STATIC = Path(__file__).parent / "static"
@@ -38,25 +49,32 @@ def _is_loopback_hostname(hostname: str | None) -> bool:
 
 @app.middleware("http")
 async def protect_local_api(request: Request, call_next):
-    """Defend local private API reads and writes against DNS rebinding and CSRF.
+    """Defend private API traffic against DNS rebinding, CSRF and cache retention.
 
     This is not authentication. The local service must remain bound to loopback.
     """
-    if request.url.path == "/v1" or request.url.path.startswith("/v1/"):
-        if not _is_loopback_hostname(request.url.hostname):
-            return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
+    is_private_api = request.url.path == "/v1" or request.url.path.startswith("/v1/")
+
+    def private_response(response):
+        if is_private_api:
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+    if is_private_api and not _is_loopback_hostname(request.url.hostname):
+        return private_response(JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."}))
 
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         request_host = request.headers.get("host", "").lower()
         fetch_site = request.headers.get("sec-fetch-site", "").lower()
         origin = request.headers.get("origin")
         if fetch_site == "cross-site":
-            return JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."})
+            return private_response(JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."}))
         if origin:
             try:
                 parsed_origin = urlsplit(origin)
             except ValueError:
-                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+                return private_response(JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."}))
             if (
                 parsed_origin.scheme.lower() != request.url.scheme.lower()
                 or not parsed_origin.netloc
@@ -66,10 +84,90 @@ async def protect_local_api(request: Request, call_next):
                 or bool(parsed_origin.path or parsed_origin.query or parsed_origin.fragment)
                 or not _is_loopback_hostname(parsed_origin.hostname)
             ):
-                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
-    return await call_next(request)
+                return private_response(JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."}))
+    return private_response(await call_next(request))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
+
+MAX_BACKUP_BYTES = 8 * 1024 * 1024
+
+class RestoreBodyLimitMiddleware:
+    """Enforce the restore limit on actual streamed bytes, not only Content-Length."""
+
+    def __init__(self, app, max_bytes: int):
+        self.app = app
+        self.max_bytes = max_bytes
+        self.too_large_body = '{"detail":"Záloha je příliš velká (maximum 8 MiB)."}'.encode("utf-8")
+        self.bad_length_body = '{"detail":"Neplatná velikost požadavku."}'.encode("utf-8")
+
+    async def __call__(self, scope, receive, send):
+        if (
+            scope.get("type") != "http"
+            or scope.get("method") != "POST"
+            or scope.get("path") != "/v1/backup/restore"
+        ):
+            return await self.app(scope, receive, send)
+
+        headers = dict(scope.get("headers", []))
+        raw_length = headers.get(b"content-length")
+        if raw_length is not None:
+            try:
+                declared_length = int(raw_length)
+            except ValueError:
+                return await self._respond(send, 400, self.bad_length_body)
+            if declared_length < 0:
+                return await self._respond(send, 400, self.bad_length_body)
+            if declared_length > self.max_bytes:
+                return await self._respond(send, 413, self.too_large_body)
+
+        chunks = []
+        total = 0
+        while True:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            if message["type"] != "http.request":
+                continue
+            chunk = message.get("body", b"")
+            total += len(chunk)
+            if total > self.max_bytes:
+                return await self._respond(send, 413, self.too_large_body)
+            chunks.append(chunk)
+            if not message.get("more_body", False):
+                break
+
+        index = 0
+
+        async def replay_receive():
+            nonlocal index
+            if index < len(chunks):
+                chunk = chunks[index]
+                index += 1
+                return {
+                    "type": "http.request",
+                    "body": chunk,
+                    "more_body": index < len(chunks),
+                }
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        return await self.app(scope, replay_receive, send)
+
+    async def _respond(self, send, status_code: int, body: bytes):
+        await send({
+            "type": "http.response.start",
+            "status": status_code,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode("ascii")),
+                (b"cache-control", b"no-store"),
+                (b"pragma", b"no-cache"),
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
+
+
+app.add_middleware(RestoreBodyLimitMiddleware, max_bytes=MAX_BACKUP_BYTES)
+
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
 
 
@@ -141,6 +239,29 @@ def database() -> Iterator[sqlite3.Connection]:
                 updated_at TEXT NOT NULL,
                 UNIQUE(category, preference)
             );
+            CREATE TABLE IF NOT EXISTS tool_confirmations (
+                token_hash TEXT PRIMARY KEY,
+                tool_id TEXT NOT NULL,
+                arguments_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                consumed_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_tool_confirmations_expiry
+                ON tool_confirmations(expires_at);
+            CREATE TABLE IF NOT EXISTS tool_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tool_id TEXT NOT NULL,
+                capability TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                target TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_tool_audit_created
+                ON tool_audit(created_at);
             """
         )
         connection.commit()
@@ -188,9 +309,243 @@ class ProfileRequest(BaseModel):
     style: str = Field(default="friendly", min_length=1, max_length=40)
 
 
+class RestoreBackupRequest(BaseModel):
+    backup: dict[str, object]
+    confirm_replace: bool = False
+
+
 class ToolExecuteRequest(BaseModel):
     arguments: dict[str, object] = Field(default_factory=dict)
-    confirmed: bool = False
+    confirmation_token: str | None = Field(default=None, min_length=32, max_length=200)
+
+
+class ToolConfirmationRequest(BaseModel):
+    arguments: dict[str, object] = Field(default_factory=dict)
+
+
+class RestActionConfirmationRequest(BaseModel):
+    method: str = Field(min_length=3, max_length=8)
+    path: str = Field(min_length=4, max_length=300)
+    arguments: dict[str, object] = Field(default_factory=dict)
+
+
+TOOL_ACTIONS = {
+    "profile.read": Action("profile", "read", "local"),
+    "memory.list": Action("memory", "read", "local"),
+    "memory.create": Action("memory", "create", "local", changes_external_state=True),
+}
+TOOL_POLICY = PermissionPolicy(
+    grants=frozenset({
+        permission_key(TOOL_ACTIONS["profile.read"]),
+        permission_key(TOOL_ACTIONS["memory.list"]),
+    })
+)
+
+# Chat submission is the one narrow built-in grant: the user explicitly presses
+# Send. Every other state-changing REST route requires fresh confirmation.
+CHAT_ACTION = Action("conversation", "append", "local")
+REST_POLICY = PermissionPolicy(grants=frozenset({permission_key(CHAT_ACTION)}))
+
+
+def _resolve_rest_action(method: str, path: str) -> tuple[str, Action] | None:
+    method = method.upper()
+    if method == "POST" and path == "/v1/chat":
+        return f"rest:{method}:{path}", CHAT_ACTION
+    if method == "POST" and path == "/v1/tasks":
+        return f"rest:{method}:{path}", Action("task", "create", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/tasks/([^/]+)/cancel", path)
+    if method == "POST" and match:
+        return f"rest:{method}:{path}", Action("task", "cancel", match.group(1), changes_external_state=True)
+    if method == "POST" and path == "/v1/learning-plans":
+        return f"rest:{method}:{path}", Action("learning_plan", "create", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/learning-plans/([^/]+)/status", path)
+    if method == "PATCH" and match:
+        return f"rest:{method}:{path}", Action("learning_plan", "set_status", match.group(1), changes_external_state=True)
+    match = re.fullmatch(r"/v1/learning-plans/([^/]+)", path)
+    if method == "DELETE" and match:
+        return f"rest:{method}:{path}", Action("learning_plan", "delete", match.group(1), destructive=True)
+    if method == "PUT" and path == "/v1/profile":
+        return f"rest:{method}:{path}", Action("profile", "update", "local", changes_external_state=True)
+    if method == "POST" and path == "/v1/memories":
+        return f"rest:{method}:{path}", Action("memory", "create", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/memories/(\d+)", path)
+    if method == "PUT" and match:
+        return f"rest:{method}:{path}", Action("memory", "update", match.group(1), changes_external_state=True)
+    if method == "DELETE" and match:
+        return f"rest:{method}:{path}", Action("memory", "delete", match.group(1), destructive=True)
+    if method == "POST" and path == "/v1/preferences":
+        return f"rest:{method}:{path}", Action("preferences", "upsert", "local", changes_external_state=True)
+    match = re.fullmatch(r"/v1/preferences/(\d+)", path)
+    if method == "DELETE" and match:
+        return f"rest:{method}:{path}", Action("preferences", "delete", match.group(1), destructive=True)
+    if method == "DELETE" and path == "/v1/conversations":
+        return f"rest:{method}:{path}", Action("conversation", "clear", "local", destructive=True)
+    if method == "POST" and path == "/v1/backup/restore":
+        return f"rest:{method}:{path}", Action("backup", "restore", "local", destructive=True)
+    return None
+
+
+def _normalize_rest_arguments(arguments: dict[str, object]) -> dict[str, object]:
+    try:
+        encoded = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Obsah potvrzované akce není platný JSON.")
+    if len(encoded.encode("utf-8")) > 16384:
+        raise HTTPException(status_code=413, detail="Potvrzovaná akce je příliš velká.")
+    return arguments
+
+
+def _normalize_tool_arguments(tool_id: str, arguments: dict[str, object]) -> dict[str, str]:
+    if tool_id in {"profile.read", "memory.list"}:
+        if arguments:
+            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
+        return {}
+    if tool_id == "memory.create":
+        if set(arguments) - {"content", "category"}:
+            raise HTTPException(status_code=422, detail="Nástroj obdržel nepovolené argumenty.")
+        content = arguments.get("content")
+        category = arguments.get("category", "context")
+        if not isinstance(content, str) or not content.strip() or len(content) > 1000:
+            raise HTTPException(status_code=422, detail="Obsah poznámky musí mít 1 až 1000 znaků.")
+        if not isinstance(category, str) or not category.strip() or len(category) > 40:
+            raise HTTPException(status_code=422, detail="Kategorie musí mít 1 až 40 znaků.")
+        return {"content": content.strip(), "category": category.strip()}
+    raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+
+
+def _tool_arguments_hash(arguments: dict[str, object]) -> str:
+    canonical = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _record_tool_audit(tool_id: str, action: Action, decision: Decision, reason: str, outcome: str) -> None:
+    # Deliberately omit arguments, confirmation tokens and tool results.
+    with database() as db:
+        db.execute(
+            """INSERT INTO tool_audit
+               (tool_id, capability, operation, target, decision, reason, outcome, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (tool_id, action.capability, action.operation, action.target,
+             decision.value, reason[:240], outcome, utc_now()),
+        )
+        db.commit()
+
+
+def _consume_tool_confirmation(token: str | None, tool_id: str, arguments: dict[str, str]) -> bool:
+    if not token:
+        return False
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = datetime.now(timezone.utc)
+    with database() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            """SELECT tool_id, arguments_hash, expires_at, consumed_at
+               FROM tool_confirmations WHERE token_hash=?""",
+            (token_hash,),
+        ).fetchone()
+        if (
+            row is None
+            or row["tool_id"] != tool_id
+            or row["arguments_hash"] != _tool_arguments_hash(arguments)
+            or row["consumed_at"] is not None
+        ):
+            db.rollback()
+            return False
+        try:
+            expires_at = datetime.fromisoformat(row["expires_at"])
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except ValueError:
+            db.rollback()
+            return False
+        if expires_at <= now:
+            db.rollback()
+            return False
+        cursor = db.execute(
+            "UPDATE tool_confirmations SET consumed_at=? WHERE token_hash=? AND consumed_at IS NULL",
+            (now.isoformat(), token_hash),
+        )
+        db.commit()
+        return cursor.rowcount == 1
+
+
+async def _authorize_rest_mutation(request: Request) -> None:
+    """Apply one shared trust-policy gate to every state-changing REST route."""
+    resolved = _resolve_rest_action(request.method, request.url.path)
+    if resolved is None:
+        raise HTTPException(status_code=403, detail="Tato změna není v bezpečnostní politice povolena.")
+    action_id, action = resolved
+    raw_body = await request.body()
+    if request.method.upper() == "POST" and request.url.path == "/v1/backup/restore":
+        # The restore payload may be up to 8 MiB. Bind approval to its exact raw
+        # bytes without copying private backup contents into the confirmation row.
+        arguments = {"body_sha256": hashlib.sha256(raw_body).hexdigest()}
+    else:
+        try:
+            arguments = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise HTTPException(status_code=422, detail="Tělo požadavku není platný JSON.")
+        if not isinstance(arguments, dict):
+            raise HTTPException(status_code=422, detail="Tělo potvrzované akce musí být objekt JSON.")
+    arguments = _normalize_rest_arguments(arguments)
+    policy_result = evaluate_action(action, REST_POLICY)
+    if policy_result.decision == Decision.DENY:
+        _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+    token = request.headers.get("x-micro-helper-confirmation")
+    if policy_result.decision == Decision.CONFIRM:
+        if not _consume_tool_confirmation(token, action_id, arguments):
+            reason = "Chybí platné čerstvé potvrzení, token vypršel, byl použit nebo neodpovídá přesné akci."
+            _record_tool_audit(action_id, action, policy_result.decision, reason, "confirmation_rejected")
+            raise HTTPException(status_code=403, detail="Změna vyžaduje čerstvé potvrzení pro přesnou akci.")
+    elif token:
+        raise HTTPException(status_code=422, detail="Tato akce potvrzovací token nepřijímá.")
+    _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "authorized")
+
+
+@app.post("/v1/actions/confirm")
+async def confirm_rest_action(request: RestActionConfirmationRequest):
+    """Issue a one-time token after the UI has displayed the exact REST mutation."""
+    method = request.method.upper()
+    path = request.path
+    if (
+        method not in {"POST", "PUT", "PATCH", "DELETE"}
+        or not path.startswith("/v1/")
+        or "?" in path or "#" in path or "\\" in path
+        or "//" in path or "/../" in path
+    ):
+        raise HTTPException(status_code=422, detail="Neplatný cíl potvrzované akce.")
+    resolved = _resolve_rest_action(method, path)
+    if resolved is None:
+        raise HTTPException(status_code=404, detail="Neznámá nebo nepovolená změna.")
+    action_id, action = resolved
+    arguments = _normalize_rest_arguments(request.arguments)
+    policy_result = evaluate_action(action, REST_POLICY)
+    if policy_result.decision == Decision.DENY:
+        _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+    if policy_result.decision != Decision.CONFIRM:
+        raise HTTPException(status_code=409, detail="Tato akce nevyžaduje potvrzovací token.")
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=60)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with database() as db:
+        db.execute("DELETE FROM tool_confirmations WHERE expires_at < ?", (now.isoformat(),))
+        db.execute(
+            """INSERT INTO tool_confirmations
+               (token_hash, tool_id, arguments_hash, created_at, expires_at, consumed_at)
+               VALUES (?, ?, ?, ?, ?, NULL)""",
+            (token_hash, action_id, _tool_arguments_hash(arguments), now.isoformat(), expires_at.isoformat()),
+        )
+        db.commit()
+    _record_tool_audit(action_id, action, policy_result.decision, policy_result.reason, "confirmation_issued")
+    return {
+        "confirmation_token": token,
+        "expires_at": expires_at.isoformat(),
+        "message": "Potvrzení platí 60 sekund pouze pro tuto metodu, cestu a přesný obsah.",
+    }
+
 
 
 @app.get("/")
@@ -223,6 +578,7 @@ async def status():
             "persistent_local_profile", "persistent_local_memory",
             "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
             "capability_catalog", "browser_voice_input", "browser_voice_output",
+            "tool_policy_gate", "one_time_action_confirmation", "tool_audit_log", "rest_mutation_policy_gate", "full_backup_restore",
         ],
         "not_yet_implemented": [
             "live_duplex_voice", "wake_word", "android_integration", "windows_worker",
@@ -243,6 +599,8 @@ async def capabilities():
             "default": "deny",
             "external_side_effects_require_confirmation": True,
             "model_output_is_not_authorization": True,
+            "integrated_adapters": ["profile.read", "memory.list", "memory.create"],
+            "audit_log": True,
         },
         "available": [
             {
@@ -294,53 +652,116 @@ async def list_tools():
     return {
         "default_policy": "deny",
         "tools": [
-            {"id": "profile.read", "description": "Read the local assistant profile", "risk": "read", "confirmation_required": False},
-            {"id": "memory.list", "description": "List saved local memories", "risk": "read", "confirmation_required": False},
-            {"id": "memory.create", "description": "Create one local memory note", "risk": "local_write", "confirmation_required": True},
+            {"id": "profile.read", "description": "Read the local assistant profile", "risk": "read", "confirmation_required": False, "policy": "exact_builtin_grant"},
+            {"id": "memory.list", "description": "List saved local memories", "risk": "read", "confirmation_required": False, "policy": "exact_builtin_grant"},
+            {"id": "memory.create", "description": "Create one local memory note", "risk": "local_write", "confirmation_required": True, "confirmation_flow": "one_time_token", "confirmation_ttl_seconds": 60},
         ],
+        "audit": {"available": True, "stores_arguments": False, "stores_confirmation_tokens": False},
+    }
+
+
+@app.post("/v1/tools/{tool_id}/confirm")
+async def confirm_tool_action(tool_id: str, request: ToolConfirmationRequest):
+    """Issue a one-time, short-lived token only after the UI has obtained explicit user approval."""
+    action = TOOL_ACTIONS.get(tool_id)
+    if action is None:
+        raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+    arguments = _normalize_tool_arguments(tool_id, request.arguments)
+    result = evaluate_action(action, TOOL_POLICY)
+    if result.decision == Decision.DENY:
+        _record_tool_audit(tool_id, action, result.decision, result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+    if result.decision != Decision.CONFIRM:
+        raise HTTPException(status_code=409, detail="Tento nástroj nevyžaduje potvrzovací token.")
+
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=60)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with database() as db:
+        db.execute("DELETE FROM tool_confirmations WHERE expires_at < ?", (now.isoformat(),))
+        db.execute(
+            """INSERT INTO tool_confirmations
+               (token_hash, tool_id, arguments_hash, created_at, expires_at, consumed_at)
+               VALUES (?, ?, ?, ?, ?, NULL)""",
+            (token_hash, tool_id, _tool_arguments_hash(arguments), now.isoformat(), expires_at.isoformat()),
+        )
+        db.commit()
+    _record_tool_audit(tool_id, action, result.decision, result.reason, "confirmation_issued")
+    return {
+        "tool": tool_id,
+        "confirmation_token": token,
+        "expires_at": expires_at.isoformat(),
+        "message": "Potvrzení platí 60 sekund a pouze pro tuto přesnou akci.",
     }
 
 
 @app.post("/v1/tools/{tool_id}/execute")
 async def execute_tool(tool_id: str, request: ToolExecuteRequest):
-    """Execute only hard-coded local tools; never dispatch arbitrary code or shell commands."""
+    """Execute only registered tools after deterministic policy evaluation."""
+    action = TOOL_ACTIONS.get(tool_id)
+    if action is None:
+        raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
+    arguments = _normalize_tool_arguments(tool_id, request.arguments)
+    policy_result = evaluate_action(action, TOOL_POLICY)
+    if policy_result.decision == Decision.DENY:
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "denied")
+        raise HTTPException(status_code=403, detail="Tato akce je podle bezpečnostní politiky zakázaná.")
+
+    if policy_result.decision == Decision.CONFIRM:
+        if not _consume_tool_confirmation(request.confirmation_token, tool_id, arguments):
+            reason = "Chybí platné čerstvé potvrzení, token vypršel, byl použit nebo neodpovídá akci."
+            _record_tool_audit(tool_id, action, policy_result.decision, reason, "confirmation_rejected")
+            raise HTTPException(status_code=403, detail="Akce vyžaduje čerstvé potvrzení pro přesný obsah.")
+    elif request.confirmation_token:
+        raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá potvrzovací token.")
+
     if tool_id == "profile.read":
-        if request.arguments:
-            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
         with database() as db:
             row = db.execute("SELECT agent_name, language, style, updated_at FROM profile WHERE id=1").fetchone()
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "succeeded")
         return {"tool": tool_id, "result": dict(row)}
 
     if tool_id == "memory.list":
-        if request.arguments:
-            raise HTTPException(status_code=422, detail="Tento nástroj nepřijímá argumenty.")
         with database() as db:
             rows = db.execute("SELECT id, content, category, created_at FROM memories ORDER BY id DESC LIMIT 200").fetchall()
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "succeeded")
         return {"tool": tool_id, "result": {"memories": [dict(row) for row in rows]}}
 
     if tool_id == "memory.create":
-        if not request.confirmed:
-            raise HTTPException(status_code=403, detail="Uložení poznámky vyžaduje potvrzení uživatele.")
-        if set(request.arguments) - {"content", "category"}:
-            raise HTTPException(status_code=422, detail="Nástroj obdržel nepovolené argumenty.")
-        content = request.arguments.get("content")
-        category = request.arguments.get("category", "context")
-        if not isinstance(content, str) or not content.strip() or len(content) > 1000:
-            raise HTTPException(status_code=422, detail="Obsah poznámky musí mít 1 až 1000 znaků.")
-        if not isinstance(category, str) or not category.strip() or len(category) > 40:
-            raise HTTPException(status_code=422, detail="Kategorie musí mít 1 až 40 znaků.")
         with database() as db:
-            cursor = db.execute("INSERT INTO memories(content, category, created_at) VALUES (?, ?, ?)", (content.strip(), category.strip(), utc_now()))
+            cursor = db.execute(
+                "INSERT INTO memories(content, category, created_at) VALUES (?, ?, ?)",
+                (arguments["content"], arguments["category"], utc_now()),
+            )
             db.commit()
-            row = db.execute("SELECT id, content, category, created_at FROM memories WHERE id=?", (cursor.lastrowid,)).fetchone()
+            row = db.execute(
+                "SELECT id, content, category, created_at FROM memories WHERE id=?",
+                (cursor.lastrowid,),
+            ).fetchone()
+        _record_tool_audit(tool_id, action, policy_result.decision, policy_result.reason, "succeeded")
         return {"tool": tool_id, "result": dict(row)}
 
     raise HTTPException(status_code=404, detail="Neznámý nebo nepovolený nástroj.")
 
 
+@app.get("/v1/audit")
+async def list_tool_audit(limit: int = 50):
+    """Return recent tool metadata without storing or exposing arguments and tokens."""
+    limit = max(1, min(limit, 200))
+    with database() as db:
+        rows = db.execute(
+            """SELECT id, tool_id, capability, operation, target, decision, reason, outcome, created_at
+               FROM tool_audit ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return {"events": [dict(row) for row in rows]}
+
+
 
 @app.post("/v1/tasks", status_code=201)
-async def create_task(request: TaskRequest):
+async def create_task(request: TaskRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     """Queue a bounded, non-side-effecting AI draft task for the local worker."""
     task_id = str(uuid.uuid4())
     now = utc_now()
@@ -372,7 +793,8 @@ async def get_task(task_id: str):
 
 
 @app.post("/v1/tasks/{task_id}/cancel")
-async def cancel_task(task_id: str):
+async def cancel_task(task_id: str, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     now = utc_now()
     with database() as db:
         cursor = db.execute(
@@ -410,7 +832,8 @@ def _learning_plan_dict(row: sqlite3.Row) -> dict[str, object]:
 
 
 @app.post("/v1/learning-plans", status_code=201)
-async def create_learning_plan(request: LearningPlanRequest):
+async def create_learning_plan(request: LearningPlanRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     import json
     title, goal = request.title.strip(), request.goal.strip()
     steps = [step.strip() for step in request.steps if step.strip()]
@@ -439,7 +862,8 @@ async def get_learning_plan(plan_id: str):
 
 
 @app.patch("/v1/learning-plans/{plan_id}/status")
-async def update_learning_plan_status(plan_id: str, request: LearningPlanStatusRequest):
+async def update_learning_plan_status(plan_id: str, request: LearningPlanStatusRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute(
             "UPDATE learning_plans SET status=?, updated_at=? WHERE id=?",
@@ -453,7 +877,8 @@ async def update_learning_plan_status(plan_id: str, request: LearningPlanStatusR
 
 
 @app.delete("/v1/learning-plans/{plan_id}")
-async def delete_learning_plan(plan_id: str):
+async def delete_learning_plan(plan_id: str, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute("DELETE FROM learning_plans WHERE id=?", (plan_id,))
         db.commit()
@@ -470,7 +895,8 @@ async def get_profile():
 
 
 @app.put("/v1/profile")
-async def update_profile(request: ProfileRequest):
+async def update_profile(request: ProfileRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         db.execute(
             "UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1",
@@ -491,7 +917,8 @@ async def list_memories():
 
 
 @app.post("/v1/memories", status_code=201)
-async def create_memory(request: MemoryRequest):
+async def create_memory(request: MemoryRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     content = request.content.strip()
     category = request.category.strip()
     if not content:
@@ -510,7 +937,8 @@ async def create_memory(request: MemoryRequest):
 
 
 @app.put("/v1/memories/{memory_id}")
-async def update_memory(memory_id: int, request: MemoryRequest):
+async def update_memory(memory_id: int, request: MemoryRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     content = request.content.strip()
     category = request.category.strip()
     if not content:
@@ -531,7 +959,8 @@ async def update_memory(memory_id: int, request: MemoryRequest):
 
 
 @app.delete("/v1/memories/{memory_id}")
-async def delete_memory(memory_id: int):
+async def delete_memory(memory_id: int, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute("DELETE FROM memories WHERE id=?", (memory_id,))
         db.commit()
@@ -551,7 +980,8 @@ async def list_preferences():
 
 
 @app.post("/v1/preferences", status_code=201)
-async def create_or_update_preference(request: PreferenceRequest):
+async def create_or_update_preference(request: PreferenceRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     category = request.category.strip()
     preference = request.preference.strip()
     value = request.value.strip()
@@ -574,7 +1004,8 @@ async def create_or_update_preference(request: PreferenceRequest):
 
 
 @app.delete("/v1/preferences/{preference_id}")
-async def delete_preference(preference_id: int):
+async def delete_preference(preference_id: int, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         cursor = db.execute("DELETE FROM preferences WHERE id=?", (preference_id,))
         db.commit()
@@ -595,11 +1026,286 @@ async def get_conversations(limit: int = 100):
 
 
 @app.delete("/v1/conversations")
-async def clear_conversations():
+async def clear_conversations(http_request: Request):
+    await _authorize_rest_mutation(http_request)
     with database() as db:
         db.execute("DELETE FROM messages")
         db.commit()
     return {"deleted": True}
+
+
+@app.get("/v1/backup")
+async def export_backup():
+    """Export all local user data without caching private backup contents."""
+    with database() as db:
+        profile = db.execute(
+            "SELECT agent_name, language, style, updated_at FROM profile WHERE id=1"
+        ).fetchone()
+        memories = [dict(row) for row in db.execute(
+            "SELECT id, content, category, created_at FROM memories ORDER BY id"
+        ).fetchall()]
+        messages = [dict(row) for row in db.execute(
+            "SELECT id, role, content, created_at FROM messages ORDER BY id"
+        ).fetchall()]
+        tasks = [dict(row) for row in db.execute(
+            "SELECT id, kind, title, input_text, status, result, error, created_at, updated_at, started_at, finished_at FROM tasks ORDER BY created_at, id"
+        ).fetchall()]
+        learning_plans = []
+        for row in db.execute(
+            "SELECT id, title, goal, steps_json, status, created_at, updated_at FROM learning_plans ORDER BY created_at, id"
+        ).fetchall():
+            item = dict(row)
+            try:
+                item["steps"] = json.loads(item.pop("steps_json"))
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=500, detail="Učební plán obsahuje poškozená data; záloha nebyla vytvořena.")
+            learning_plans.append(item)
+        preferences = [dict(row) for row in db.execute(
+            "SELECT id, category, preference, value, source, updated_at FROM preferences ORDER BY id"
+        ).fetchall()]
+
+    payload = {
+        "format": "micro-helper-backup",
+        "version": 1,
+        "created_at": utc_now(),
+        "profile": dict(profile),
+        "memories": memories,
+        "messages": messages,
+        "tasks": tasks,
+        "learning_plans": learning_plans,
+        "preferences": preferences,
+    }
+    serialized_size = len(json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    if serialized_size > MAX_BACKUP_BYTES:
+        raise HTTPException(status_code=413, detail="Záloha přesahuje limit 8 MiB a nelze ji bezpečně obnovit.")
+    return JSONResponse(
+        content=payload,
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+    )
+
+
+@app.post("/v1/backup/restore")
+async def restore_backup(request: RestoreBackupRequest, http_request: Request):
+    """Validate the entire backup before replacing local data in one transaction."""
+    await _authorize_rest_mutation(http_request)
+    if request.confirm_replace is not True:
+        raise HTTPException(status_code=403, detail="Obnova vyžaduje výslovné potvrzení nahrazení místních dat.")
+
+    backup = request.backup
+    expected_keys = {
+        "format", "version", "created_at", "profile", "memories",
+        "messages", "tasks", "learning_plans", "preferences",
+    }
+    if set(backup) != expected_keys or backup.get("format") != "micro-helper-backup":
+        raise HTTPException(status_code=422, detail="Soubor není úplná záloha Micro Helperu verze 1.")
+    if type(backup.get("version")) is not int or backup["version"] != 1:
+        raise HTTPException(status_code=422, detail="Verze zálohy není podporována.")
+
+    def required_text(value: object, maximum: int) -> str:
+        if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+            raise ValueError("invalid text")
+        return value.strip()
+
+    def optional_text(value: object, maximum: int) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or len(value) > maximum:
+            raise ValueError("invalid optional text")
+        return value
+
+    def record_id(value: object) -> int:
+        if type(value) is not int or value <= 0:
+            raise ValueError("invalid record id")
+        return value
+
+    def record_uuid(value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("invalid record uuid")
+        parsed = uuid.UUID(value)
+        return str(parsed)
+
+    def collection(name: str, maximum: int) -> list[object]:
+        value = backup.get(name)
+        if not isinstance(value, list) or len(value) > maximum:
+            raise ValueError("invalid collection")
+        return value
+
+    try:
+        required_text(backup.get("created_at"), 100)
+        profile = backup.get("profile")
+        if not isinstance(profile, dict):
+            raise ValueError("invalid profile")
+        profile_row = (
+            required_text(profile.get("agent_name"), 30),
+            required_text(profile.get("language"), 20),
+            required_text(profile.get("style"), 40),
+            required_text(profile.get("updated_at"), 100),
+        )
+
+        memory_rows = []
+        for item in collection("memories", 10000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid memory")
+            memory_rows.append((
+                record_id(item.get("id")),
+                required_text(item.get("content"), 1000),
+                required_text(item.get("category"), 40),
+                required_text(item.get("created_at"), 100),
+            ))
+
+        message_rows = []
+        for item in collection("messages", 20000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid message")
+            role = required_text(item.get("role"), 20)
+            if role not in {"user", "assistant"}:
+                raise ValueError("invalid message role")
+            message_rows.append((
+                record_id(item.get("id")),
+                role,
+                required_text(item.get("content"), 100000),
+                required_text(item.get("created_at"), 100),
+            ))
+
+        task_rows = []
+        allowed_task_statuses = {"queued", "running", "completed", "failed", "cancelled"}
+        for item in collection("tasks", 10000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid task")
+            kind = required_text(item.get("kind"), 40)
+            status = required_text(item.get("status"), 20)
+            if kind != "agent.draft" or status not in allowed_task_statuses:
+                raise ValueError("unsupported task")
+            # A worker process is not guaranteed to survive a restore. Re-queue
+            # interrupted draft work instead of leaving it permanently running.
+            if status == "running":
+                status = "queued"
+            task_rows.append((
+                record_uuid(item.get("id")),
+                kind,
+                required_text(item.get("title"), 120),
+                required_text(item.get("input_text"), 12000),
+                status,
+                optional_text(item.get("result"), 100000),
+                optional_text(item.get("error"), 4000),
+                required_text(item.get("created_at"), 100),
+                required_text(item.get("updated_at"), 100),
+                optional_text(item.get("started_at"), 100),
+                optional_text(item.get("finished_at"), 100),
+            ))
+
+        plan_rows = []
+        for item in collection("learning_plans", 1000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid learning plan")
+            steps = item.get("steps")
+            if not isinstance(steps, list) or not 1 <= len(steps) <= 50:
+                raise ValueError("invalid learning plan steps")
+            clean_steps = [required_text(step, 500) for step in steps]
+            status = required_text(item.get("status"), 20)
+            if status not in {"active", "paused", "completed"}:
+                raise ValueError("invalid learning plan status")
+            plan_rows.append((
+                record_uuid(item.get("id")),
+                required_text(item.get("title"), 120),
+                required_text(item.get("goal"), 2000),
+                json.dumps(clean_steps, ensure_ascii=False),
+                status,
+                required_text(item.get("created_at"), 100),
+                required_text(item.get("updated_at"), 100),
+            ))
+
+        preference_rows = []
+        preference_keys = set()
+        for item in collection("preferences", 5000):
+            if not isinstance(item, dict):
+                raise ValueError("invalid preference")
+            category = required_text(item.get("category"), 40)
+            preference = required_text(item.get("preference"), 80)
+            key = (category, preference)
+            if key in preference_keys:
+                raise ValueError("duplicate preference")
+            preference_keys.add(key)
+            preference_rows.append((
+                record_id(item.get("id")),
+                category,
+                preference,
+                required_text(item.get("value"), 500),
+                required_text(item.get("source"), 40),
+                required_text(item.get("updated_at"), 100),
+            ))
+
+        for rows in (memory_rows, message_rows, preference_rows):
+            ids = [row[0] for row in rows]
+            if len(ids) != len(set(ids)):
+                raise ValueError("duplicate numeric id")
+        for rows in (task_rows, plan_rows):
+            ids = [row[0] for row in rows]
+            if len(ids) != len(set(ids)):
+                raise ValueError("duplicate uuid")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise HTTPException(status_code=422, detail="Záloha obsahuje neplatná nebo duplicitní data.")
+
+    try:
+        with database() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                db.execute(
+                    "UPDATE profile SET agent_name=?, language=?, style=?, updated_at=? WHERE id=1",
+                    profile_row,
+                )
+                db.execute("DELETE FROM memories")
+                db.execute("DELETE FROM messages")
+                db.execute("DELETE FROM tasks")
+                db.execute("DELETE FROM learning_plans")
+                db.execute("DELETE FROM preferences")
+                db.executemany(
+                    "INSERT INTO memories(id, content, category, created_at) VALUES (?, ?, ?, ?)",
+                    memory_rows,
+                )
+                db.executemany(
+                    "INSERT INTO messages(id, role, content, created_at) VALUES (?, ?, ?, ?)",
+                    message_rows,
+                )
+                db.executemany(
+                    """INSERT INTO tasks
+                       (id, kind, title, input_text, status, result, error, created_at, updated_at, started_at, finished_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    task_rows,
+                )
+                db.executemany(
+                    """INSERT INTO learning_plans
+                       (id, title, goal, steps_json, status, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    plan_rows,
+                )
+                db.executemany(
+                    """INSERT INTO preferences
+                       (id, category, preference, value, source, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    preference_rows,
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+    except sqlite3.Error:
+        raise HTTPException(
+            status_code=422,
+            detail="Zálohu se nepodařilo bezpečně obnovit; původní data zůstala zachována.",
+        )
+
+    restored = {
+        "memories": len(memory_rows),
+        "messages": len(message_rows),
+        "tasks": len(task_rows),
+        "learning_plans": len(plan_rows),
+        "preferences": len(preference_rows),
+    }
+    return JSONResponse(
+        content={"restored": restored, "message": "Záloha byla bezpečně obnovena."},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/v1/models")
@@ -616,7 +1322,8 @@ async def models():
 
 
 @app.post("/v1/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, http_request: Request):
+    await _authorize_rest_mutation(http_request)
     model = request.model.strip()
     if not MODEL_PATTERN.fullmatch(model) or ".." in model or model.startswith("/") or model.endswith("/") or "//" in model:
         raise HTTPException(status_code=422, detail="Název modelu obsahuje nepovolené znaky.")
