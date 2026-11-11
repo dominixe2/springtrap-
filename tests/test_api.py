@@ -349,13 +349,22 @@ def test_task_queue_rejects_unapproved_task_kinds_and_unknown_ids():
     assert client.post("/v1/tasks/not-a-real-task/cancel").status_code == 404
 
 
-def test_worker_processes_one_draft_task(monkeypatch):
+def test_worker_processes_one_draft_task_and_formats_preferences(monkeypatch):
     from micro_helper import worker
+
+    with api.database() as db:
+        db.execute(
+            "INSERT INTO preferences(category, preference, value, source, updated_at) "
+            "VALUES (?, ?, ?, 'user', 'now')",
+            ("communication", "language", "Čeština a stručné odpovědi"),
+        )
+        db.commit()
 
     created = client.post("/v1/tasks", json={
         "kind": "agent.draft", "title": "Návrh", "input_text": "Napiš krátký návrh."
     })
     task_id = created.json()["id"]
+    captured = {}
 
     class FakeResponse:
         def raise_for_status(self):
@@ -364,11 +373,19 @@ def test_worker_processes_one_draft_task(monkeypatch):
         def json(self):
             return {"message": {"content": "Hotový návrh."}}
 
-    monkeypatch.setattr(worker.httpx, "post", lambda *args, **kwargs: FakeResponse())
+    def fake_post(*args, **kwargs):
+        captured["payload"] = kwargs["json"]
+        return FakeResponse()
+
+    monkeypatch.setattr(worker.httpx, "post", fake_post)
     assert worker.run_once() is True
     task = client.get(f"/v1/tasks/{task_id}").json()
     assert task["status"] == "completed"
     assert task["result"] == "Hotový návrh."
+    system_prompt = captured["payload"]["messages"][0]["content"]
+    assert "\nPotvrzené preference uživatele:\n" in system_prompt
+    assert "\\nPotvrzené preference uživatele:" not in system_prompt
+    assert "Čeština a stručné odpovědi" in system_prompt
     assert worker.run_once() is False
 
 
@@ -382,13 +399,16 @@ def test_worker_marks_task_failed_when_model_is_unavailable(monkeypatch):
     task_id = created.json()["id"]
 
     def fail(*args, **kwargs):
-        raise httpx.ConnectError("offline")
+        raise httpx.ConnectError("offline https://user:secret@example.invalid/?token=hidden")
 
     monkeypatch.setattr(worker.httpx, "post", fail)
     assert worker.run_once() is True
     task = client.get(f"/v1/tasks/{task_id}").json()
     assert task["status"] == "failed"
-    assert "offline" in task["error"]
+    assert task["error"] == "Ollama není dostupná. Zkontroluj, že běží na notebooku."
+    assert "secret" not in task["error"]
+    assert "hidden" not in task["error"]
+    assert "example.invalid" not in task["error"]
 
 
 
