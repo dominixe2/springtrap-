@@ -1,6 +1,10 @@
 name: Build Micro Helper Android APK
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "android-wrapper/**"
+      - ".github/workflows/android-apk.yml"
   push:
     branches: [micro-helper]
     paths:
@@ -17,9 +21,9 @@ jobs:
         working-directory: android-wrapper
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Set up Java
@@ -53,7 +57,7 @@ jobs:
           text = p.read_text()
           permission = '    <uses-permission android:name="android.permission.RECORD_AUDIO" />'
           if "android.permission.RECORD_AUDIO" not in text:
-              text = text.replace("<application", permission + "\n    <application", 1)
+              text = text.replace("<application", permission + "\\n    <application", 1)
           p.write_text(text)
           PY
       - name: Build debug APK
