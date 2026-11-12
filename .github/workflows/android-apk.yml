@@ -57,7 +57,7 @@ jobs:
           text = p.read_text()
           permission = '    <uses-permission android:name="android.permission.RECORD_AUDIO" />'
           if "android.permission.RECORD_AUDIO" not in text:
-              text = text.replace("<application", permission + "\\n    <application", 1)
+              text = text.replace("<application", permission + "\n    <application", 1)
           p.write_text(text)
           PY
       - name: Build debug APK
