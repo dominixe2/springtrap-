@@ -17,9 +17,10 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - name: Check JavaScript syntax
@@ -28,5 +29,5 @@ jobs:
         run: node --experimental-default-type=module --test cloudflare/worker.test.mjs
       - name: Validate Wrangler configuration
         run: |
-          npm install --global wrangler
+          npm install --global wrangler@4.160.1
           wrangler deploy --config cloudflare/wrangler.toml --dry-run
