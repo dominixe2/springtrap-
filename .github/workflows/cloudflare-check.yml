@@ -29,5 +29,5 @@ jobs:
         run: node --experimental-default-type=module --test cloudflare/worker.test.mjs
       - name: Validate Wrangler configuration
         run: |
-          npm install --global wrangler
+          npm install --global wrangler@4.160.1
           wrangler deploy --config cloudflare/wrangler.toml --dry-run
