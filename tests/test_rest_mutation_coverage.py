@@ -55,10 +55,11 @@ def endpoint_names(endpoint) -> set[str]:
     return set(code.co_names) if code is not None else set()
 
 
-def test_every_state_changing_local_rest_route_has_an_explicit_policy_gate():
+def route_gate_errors(routes) -> list[str]:
+    """Return actionable failures for unprotected state-changing local routes."""
     uncovered = []
 
-    for route in app.routes:
+    for route in routes:
         route_path = getattr(route, "path", "")
         if not route_path.startswith("/v1/"):
             continue
@@ -85,6 +86,11 @@ def test_every_state_changing_local_rest_route_has_an_explicit_policy_gate():
                     f"{method} {route_path} does not call _authorize_rest_mutation"
                 )
 
+    return uncovered
+
+
+def test_every_state_changing_local_rest_route_has_an_explicit_policy_gate():
+    uncovered = route_gate_errors(app.routes)
     assert not uncovered, (
         "State-changing local REST route(s) are not fully protected: "
         + "; ".join(uncovered)
@@ -101,7 +107,17 @@ def test_chat_is_the_only_builtin_allow_grant():
 
 
 def test_route_gate_checker_detects_an_unprotected_handler():
+    from types import SimpleNamespace
+
     def unprotected_endpoint():
         return {"ok": True}
 
-    assert "_authorize_rest_mutation" not in endpoint_names(unprotected_endpoint)
+    route = SimpleNamespace(
+        path="/v1/test-unprotected",
+        methods={"POST"},
+        endpoint=unprotected_endpoint,
+    )
+
+    errors = route_gate_errors([route])
+    assert any("has no policy action" in error for error in errors)
+    assert any("does not call _authorize_rest_mutation" in error for error in errors)
