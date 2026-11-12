@@ -24,7 +24,7 @@ jobs:
       - name: Validate worker syntax
         run: node --check cloudflare/worker.js
       - name: Install Wrangler
-        run: npm install --global wrangler
+        run: npm install --global wrangler@4.160.1
       - name: Deploy Cloudflare Worker and Durable Object
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
