@@ -44,7 +44,7 @@ PLACEHOLDER_VALUES = {
 
 def sample_path(route_path: str) -> str:
     return re.sub(
-        r"\\{([^{}]+)\\}",
+        r"\{([^{}]+)\}",
         lambda match: PLACEHOLDER_VALUES[match.group(1)],
         route_path,
     )
