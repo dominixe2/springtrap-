@@ -1,7 +1,8 @@
-"""Guard the Adaptive Trust Engine route map against newly added REST mutations.
+"""Guard every state-changing REST route at both mapping and handler level.
 
-Every local /v1 state-changing route must either resolve to a deterministic
-trust-policy action or be explicitly listed as using a separate gate.
+A route is not protected merely because an action exists in the policy map:
+its endpoint must actually invoke the shared authorization gate, or implement
+one of the narrowly documented separate confirmation gates.
 """
 import re
 
@@ -14,14 +15,22 @@ from micro_helper.api import (
 from micro_helper.trust_policy import permission_key
 
 
-SEPARATE_GATES = {
-    # Issues a one-time token only after resolving and validating the requested
-    # target action through the same allowlist.
-    ("POST", "/v1/actions/confirm"),
-    # Uses the dedicated capability/tool confirmation flow instead of REST
-    # mutation confirmation.
-    ("POST", "/v1/tools/{tool_id}/confirm"),
-    ("POST", "/v1/tools/{tool_id}/execute"),
+SEPARATE_GATE_CALLS = {
+    # Issues a one-time token only after resolving and evaluating the target action.
+    ("POST", "/v1/actions/confirm"): {
+        "_resolve_rest_action", "_normalize_rest_arguments", "evaluate_action",
+        "REST_POLICY", "_record_tool_audit", "database",
+    },
+    # Tool confirmation validates the allowlisted tool and policy before issuing.
+    ("POST", "/v1/tools/{tool_id}/confirm"): {
+        "TOOL_ACTIONS", "_normalize_tool_arguments", "evaluate_action",
+        "TOOL_POLICY", "_record_tool_audit", "database",
+    },
+    # Tool execution re-evaluates policy and consumes a matching one-time token.
+    ("POST", "/v1/tools/{tool_id}/execute"): {
+        "TOOL_ACTIONS", "_normalize_tool_arguments", "evaluate_action",
+        "TOOL_POLICY", "_consume_tool_confirmation",
+    },
 }
 
 PLACEHOLDER_VALUES = {
@@ -35,10 +44,15 @@ PLACEHOLDER_VALUES = {
 
 def sample_path(route_path: str) -> str:
     return re.sub(
-        r"\{([^{}]+)\}",
+        r"\\{([^{}]+)\\}",
         lambda match: PLACEHOLDER_VALUES[match.group(1)],
         route_path,
     )
+
+
+def endpoint_names(endpoint) -> set[str]:
+    code = getattr(endpoint, "__code__", None)
+    return set(code.co_names) if code is not None else set()
 
 
 def test_every_state_changing_local_rest_route_has_an_explicit_policy_gate():
@@ -51,16 +65,29 @@ def test_every_state_changing_local_rest_route_has_an_explicit_policy_gate():
 
         methods = getattr(route, "methods", set()) or set()
         for method in sorted(methods & {"POST", "PUT", "PATCH", "DELETE"}):
-            if (method, route_path) in SEPARATE_GATES:
+            key = (method, route_path)
+            names = endpoint_names(route.endpoint)
+
+            if key in SEPARATE_GATE_CALLS:
+                missing = SEPARATE_GATE_CALLS[key] - names
+                if missing:
+                    uncovered.append(
+                        f"{method} {route_path} separate gate missing calls: "
+                        + ", ".join(sorted(missing))
+                    )
                 continue
 
             resolved = _resolve_rest_action(method, sample_path(route_path))
             if resolved is None:
-                uncovered.append(f"{method} {route_path}")
+                uncovered.append(f"{method} {route_path} has no policy action")
+            if "_authorize_rest_mutation" not in names:
+                uncovered.append(
+                    f"{method} {route_path} does not call _authorize_rest_mutation"
+                )
 
     assert not uncovered, (
-        "New state-changing REST route(s) lack an explicit Adaptive Trust "
-        "Engine mapping or documented separate gate: " + ", ".join(uncovered)
+        "State-changing local REST route(s) are not fully protected: "
+        + "; ".join(uncovered)
     )
 
 
@@ -71,3 +98,10 @@ def test_chat_is_the_only_builtin_allow_grant():
     resolved = _resolve_rest_action("POST", "/v1/chat")
     assert resolved is not None
     assert resolved[0] == "rest:POST:/v1/chat"
+
+
+def test_route_gate_checker_detects_an_unprotected_handler():
+    def unprotected_endpoint():
+        return {"ok": True}
+
+    assert "_authorize_rest_mutation" not in endpoint_names(unprotected_endpoint)
