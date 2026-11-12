@@ -70,7 +70,7 @@ jobs:
           cd android/app/build/outputs/apk/debug
           sha256sum app-debug.apk > app-debug.apk.sha256
       - name: Upload installable APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: micro-helper-android-debug-apk
           path: |
