@@ -4,7 +4,7 @@ import pytest
 import micro_helper.api as api
 
 
-client = TestClient(api.app, base_url="http://127.0.0.1:8000")
+client = TestClient(api.app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 8000))
 
 
 @pytest.fixture(autouse=True)
@@ -87,6 +87,26 @@ def test_non_loopback_host_cannot_read_private_api_routes(path):
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "Non-loopback host blocked."
+
+
+def test_remote_socket_peer_cannot_spoof_loopback_host_for_private_reads():
+    remote_client = TestClient(
+        api.app,
+        base_url="http://127.0.0.1:8000",
+        client=("192.0.2.44", 50000),
+    )
+    response = remote_client.get(
+        "/v1/status",
+        headers={
+            "host": "localhost:8000",
+            "origin": "http://localhost:8000",
+            "sec-fetch-site": "same-origin",
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Non-loopback client blocked."
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
 
 
 def test_non_loopback_host_cannot_submit_chat_or_tool_requests():
