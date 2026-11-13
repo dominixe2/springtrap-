@@ -48,3 +48,29 @@ def test_database_refuses_symbolic_link_target(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="symbolic-link"):
         with api.database():
             pass
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits are not portable to Windows.")
+def test_existing_database_file_is_restricted_before_use(monkeypatch, tmp_path):
+    data_dir = tmp_path / ".micro-helper"
+    data_dir.mkdir()
+    database_path = data_dir / "micro_helper.sqlite3"
+    database_path.write_bytes(b"")
+    os.chmod(database_path, 0o644)
+    monkeypatch.setattr(api, "DATABASE_PATH", database_path)
+
+    with api.database():
+        assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX special files are not portable to Windows.")
+def test_database_refuses_fifo_without_blocking(monkeypatch, tmp_path):
+    data_dir = tmp_path / ".micro-helper"
+    data_dir.mkdir()
+    database_path = data_dir / "micro_helper.sqlite3"
+    os.mkfifo(database_path)
+    monkeypatch.setattr(api, "DATABASE_PATH", database_path)
+
+    with pytest.raises(RuntimeError, match="non-regular"):
+        with api.database():
+            pass
