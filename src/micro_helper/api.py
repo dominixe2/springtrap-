@@ -52,7 +52,10 @@ def _is_loopback_peer(peer: str | None) -> bool:
     if not peer:
         return False
     try:
-        return ipaddress.ip_address(peer.strip("[]")).is_loopback
+        address = ipaddress.ip_address(peer.strip("[]"))
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+            return address.ipv4_mapped.is_loopback
+        return address.is_loopback
     except ValueError:
         return False
 
