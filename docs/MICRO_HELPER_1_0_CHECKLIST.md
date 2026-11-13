@@ -1,7 +1,7 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.20
-- **Snapshot date:** 2026-11-12
+- **Checklist version:** 1.0.0-checklist.21
+- **Snapshot date:** 2026-11-13
 - **Snapshot source:** Stacked PR #34 trust-gateway + full backup/restore head `3d517d92a5fa3ee885baaa4be6ce89e7ff990f7b` passed CI run #42679331114: 86 project tests, 11 relay tests, embedded browser JavaScript syntax and Python compilation. PR #34 is based on PR #32 → PR #31 → PR #23 and remains unmerged. PR #25 remains a separate backup/restore implementation reference. Separate PR #33 (`security/render-relay-session-guards`) adds protections to the active Render relay source and passed Micro Helper run #42636316961 plus Cloudflare Relay Checks run #42636316955. PR #35 (`security/backup-export-warning-20261110`) extends the stack with explicit plaintext-export warnings and no-cache headers; its head `d90e2cb632070ddfca41cd222301045bd112997a` passed run #42885578401 with 91 project tests and 11 relay tests. PR #36 (`fix/worker-prompt-and-error-redaction-20261111`) corrects worker preference line breaks and stores categorized task failures instead of raw exception text; head `8e898fe493d7a901bb3c38e2f3da2df803973a01` passed run #43079790199 with 94 project tests and 11 relay tests, embedded JavaScript syntax and Python compilation. Merged PRs #18 and #19 provide additional verified Cloudflare-session and local-origin protections.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
@@ -39,6 +39,8 @@ A level may be raised only when new implementation and evidence are linked in th
 
 ## Current test evidence
 
+- **PASS (PR #37 actual socket-peer loopback enforcement):** head `7abcc7d13780785f4a42a6861a0cda8af7c8031d`, GitHub Actions run [#43485121331](https://github.com/dominixe2/springtrap-/actions/runs/43485121331): 96 project tests and 11 relay tests passed; embedded browser JavaScript syntax and Python compilation passed. The new regression uses a simulated remote peer (`192.0.2.44`) with spoofed `Host: localhost` and verifies that private API reads are rejected with non-cacheable 403 responses. Test clients now declare explicit loopback peers. One Starlette/httpx deprecation warning remains in each pytest suite.
+
 - **PASS:** PR #23 trust-gateway/checklist head `ccf1036b137a4b24947f50accc9042ab86fabb24`, GitHub Actions run [#42512645801](https://github.com/dominixe2/springtrap-/actions/runs/42512645801): 61 project tests and 11 relay tests passed; embedded JavaScript syntax and Python compilation passed. The workflow uses v7 actions, read-only repository permissions and a 15-minute job timeout.
 - **PASS (merged relay guards):** PR #18 Cloudflare Relay Checks [#42376109737](https://github.com/dominixe2/springtrap-/actions/runs/42376109737), including JavaScript syntax, four Durable Object WebSocket guard tests and Wrangler dry-run.
 - **PASS (merged local API guards):** PR #19 Micro Helper checks [#42385818037](https://github.com/dominixe2/springtrap-/actions/runs/42385818037), including project/relay tests, embedded JavaScript syntax and Python compilation.
@@ -56,7 +58,7 @@ A level may be raised only when new implementation and evidence are linked in th
 
 1. The trust policy is not yet enforced through every hosted and desktop tool/action path.
 2. JARVIS PR #5 remains the original unauthenticated LAN Ollama implementation and must not be merged. Draft PR #9 (`security/ollama-relay-auth-20261110`) adds per-launch bearer pairing, HTTPS-only phone token use, rate/concurrency limits and chat-only relay tests. The same PR branch now also carries PR #7's loopback-only Windows bridge binding and a listener-address regression test; latest JARVIS CI has not yet been observed. Keep both relay and Vite development server off the public internet.
-3. The active `micro-helper` base includes the loopback/Origin/Fetch-Metadata protections from merged PR #19. PR #13 remains open against the older `main` API and should not be confused with the active product-branch fix. These checks are defense in depth, not authentication; the local API must remain loopback-only and they do not secure hosted routes or the JARVIS relay.
+3. The active `micro-helper` base includes the loopback/Origin/Fetch-Metadata protections from merged PR #19. PR #37 now also verifies the actual ASGI socket peer IP, so a non-loopback client cannot bypass the Host check by spoofing `Host: localhost`. PR #13 remains open against the older `main` API and should not be confused with the active product-branch fix. These checks are defense in depth, not authentication; the local API must remain loopback-only and they do not secure hosted routes or the JARVIS relay.
 4. Android/Windows physical-device acceptance tests are not recorded.
 5. The hosted source mirror and AppDeploy live snapshot need explicit parity evidence before a source change can be called deployed.
 6. Cross-device encrypted sync, conflict handling and device-session revocation are not yet proven end to end.
@@ -74,6 +76,9 @@ A level may be raised only when new implementation and evidence are linked in th
 7. Recalculate this checklist only after updating the evidence links and levels.
 
 ## Change log
+
+- **1.0.0-checklist.21 (2026-11-13):** PR #37 now checks the actual ASGI socket peer IP for every private `/v1` request in addition to Host/Origin validation. Added a regression where a remote peer spoofs `Host: localhost`; the request is rejected and the response retains `no-store`/ `no-cache` headers. CI run #43485121331 passed 96 project tests and 11 relay tests, embedded JavaScript syntax and Python compilation. Score remains 50.00%; this is a local security hardening, not physical-device or release acceptance.
+
 
 - **1.0.0-checklist.20 (2026-11-12):** records PR #37 as the consolidated superset candidate targeting `micro-helper`, with 12 changed files and the full trust/backup/export/worker stack plus handler-level route enforcement. Its latest documented head passed run #43285515333 (Python-checks job, embedded JavaScript, Python compilation, project and relay tests). Evidence levels and weighted score remain 50.00%; physical installation, signed-in cross-device flows, hosted/desktop policy integration and release acceptance remain unverified.
 
