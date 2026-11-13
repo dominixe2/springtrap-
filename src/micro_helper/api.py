@@ -35,7 +35,7 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 def _is_loopback_hostname(hostname: str | None) -> bool:
-    """Accept only localhost and literal loopback IP addresses."""
+    """Accept only localhost and literal loopback IP addresses in Host/Origin."""
     if not hostname:
         return False
     normalized = hostname.strip("[]").rstrip(".").lower()
@@ -43,6 +43,16 @@ def _is_loopback_hostname(hostname: str | None) -> bool:
         return True
     try:
         return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+def _is_loopback_peer(peer: str | None) -> bool:
+    """Require the actual TCP peer to be a loopback IP; never trust Host for this."""
+    if not peer:
+        return False
+    try:
+        return ipaddress.ip_address(peer.strip("[]")).is_loopback
     except ValueError:
         return False
 
@@ -63,6 +73,13 @@ async def protect_local_api(request: Request, call_next):
 
     if is_private_api and not _is_loopback_hostname(request.url.hostname):
         return private_response(JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."}))
+
+    # Host and Origin are caller-controlled headers. Also verify the actual
+    # socket peer so a LAN client cannot spoof Host: localhost if the server
+    # is accidentally bound beyond loopback.
+    peer_host = request.client.host if request.client is not None else None
+    if is_private_api and not _is_loopback_peer(peer_host):
+        return private_response(JSONResponse(status_code=403, content={"detail": "Non-loopback client blocked."}))
 
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         request_host = request.headers.get("host", "").lower()
