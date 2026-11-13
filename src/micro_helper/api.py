@@ -5,6 +5,7 @@ import ipaddress
 import os
 import re
 import sqlite3
+import stat
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -77,14 +78,62 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _secure_storage_permissions() -> None:
+    """Keep local database files private on POSIX without changing custom parent directories."""
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if os.name != "posix":
+        # Windows permissions are inherited from the user's profile/ACL.
+        return
+
+    parent = DATABASE_PATH.parent
+    if parent.name == ".micro-helper":
+        if parent.is_symlink():
+            raise RuntimeError("Refusing a symbolic-link Micro Helper data directory.")
+        os.chmod(parent, 0o700)
+
+    # Create the database with a private mode from its first byte, rather than
+    # creating a briefly world-readable SQLite file and chmodding it later.
+    create_flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(DATABASE_PATH, create_flags, 0o600)
+    except FileExistsError:
+        pass
+    else:
+        os.close(descriptor)
+
+    # SQLite may create WAL/SHM/journal sidecars. Refuse symlinks and tighten
+    # every regular file without following a path that was replaced by a link.
+    for path in (
+        DATABASE_PATH,
+        Path(str(DATABASE_PATH) + "-wal"),
+        Path(str(DATABASE_PATH) + "-shm"),
+        Path(str(DATABASE_PATH) + "-journal"),
+    ):
+        if path.is_symlink():
+            raise RuntimeError("Refusing a symbolic-link Micro Helper database file.")
+        try:
+            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise RuntimeError("Unable to secure Micro Helper database file permissions.") from exc
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise RuntimeError("Refusing a non-regular Micro Helper database file.")
+            os.fchmod(descriptor, 0o600)
+        finally:
+            os.close(descriptor)
+
+
 @contextmanager
 def database() -> Iterator[sqlite3.Connection]:
-    """Open the local database and ensure its small schema exists."""
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    """Open the local database with private file permissions and ensure its schema exists."""
+    _secure_storage_permissions()
     connection = sqlite3.connect(DATABASE_PATH, timeout=5)
     connection.row_factory = sqlite3.Row
     try:
         connection.execute("PRAGMA journal_mode=WAL")
+        _secure_storage_permissions()
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS profile (
@@ -144,6 +193,7 @@ def database() -> Iterator[sqlite3.Connection]:
             """
         )
         connection.commit()
+        _secure_storage_permissions()
         yield connection
     finally:
         connection.close()
