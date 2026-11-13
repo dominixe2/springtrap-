@@ -31,3 +31,11 @@
 - The Windows EXE is not code-signed; Windows SmartScreen may display a warning.
 - The browser-local fallback uses browser storage and is not encrypted by this app. Treat device access and browser profile security accordingly.
 - A successful CI build proves packaging and static checks, not behavior on the user's physical phone or notebook.
+
+
+## Local SQLite file permissions
+
+- On POSIX systems, the default `~/.micro-helper` data directory is restricted to mode `0700`.
+- The SQLite database and its WAL/SHM/journal sidecars are restricted to mode `0600`; symlink targets and non-regular files are refused.
+- When `MICRO_HELPER_DB` points into a custom directory, the database files are restricted but the custom parent directory is left unchanged.
+- On Windows, file access remains governed by the inherited Windows user profile ACL. This code does not claim to configure or verify Windows ACLs.
