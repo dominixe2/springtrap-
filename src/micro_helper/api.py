@@ -112,7 +112,16 @@ def _secure_storage_permissions() -> None:
         if path.is_symlink():
             raise RuntimeError("Refusing a symbolic-link Micro Helper database file.")
         try:
-            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            path_mode = path.lstat().st_mode
+        except FileNotFoundError:
+            continue
+        if not stat.S_ISREG(path_mode):
+            raise RuntimeError("Refusing a non-regular Micro Helper database file.")
+        try:
+            descriptor = os.open(
+                path,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0),
+            )
         except FileNotFoundError:
             continue
         except OSError as exc:
