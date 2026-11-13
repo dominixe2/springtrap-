@@ -89,6 +89,16 @@ def test_non_loopback_host_cannot_read_private_api_routes(path):
     assert response.json()["detail"] == "Non-loopback host blocked."
 
 
+@pytest.mark.parametrize("peer", ["127.0.0.1", "::1", "::ffff:127.0.0.1"])
+def test_loopback_peer_helper_accepts_local_addresses(peer):
+    assert api._is_loopback_peer(peer) is True
+
+
+@pytest.mark.parametrize("peer", ["192.0.2.10", "::ffff:192.0.2.10", "testclient", ""])
+def test_loopback_peer_helper_rejects_remote_or_unresolved_addresses(peer):
+    assert api._is_loopback_peer(peer) is False
+
+
 def test_remote_socket_peer_cannot_spoof_loopback_host_for_private_reads():
     remote_client = TestClient(
         api.app,
