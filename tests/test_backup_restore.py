@@ -11,7 +11,7 @@ import pytest
 import micro_helper.api as api
 
 
-raw_client = TestClient(api.app, base_url="http://127.0.0.1:8000")
+raw_client = TestClient(api.app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 8000))
 
 
 class PolicyAwareTestClient:
