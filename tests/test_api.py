@@ -1,9 +1,53 @@
 from fastapi.testclient import TestClient
+from urllib.parse import urlsplit
 import pytest
 import micro_helper.api as api
 
 
-client = TestClient(api.app, base_url="http://127.0.0.1:8000")
+raw_client = TestClient(api.app, base_url="http://127.0.0.1:8000", client=("127.0.0.1", 8000))
+
+
+class PolicyAwareTestClient:
+    """Simulate the browser UI obtaining an action-bound token after approval."""
+
+    def request(self, method, url, **kwargs):
+        method = method.upper()
+        path = urlsplit(str(url)).path
+        exempt = path == "/v1/chat" or path == "/v1/actions/confirm" or path.startswith("/v1/tools/")
+        if method in {"POST", "PUT", "PATCH", "DELETE"} and path.startswith("/v1/") and not exempt:
+            arguments = kwargs.get("json")
+            if not isinstance(arguments, dict):
+                arguments = {}
+            confirmation = raw_client.post(
+                "/v1/actions/confirm",
+                json={"method": method, "path": path, "arguments": arguments},
+            )
+            if confirmation.status_code == 200:
+                headers = dict(kwargs.get("headers") or {})
+                headers["X-Micro-Helper-Confirmation"] = confirmation.json()["confirmation_token"]
+                kwargs["headers"] = headers
+        return raw_client.request(method, url, **kwargs)
+
+    def get(self, url, **kwargs):
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url, **kwargs):
+        return self.request("POST", url, **kwargs)
+
+    def put(self, url, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def patch(self, url, **kwargs):
+        return self.request("PATCH", url, **kwargs)
+
+    def delete(self, url, **kwargs):
+        return self.request("DELETE", url, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(raw_client, name)
+
+
+client = PolicyAwareTestClient()
 
 
 @pytest.fixture(autouse=True)
@@ -198,17 +242,85 @@ def test_tool_registry_is_explicit_and_defaults_to_deny():
     assert next(item for item in body["tools"] if item["id"] == "memory.create")["confirmation_required"] is True
 
 
-def test_tool_execution_is_allowlisted_and_memory_write_requires_confirmation():
+def test_tool_execution_uses_policy_and_one_time_confirmation_tokens():
     assert client.post("/v1/tools/profile.read/execute", json={}).status_code == 200
+    assert client.post("/v1/tools/memory.list/execute", json={}).status_code == 200
     assert client.post("/v1/tools/shell/execute", json={}).status_code == 404
-    denied = client.post("/v1/tools/memory.create/execute", json={"arguments": {"content": "test"}})
+
+    arguments = {"content": "poznámka z nástroje", "category": "context"}
+    denied = client.post("/v1/tools/memory.create/execute", json={"arguments": arguments})
     assert denied.status_code == 403
+
+    # A caller-provided boolean is not proof of a fresh user confirmation.
+    forged_boolean = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": arguments, "confirmed": True
+    })
+    assert forged_boolean.status_code == 403
+
+    challenge = client.post("/v1/tools/memory.create/confirm", json={"arguments": arguments})
+    assert challenge.status_code == 200
+    token = challenge.json()["confirmation_token"]
+
+    # The token is bound to the exact normalized arguments and is not consumed by a mismatch.
+    mismatch = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": {"content": "jiná poznámka", "category": "context"},
+        "confirmation_token": token,
+    })
+    assert mismatch.status_code == 403
+
     saved = client.post("/v1/tools/memory.create/execute", json={
-        "arguments": {"content": "poznámka z nástroje", "category": "context"}, "confirmed": True
+        "arguments": arguments, "confirmation_token": token
     })
     assert saved.status_code == 200
     assert saved.json()["result"]["content"] == "poznámka z nástroje"
     assert client.get("/v1/memories").json()["memories"][0]["content"] == "poznámka z nástroje"
+
+    replay = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": arguments, "confirmation_token": token
+    })
+    assert replay.status_code == 403
+
+
+def test_tool_confirmation_expires_and_audit_omits_private_arguments(monkeypatch):
+    import hashlib
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    arguments = {"content": "tajná testovací poznámka", "category": "context"}
+    challenge = client.post("/v1/tools/memory.create/confirm", json={"arguments": arguments})
+    assert challenge.status_code == 200
+    token = challenge.json()["confirmation_token"]
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    expired = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    with api.database() as db:
+        db.execute(
+            "UPDATE tool_confirmations SET expires_at=? WHERE token_hash=?",
+            (expired, token_hash),
+        )
+        db.commit()
+
+    response = client.post("/v1/tools/memory.create/execute", json={
+        "arguments": arguments, "confirmation_token": token
+    })
+    assert response.status_code == 403
+
+    events = client.get("/v1/audit?limit=20").json()["events"]
+    assert any(event["outcome"] == "confirmation_issued" for event in events)
+    assert any(event["outcome"] == "confirmation_rejected" for event in events)
+    serialized = json.dumps(events, ensure_ascii=False)
+    assert "tajná testovací poznámka" not in serialized
+    assert token not in serialized
+
+
+def test_tool_audit_records_success_without_storing_tool_payloads():
+    result = client.post("/v1/tools/profile.read/execute", json={})
+    assert result.status_code == 200
+    events = client.get("/v1/audit").json()["events"]
+    event = next(item for item in events if item["tool_id"] == "profile.read")
+    assert event["decision"] == "allow"
+    assert event["outcome"] == "succeeded"
+    assert "arguments" not in event
+    assert "result" not in event
 
 
 
@@ -237,13 +349,22 @@ def test_task_queue_rejects_unapproved_task_kinds_and_unknown_ids():
     assert client.post("/v1/tasks/not-a-real-task/cancel").status_code == 404
 
 
-def test_worker_processes_one_draft_task(monkeypatch):
+def test_worker_processes_one_draft_task_and_formats_preferences(monkeypatch):
     from micro_helper import worker
+
+    with api.database() as db:
+        db.execute(
+            "INSERT INTO preferences(category, preference, value, source, updated_at) "
+            "VALUES (?, ?, ?, 'user', 'now')",
+            ("communication", "language", "Čeština a stručné odpovědi"),
+        )
+        db.commit()
 
     created = client.post("/v1/tasks", json={
         "kind": "agent.draft", "title": "Návrh", "input_text": "Napiš krátký návrh."
     })
     task_id = created.json()["id"]
+    captured = {}
 
     class FakeResponse:
         def raise_for_status(self):
@@ -252,11 +373,19 @@ def test_worker_processes_one_draft_task(monkeypatch):
         def json(self):
             return {"message": {"content": "Hotový návrh."}}
 
-    monkeypatch.setattr(worker.httpx, "post", lambda *args, **kwargs: FakeResponse())
+    def fake_post(*args, **kwargs):
+        captured["payload"] = kwargs["json"]
+        return FakeResponse()
+
+    monkeypatch.setattr(worker.httpx, "post", fake_post)
     assert worker.run_once() is True
     task = client.get(f"/v1/tasks/{task_id}").json()
     assert task["status"] == "completed"
     assert task["result"] == "Hotový návrh."
+    system_prompt = captured["payload"]["messages"][0]["content"]
+    assert "\nPotvrzené preference uživatele:\n" in system_prompt
+    assert "\\nPotvrzené preference uživatele:" not in system_prompt
+    assert "Čeština a stručné odpovědi" in system_prompt
     assert worker.run_once() is False
 
 
@@ -270,13 +399,68 @@ def test_worker_marks_task_failed_when_model_is_unavailable(monkeypatch):
     task_id = created.json()["id"]
 
     def fail(*args, **kwargs):
-        raise httpx.ConnectError("offline")
+        raise httpx.ConnectError("offline https://user:secret@example.invalid/?token=hidden")
 
     monkeypatch.setattr(worker.httpx, "post", fail)
     assert worker.run_once() is True
     task = client.get(f"/v1/tasks/{task_id}").json()
     assert task["status"] == "failed"
-    assert "offline" in task["error"]
+    assert task["error"] == "Ollama není dostupná. Zkontroluj, že běží na notebooku."
+    assert "secret" not in task["error"]
+    assert "hidden" not in task["error"]
+    assert "example.invalid" not in task["error"]
+
+
+
+@pytest.mark.parametrize(
+    ("failure_kind", "expected_error"),
+    [
+        ("timeout", "Ollama neodpověděla v časovém limitu."),
+        ("http_status", "Ollama vrátila HTTP 502."),
+        ("unexpected", "Úloha selhala (RuntimeError)."),
+    ],
+)
+def test_worker_persists_safe_error_categories_without_request_details(
+    monkeypatch, failure_kind, expected_error
+):
+    from micro_helper import worker
+    import httpx
+
+    created = client.post("/v1/tasks", json={
+        "kind": "agent.draft", "title": "Návrh", "input_text": "Napiš návrh."
+    })
+    task_id = created.json()["id"]
+    request = httpx.Request(
+        "POST", "https://user:secret@example.invalid/api/chat?token=hidden"
+    )
+
+    if failure_kind == "timeout":
+        failure = httpx.ReadTimeout(
+            "timeout https://user:secret@example.invalid/?token=hidden",
+            request=request,
+        )
+    elif failure_kind == "http_status":
+        response = httpx.Response(502, request=request)
+        failure = httpx.HTTPStatusError(
+            "upstream failure https://user:secret@example.invalid/?token=hidden",
+            request=request,
+            response=response,
+        )
+    else:
+        failure = RuntimeError(
+            "unexpected failure https://user:secret@example.invalid/?token=hidden"
+        )
+
+    def fail(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(worker.httpx, "post", fail)
+    assert worker.run_once() is True
+    task = client.get(f"/v1/tasks/{task_id}").json()
+    assert task["status"] == "failed"
+    assert task["error"] == expected_error
+    for sensitive_fragment in ("secret", "hidden", "example.invalid", "user:"):
+        assert sensitive_fragment not in task["error"]
 
 
 
@@ -340,3 +524,81 @@ def test_home_page_exposes_learning_plan_ui_and_offline_support():
     assert 'id="learningPlanFilter"' in html
     assert "Learning plans UI" in html
     assert 'url.pathname === "/v1/learning-plans" && method === "POST"' in html
+
+
+
+def test_direct_rest_memory_write_cannot_bypass_policy_with_forged_boolean():
+    response = raw_client.post(
+        "/v1/memories",
+        json={"content": "nepovolený zápis", "category": "context", "confirmed": True},
+    )
+    assert response.status_code == 403
+    assert raw_client.get("/v1/memories").json()["memories"] == []
+
+
+def test_rest_confirmation_is_bound_to_method_path_arguments_and_single_use():
+    arguments = {"content": "přesná poznámka", "category": "context"}
+    issued = raw_client.post(
+        "/v1/actions/confirm",
+        json={"method": "POST", "path": "/v1/memories", "arguments": arguments},
+    )
+    assert issued.status_code == 200
+    token = issued.json()["confirmation_token"]
+    headers = {"X-Micro-Helper-Confirmation": token}
+
+    mismatch = raw_client.post(
+        "/v1/memories",
+        json={"content": "jiná poznámka", "category": "context"},
+        headers=headers,
+    )
+    assert mismatch.status_code == 403
+
+    saved = raw_client.post("/v1/memories", json=arguments, headers=headers)
+    assert saved.status_code == 201
+    replay = raw_client.post("/v1/memories", json=arguments, headers=headers)
+    assert replay.status_code == 403
+
+
+def test_rest_confirmation_rejects_wrong_path_and_unknown_mutation():
+    issued = raw_client.post(
+        "/v1/actions/confirm",
+        json={"method": "POST", "path": "/v1/memories", "arguments": {"content": "x", "category": "context"}},
+    )
+    token = issued.json()["confirmation_token"]
+    wrong_path = raw_client.put(
+        "/v1/profile",
+        json={"agent_name": "Forged", "language": "cs-CZ", "style": "friendly"},
+        headers={"X-Micro-Helper-Confirmation": token},
+    )
+    assert wrong_path.status_code == 403
+    unknown = raw_client.post(
+        "/v1/actions/confirm",
+        json={"method": "POST", "path": "/v1/admin/reset", "arguments": {}},
+    )
+    assert unknown.status_code == 404
+
+
+def test_rest_policy_covers_every_state_changing_route():
+    routes = [
+        ("POST", "/v1/chat"),
+        ("POST", "/v1/tasks"),
+        ("POST", "/v1/tasks/123/cancel"),
+        ("POST", "/v1/learning-plans"),
+        ("PATCH", "/v1/learning-plans/plan-1/status"),
+        ("DELETE", "/v1/learning-plans/plan-1"),
+        ("PUT", "/v1/profile"),
+        ("POST", "/v1/memories"),
+        ("PUT", "/v1/memories/1"),
+        ("DELETE", "/v1/memories/1"),
+        ("POST", "/v1/preferences"),
+        ("DELETE", "/v1/preferences/1"),
+        ("DELETE", "/v1/conversations"),
+    ]
+    assert all(api._resolve_rest_action(method, path) is not None for method, path in routes)
+
+
+def test_home_page_exposes_rest_confirmation_flow():
+    html = client.get("/").text
+    assert "/v1/actions/confirm" in html
+    assert "X-Micro-Helper-Confirmation" in html
+    assert "localConfirmations" in html
