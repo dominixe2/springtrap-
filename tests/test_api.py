@@ -830,3 +830,12 @@ def test_expired_local_session_is_rejected_even_when_cookie_is_present():
         "configured": True,
         "authenticated": False,
     }
+
+
+def test_local_auth_ui_discloses_recovery_limit_and_never_stores_credentials():
+    response = raw_client.get("/static/local-auth.js")
+    assert response.status_code == 200
+    assert "obnovení" in response.text.lower()
+    assert "localStorage.setItem" not in response.text
+    assert "sessionStorage.setItem" not in response.text
+    assert "HttpOnly cookie" in response.text
