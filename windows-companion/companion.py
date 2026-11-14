@@ -66,7 +66,7 @@ code{display:block;margin:22px 0;padding:20px;border-radius:14px;background:#071
 <p>Jednorázový kód je dostupný pouze na tomto notebooku. Zadej jej do panelu Windows Companion v aplikaci Micro Helper.</p>
 <code id="pairingCode">Načítám…</code>
 <p id="state" role="status">Kontroluji stav…</p>
-<small id="expiry">Kód se po vypršení automaticky skryje. Tato stránka jej neukládá do localStorage ani sessionStorage.</small>
+<small id="expiry">Kód se po vypršení automaticky skryje. Tato stránka jej nikam neukládá.</small>
 </main>
 <script>
 async function refreshPairingStatus(){
