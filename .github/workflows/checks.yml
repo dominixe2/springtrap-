@@ -40,7 +40,9 @@ jobs:
               subprocess.run(["node", "--check", str(path)], check=True)
           PY
       - name: Compile source
-        run: python -m compileall -q src tests cloud-relay
+        run: python -m compileall -q src tests cloud-relay windows-companion
+      - name: Run Windows Companion unit tests
+        run: python -m unittest discover -s windows-companion/tests -v
       - name: Run project tests
         run: pytest -q
       - name: Run relay tests
