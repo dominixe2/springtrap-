@@ -31,7 +31,7 @@ from micro_helper.trust_policy import (
     permission_key,
 )
 
-app = FastAPI(title="Micro Helper", version="0.3.0")
+app = FastAPI(title="Micro Helper", version="0.4.0")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -93,6 +93,7 @@ async def protect_local_api(request: Request, call_next):
     if is_private_api and not _is_loopback_peer(peer_host):
         return private_response(JSONResponse(status_code=403, content={"detail": "Non-loopback client blocked."}))
 
+    origin = None
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         request_host = request.headers.get("host", "").lower()
         fetch_site = request.headers.get("sec-fetch-site", "").lower()
@@ -399,7 +400,12 @@ def _auth_login_blocked(key: str) -> bool:
         attempts = [stamp for stamp in _AUTH_LOGIN_FAILURES.get(key, []) if now - stamp < AUTH_FAILURE_WINDOW_SECONDS]
         _AUTH_LOGIN_FAILURES[key] = attempts
         if len(_AUTH_LOGIN_FAILURES) > 256:
-            _AUTH_LOGIN_FAILURES.update({item: values for item, values in _AUTH_LOGIN_FAILURES.items() if values})
+            oldest = sorted(
+                _AUTH_LOGIN_FAILURES,
+                key=lambda item: max(_AUTH_LOGIN_FAILURES[item], default=0.0),
+            )
+            for item in oldest[: len(_AUTH_LOGIN_FAILURES) - 256]:
+                _AUTH_LOGIN_FAILURES.pop(item, None)
         return len(attempts) >= AUTH_FAILURE_LIMIT
 
 
