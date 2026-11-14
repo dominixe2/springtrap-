@@ -76,3 +76,10 @@
 - This is single-user authentication for a loopback-only local instance, not multi-user cloud authentication or a way to expose the API to a LAN.
 - Password recovery is not implemented yet. Keep a separate backup before any manual recovery procedure.
 - The browser UI does not put the password or session value into localStorage or sessionStorage.
+
+## Local SQLite file permissions
+
+- On POSIX systems, the default ~/.micro-helper data directory is restricted to mode 0700.
+- The SQLite database and its WAL/SHM/journal sidecars are restricted to mode 0600; symlink targets and non-regular files are refused.
+- When MICRO_HELPER_DB points into a custom directory, the database files are restricted but the custom parent directory is left unchanged.
+- On Windows, file access remains governed by the inherited Windows user profile ACL. This code does not claim to configure or verify Windows ACLs.
