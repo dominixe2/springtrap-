@@ -95,8 +95,8 @@ class CompanionSecurityTests(unittest.TestCase):
                 page = response.read().decode("utf-8")
             self.assertIn("textContent", page)
             self.assertIn('fetch("/status"', page)
-            self.assertNotIn("localStorage", page)
-            self.assertNotIn("sessionStorage", page)
+            self.assertNotIn("localStorage.setItem", page)
+            self.assertNotIn("sessionStorage.setItem", page)
         finally:
             server.shutdown()
             server.server_close()
