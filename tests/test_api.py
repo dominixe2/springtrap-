@@ -362,7 +362,8 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert icon.status_code == 200
     assert "<svg" in icon.text
     assert worker.status_code == 200
-    assert "micro-helper-pwa-v2" in worker.text
+    assert "micro-helper-pwa-v3" in worker.text
+    assert "/static/local-auth.js" in worker.text
 
 
 def test_home_page_has_offline_local_fallback():
@@ -700,6 +701,7 @@ def test_direct_rest_memory_write_cannot_bypass_policy_with_forged_boolean():
     response = raw_client.post(
         "/v1/memories",
         json={"content": "nepovolený zápis", "category": "context", "confirmed": True},
+        headers={"Origin": TEST_ORIGIN},
     )
     assert response.status_code == 403
     assert raw_client.get("/v1/memories").json()["memories"] == []
@@ -710,10 +712,11 @@ def test_rest_confirmation_is_bound_to_method_path_arguments_and_single_use():
     issued = raw_client.post(
         "/v1/actions/confirm",
         json={"method": "POST", "path": "/v1/memories", "arguments": arguments},
+        headers={"Origin": TEST_ORIGIN},
     )
     assert issued.status_code == 200
     token = issued.json()["confirmation_token"]
-    headers = {"X-Micro-Helper-Confirmation": token}
+    headers = {"Origin": TEST_ORIGIN, "X-Micro-Helper-Confirmation": token}
 
     mismatch = raw_client.post(
         "/v1/memories",
@@ -732,17 +735,19 @@ def test_rest_confirmation_rejects_wrong_path_and_unknown_mutation():
     issued = raw_client.post(
         "/v1/actions/confirm",
         json={"method": "POST", "path": "/v1/memories", "arguments": {"content": "x", "category": "context"}},
+        headers={"Origin": TEST_ORIGIN},
     )
     token = issued.json()["confirmation_token"]
     wrong_path = raw_client.put(
         "/v1/profile",
         json={"agent_name": "Forged", "language": "cs-CZ", "style": "friendly"},
-        headers={"X-Micro-Helper-Confirmation": token},
+        headers={"Origin": TEST_ORIGIN, "X-Micro-Helper-Confirmation": token},
     )
     assert wrong_path.status_code == 403
     unknown = raw_client.post(
         "/v1/actions/confirm",
         json={"method": "POST", "path": "/v1/admin/reset", "arguments": {}},
+        headers={"Origin": TEST_ORIGIN},
     )
     assert unknown.status_code == 404
 
