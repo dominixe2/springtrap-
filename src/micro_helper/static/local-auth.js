@@ -60,7 +60,7 @@
     error.id = "mh-local-auth-error";
     error.setAttribute("role", "alert");
     const note = document.createElement("small");
-    note.textContent = "Heslo ani relace se neukládají do localStorage nebo sessionStorage. Místní API musí zůstat dostupné pouze přes loopback.";
+    note.textContent = (configured ? "Obnovení místního hesla zatím není dostupné. " : "Po nastavení hesla zatím není dostupné jeho obnovení. ") + "Heslo ani relace se neukládají do localStorage nebo sessionStorage. Místní API musí zůstat dostupné pouze přes loopback.";
     form.append(submit, error);
     card.append(title, description, form, note);
     gate.append(card);
