@@ -202,6 +202,32 @@ def test_private_mutations_require_origin_even_with_a_valid_session():
     assert foreign_origin.status_code == 403
 
 
+def test_local_auth_marks_cookie_secure_on_https():
+    https_client = TestClient(
+        api.app,
+        base_url="https://127.0.0.1:8000",
+        client=("127.0.0.1", 8000),
+    )
+    response = https_client.post(
+        "/v1/auth/login",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": "https://127.0.0.1:8000"},
+    )
+    assert response.status_code == 200
+    cookie_header = response.headers["set-cookie"].lower()
+    assert "secure" in cookie_header
+    assert "httponly" in cookie_header
+    assert "samesite=strict" in cookie_header
+
+
+def test_local_session_is_invalidated_if_local_auth_record_is_removed():
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth WHERE id=1")
+        db.commit()
+    assert raw_client.get("/v1/profile").status_code == 401
+    assert raw_client.get("/v1/auth/status").json() == {"configured": False, "authenticated": False}
+
+
 def test_local_session_expiry_invalidates_the_cookie():
     token = raw_client.cookies.get("mh_session")
     assert token
