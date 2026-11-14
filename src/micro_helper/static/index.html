@@ -17,7 +17,8 @@ input{min-width:0;flex:1}button{cursor:pointer;background:#1b3447}button.primary
 .msg{max-width:82%;padding:12px 15px;margin:10px 0;border-radius:15px;white-space:pre-wrap;line-height:1.45}.user{margin-left:auto;background:#21483f}.agent{background:#18263b;border:1px solid #2a3b56}
 form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
 @media(max-width:600px){main{padding:14px}.msg{max-width:94%}#messages{max-height:none}}
-</style></head>
+</style> <script src="/static/local-auth.js" defer></script>
+</head>
 <body><main>
 <header><div class="orb"></div><div><h1 id="title">Micro Helper</h1><small>Tvůj osobní lokální AI agent</small></div><span class="status" id="status">Připraven</span></header>
 <section id="setup"><label>Jméno agenta <input id="agentName" value="Micro Helper" maxlength="30"></label><label>Model <input id="model" value="llama3.2" maxlength="80"></label><button class="primary" id="save">Uložit nastavení</button></section>
