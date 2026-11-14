@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi.testclient import TestClient
 import pytest
 
@@ -10,6 +12,14 @@ client = TestClient(api.app, base_url="http://127.0.0.1:8000", client=("127.0.0.
 @pytest.fixture(autouse=True)
 def isolated_database(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "DATABASE_PATH", tmp_path / "origin-tests.sqlite3")
+    client.cookies.clear()
+    api._AUTH_LOGIN_FAILURES.clear()
+    setup = client.post(
+        "/v1/auth/setup",
+        json={"password": secrets.token_urlsafe(24)},
+        headers={"origin": "http://127.0.0.1:8000"},
+    )
+    assert setup.status_code == 201
 
 
 def test_cross_origin_profile_write_is_rejected():
@@ -38,6 +48,7 @@ def test_same_origin_profile_write_still_works_after_explicit_action_confirmatio
     arguments = {"agent_name": "Nova", "language": "cs-CZ", "style": "friendly"}
     confirmation = client.post(
         "/v1/actions/confirm",
+        headers={"origin": "http://127.0.0.1:8000"},
         json={"method": "PUT", "path": "/v1/profile", "arguments": arguments},
     )
     assert confirmation.status_code == 200
