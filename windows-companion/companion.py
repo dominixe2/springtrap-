@@ -38,8 +38,13 @@ class PairingStatus:
     def snapshot(self) -> dict[str, object]:
         with self._lock:
             remaining = max(0, int(self._expires_at - time.monotonic()))
+            if remaining == 0:
+                # Do not merely hide an expired one-time code from HTTP clients;
+                # remove it from process memory as soon as its TTL has elapsed.
+                self._pairing_code = None
+                self._expires_at = 0.0
             return {
-                "pairing_code": self._pairing_code if remaining > 0 else None,
+                "pairing_code": self._pairing_code,
                 "expires_in": remaining,
                 "connected": self._connected,
             }
