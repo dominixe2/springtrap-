@@ -435,7 +435,12 @@ def _has_valid_local_session(request: Request) -> bool:
     token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
     with database() as db:
         row = db.execute(
-            "SELECT expires_at FROM local_sessions WHERE token_hash=?",
+            """
+            SELECT sessions.expires_at
+            FROM local_sessions AS sessions
+            INNER JOIN local_auth ON local_auth.id=1
+            WHERE sessions.token_hash=?
+            """,
             (token_hash,),
         ).fetchone()
     if row is None:
