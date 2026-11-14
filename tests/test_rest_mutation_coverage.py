@@ -16,6 +16,19 @@ from micro_helper.trust_policy import permission_key
 
 
 SEPARATE_GATE_CALLS = {
+    # First-run setup is one-time, strong-password and exact same-origin only.
+    ("POST", "/v1/auth/setup"): {
+        "_is_same_origin_auth_request", "_password_digest", "database", "_issue_local_session",
+    },
+    # Login is same-origin, rate-limited, constant-time verified and issues a short-lived session.
+    ("POST", "/v1/auth/login"): {
+        "_is_same_origin_auth_request", "_auth_login_blocked", "_password_digest",
+        "compare_digest", "_issue_local_session",
+    },
+    # Logout requires the exact same origin and revokes the server-side session.
+    ("POST", "/v1/auth/logout"): {
+        "_is_same_origin_auth_request", "database", "delete_cookie",
+    },
     # Issues a one-time token only after resolving and evaluating the target action.
     ("POST", "/v1/actions/confirm"): {
         "_resolve_rest_action", "_normalize_rest_arguments", "evaluate_action",
