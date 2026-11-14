@@ -149,6 +149,7 @@ def test_local_auth_login_cookie_is_httponly_strict_and_revocable():
     assert "max-age=43200" in cookie_header
     assert "mh_session" not in response.text
     session_value = raw_client.cookies.get("mh_session")
+    assert session_value not in response.text
     assert session_value
     session_hash = hashlib.sha256(session_value.encode("utf-8")).hexdigest()
     with api.database() as db:
@@ -803,3 +804,29 @@ def test_home_page_exposes_rest_confirmation_flow():
     assert "/v1/actions/confirm" in html
     assert "X-Micro-Helper-Confirmation" in html
     assert "localConfirmations" in html
+
+
+def test_expired_local_session_is_rejected_even_when_cookie_is_present():
+    raw_client.cookies.clear()
+    response = raw_client.post(
+        "/v1/auth/login",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert response.status_code == 200
+    session_value = raw_client.cookies.get("mh_session")
+    assert session_value
+    session_hash = hashlib.sha256(session_value.encode("utf-8")).hexdigest()
+
+    with api.database() as db:
+        db.execute(
+            "UPDATE local_sessions SET expires_at=? WHERE token_hash=?",
+            ("2000-01-01T00:00:00+00:00", session_hash),
+        )
+        db.commit()
+
+    assert raw_client.get("/v1/profile").status_code == 401
+    assert raw_client.get("/v1/auth/status").json() == {
+        "configured": True,
+        "authenticated": False,
+    }
