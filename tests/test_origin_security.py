@@ -144,12 +144,18 @@ def test_malformed_or_wrong_origin_is_rejected(origin):
     assert response.status_code == 403
 
 
-@pytest.mark.parametrize("hostname", ["localhost", "localhost.", "127.0.0.1", "::1"])
+@pytest.mark.parametrize(
+    "hostname",
+    ["localhost", "localhost.", "127.0.0.1", "::1", "::ffff:127.0.0.1"],
+)
 def test_loopback_hostname_helper_accepts_localhost(hostname):
     assert api._is_loopback_hostname(hostname) is True
 
 
-@pytest.mark.parametrize("hostname", ["attacker.example", "192.0.2.10", "0.0.0.0", ""])
+@pytest.mark.parametrize(
+    "hostname",
+    ["attacker.example", "192.0.2.10", "0.0.0.0", "::ffff:192.0.2.10", ""],
+)
 def test_loopback_hostname_helper_rejects_non_loopback(hostname):
     assert api._is_loopback_hostname(hostname) is False
 
