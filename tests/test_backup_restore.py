@@ -337,12 +337,17 @@ def test_restore_replays_valid_chunked_body_without_content_length():
             yield payload[17:]
 
         transport = httpx.ASGITransport(app=api.app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8000") as async_client:
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://127.0.0.1:8000",
+            cookies={"mh_session": raw_client.cookies.get("mh_session")},
+        ) as async_client:
             return await async_client.post(
                 "/v1/backup/restore",
                 content=chunks(),
                 headers={
                     "content-type": "application/json",
+                    "origin": "http://127.0.0.1:8000",
                     "x-micro-helper-confirmation": token,
                 },
             )
