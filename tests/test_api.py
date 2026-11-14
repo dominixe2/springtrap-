@@ -1,6 +1,10 @@
-from fastapi.testclient import TestClient
+import hashlib
+import secrets
 from urllib.parse import urlsplit
+
 import pytest
+from fastapi.testclient import TestClient
+
 import micro_helper.api as api
 
 
@@ -54,9 +58,6 @@ class PolicyAwareTestClient:
 
 client = PolicyAwareTestClient()
 
-
-import secrets
-import hashlib
 
 TEST_LOCAL_PASSWORD = secrets.token_urlsafe(24)
 TEST_ORIGIN = "http://127.0.0.1:8000"
@@ -197,6 +198,17 @@ def test_local_session_expiry_invalidates_the_cookie():
     assert raw_client.get("/v1/profile").status_code == 401
 
 
+def test_home_page_loads_local_auth_gate_without_browser_token_storage():
+    home = client.get("/")
+    assert '/static/local-auth.js' in home.text
+    script = client.get("/static/local-auth.js")
+    assert script.status_code == 200
+    assert 'credentials: "same-origin"' in script.text
+    assert "localStorage.setItem" not in script.text
+    assert "sessionStorage.setItem" not in script.text
+    assert "window.location.reload()" in script.text
+
+
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
@@ -214,6 +226,7 @@ def test_status_is_honest_about_scope():
     assert "browser_voice_input" in body["implemented"]
     assert "browser_voice_output" in body["implemented"]
     assert "adaptive_user_preferences" in body["implemented"]
+    assert "local_api_session_authentication" in body["implemented"]
     assert "live_duplex_voice" in body["not_yet_implemented"]
     assert body["storage"]["type"] == "local_sqlite"
 
