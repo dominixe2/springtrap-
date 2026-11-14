@@ -63,3 +63,16 @@
 - The resulting token is short-lived, single-use and bound to the exact restore body bytes. The ASGI body-limit middleware enforces 8 MiB on both declared and chunked requests before JSON parsing.
 - All `/v1` local API responses, including private reads and rejected requests, use `Cache-Control: no-store` and `Pragma: no-cache` to reduce retention of profile, memory, history and backup data by browsers or intermediaries.
 - The local API remains loopback-only. Middleware checks both the Host/Origin hostname and the actual ASGI socket peer IP; a caller cannot bypass the boundary by sending `Host: localhost` from a LAN address. The confirmation token is an action/replay guard, not authentication.
+
+## Local single-user API authentication
+
+- The first run requires an exact same-origin setup request and a password of at least 12 characters.
+- Passwords are stored only as salted scrypt hashes in the local SQLite database; plaintext passwords are not persisted.
+- Successful setup/login issues an opaque 12-hour HttpOnly, SameSite=Strict session cookie. Only the SHA-256 hash of the cookie value is stored in SQLite; the raw value is never returned in JSON or written to browser storage.
+- All private /v1 routes require a valid unexpired local session, except the minimal status/setup/login/logout endpoints.
+- All state-changing /v1 requests require an exact Origin; setup, login and logout always require the exact same origin.
+- Failed login attempts are rate-limited to five per 15 minutes per local process. This in-memory limiter resets when the process restarts.
+- Logout revokes the server-side session immediately. The cookie expires after 12 hours.
+- This is single-user authentication for a loopback-only local instance, not multi-user cloud authentication or a way to expose the API to a LAN.
+- Password recovery is not implemented yet. Keep a separate backup before any manual recovery procedure.
+- The browser UI does not put the password or session value into localStorage or sessionStorage.
