@@ -390,6 +390,7 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert worker.status_code == 200
     assert "micro-helper-pwa-v3" in worker.text
     assert "/static/local-auth.js" in worker.text
+    assert 'url.pathname.startsWith("/v1/")' in worker.text
 
 
 def test_home_page_has_offline_local_fallback():
