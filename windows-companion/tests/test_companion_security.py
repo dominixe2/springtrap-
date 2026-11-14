@@ -79,12 +79,14 @@ class CompanionSecurityTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
-    def test_expired_pairing_code_is_not_returned(self):
+    def test_expired_pairing_code_is_not_returned_or_retained_in_memory(self):
         status = companion.PairingStatus()
         status.set_pairing_code("999999", 0)
         snapshot = status.snapshot()
         self.assertIsNone(snapshot["pairing_code"])
         self.assertEqual(snapshot["expires_in"], 0)
+        self.assertIsNone(status._pairing_code)
+        self.assertEqual(status._expires_at, 0.0)
 
     def test_pairing_page_uses_text_content_and_no_web_storage(self):
         status = companion.PairingStatus()
