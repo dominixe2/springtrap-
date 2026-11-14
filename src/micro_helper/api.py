@@ -8,6 +8,8 @@ import os
 import re
 import secrets
 import sqlite3
+import threading
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -32,6 +34,13 @@ from micro_helper.trust_policy import (
 app = FastAPI(title="Micro Helper", version="0.3.0")
 STATIC = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+AUTH_COOKIE_NAME = "mh_session"
+AUTH_SESSION_SECONDS = 12 * 60 * 60
+AUTH_FAILURE_WINDOW_SECONDS = 15 * 60
+AUTH_FAILURE_LIMIT = 5
+_AUTH_LOGIN_FAILURES: dict[str, list[float]] = {}
+_AUTH_LOGIN_LOCK = threading.Lock()
 
 
 def _is_loopback_hostname(hostname: str | None) -> bool:
@@ -105,6 +114,22 @@ async def protect_local_api(request: Request, call_next):
                 or not _is_loopback_hostname(parsed_origin.hostname)
             ):
                 return private_response(JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."}))
+    if is_private_api and request.method in {"POST", "PUT", "PATCH", "DELETE"} and not origin:
+        return private_response(JSONResponse(status_code=403, content={"detail": "State-changing local API requests require an exact Origin."}))
+
+    auth_write_paths = {"/v1/auth/setup", "/v1/auth/login", "/v1/auth/logout"}
+    if request.method == "POST" and request.url.path in auth_write_paths and not _is_same_origin_auth_request(request):
+        return private_response(JSONResponse(status_code=403, content={"detail": "Authentication requests require the exact same origin."}))
+
+    auth_public_paths = {
+        "/v1/auth/status",
+        "/v1/auth/setup",
+        "/v1/auth/login",
+        "/v1/auth/logout",
+    }
+    if is_private_api and request.url.path not in auth_public_paths and not _has_valid_local_session(request):
+        return private_response(JSONResponse(status_code=401, content={"detail": "Local authentication required."}))
+
     return private_response(await call_next(request))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
@@ -282,12 +307,207 @@ def database() -> Iterator[sqlite3.Connection]:
             );
             CREATE INDEX IF NOT EXISTS idx_tool_audit_created
                 ON tool_audit(created_at);
+            CREATE TABLE IF NOT EXISTS local_auth (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                salt TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS local_sessions (
+                token_hash TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_local_sessions_expiry
+                ON local_sessions(expires_at);
             """
         )
         connection.commit()
         yield connection
     finally:
         connection.close()
+
+
+def _is_same_origin_auth_request(request: Request) -> bool:
+    """Require a browser-supplied exact Origin for setup, login and logout."""
+    origin = request.headers.get("origin")
+    if not origin:
+        return False
+    fetch_site = request.headers.get("sec-fetch-site", "").lower()
+    if fetch_site and fetch_site != "same-origin":
+        return False
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    host = request.headers.get("host", "")
+    return (
+        parsed.scheme.lower() == request.url.scheme.lower()
+        and bool(parsed.netloc)
+        and parsed.netloc.lower() == host.lower()
+        and parsed.username is None
+        and parsed.password is None
+        and not parsed.path
+        and not parsed.query
+        and not parsed.fragment
+        and _is_loopback_hostname(parsed.hostname)
+    )
+
+
+def _password_digest(password: str, salt_hex: str) -> str:
+    """Use a salted, deliberately expensive stdlib password hash; never store plaintext."""
+    return hashlib.scrypt(
+        password.encode("utf-8"),
+        salt=bytes.fromhex(salt_hex),
+        n=2**14,
+        r=8,
+        p=1,
+        dklen=32,
+        maxmem=64 * 1024 * 1024,
+    ).hex()
+
+
+def _has_valid_local_session(request: Request) -> bool:
+    token = request.cookies.get(AUTH_COOKIE_NAME, "")
+    if not token or len(token) > 128:
+        return False
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with database() as db:
+        row = db.execute(
+            "SELECT expires_at FROM local_sessions WHERE token_hash=?",
+            (token_hash,),
+        ).fetchone()
+    if row is None:
+        return False
+    try:
+        expires_at = datetime.fromisoformat(row["expires_at"])
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return False
+    return expires_at > datetime.now(timezone.utc)
+
+
+def _auth_failure_key(request: Request) -> str:
+    return request.client.host if request.client is not None else "unknown"
+
+
+def _auth_login_blocked(key: str) -> bool:
+    now = time.monotonic()
+    with _AUTH_LOGIN_LOCK:
+        attempts = [stamp for stamp in _AUTH_LOGIN_FAILURES.get(key, []) if now - stamp < AUTH_FAILURE_WINDOW_SECONDS]
+        _AUTH_LOGIN_FAILURES[key] = attempts
+        if len(_AUTH_LOGIN_FAILURES) > 256:
+            _AUTH_LOGIN_FAILURES.update({item: values for item, values in _AUTH_LOGIN_FAILURES.items() if values})
+        return len(attempts) >= AUTH_FAILURE_LIMIT
+
+
+def _record_auth_failure(key: str) -> None:
+    now = time.monotonic()
+    with _AUTH_LOGIN_LOCK:
+        attempts = [stamp for stamp in _AUTH_LOGIN_FAILURES.get(key, []) if now - stamp < AUTH_FAILURE_WINDOW_SECONDS]
+        attempts.append(now)
+        _AUTH_LOGIN_FAILURES[key] = attempts
+
+
+def _clear_auth_failures(key: str) -> None:
+    with _AUTH_LOGIN_LOCK:
+        _AUTH_LOGIN_FAILURES.pop(key, None)
+
+
+def _issue_local_session(request: Request, response: JSONResponse) -> None:
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=AUTH_SESSION_SECONDS)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with database() as db:
+        db.execute("DELETE FROM local_sessions WHERE expires_at <= ?", (now.isoformat(),))
+        db.execute(
+            "INSERT INTO local_sessions(token_hash, created_at, expires_at) VALUES (?, ?, ?)",
+            (token_hash, now.isoformat(), expires_at.isoformat()),
+        )
+        db.commit()
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        max_age=AUTH_SESSION_SECONDS,
+        path="/",
+        httponly=True,
+        secure=request.url.scheme.lower() == "https",
+        samesite="strict",
+    )
+
+
+class LocalAuthRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+@app.get("/v1/auth/status")
+async def local_auth_status(request: Request):
+    with database() as db:
+        configured = db.execute("SELECT 1 FROM local_auth WHERE id=1").fetchone() is not None
+    return {"configured": configured, "authenticated": _has_valid_local_session(request)}
+
+
+@app.post("/v1/auth/setup", status_code=201)
+async def setup_local_auth(payload: LocalAuthRequest, request: Request):
+    if len(payload.password) < 12:
+        raise HTTPException(status_code=422, detail="Heslo musí mít alespoň 12 znaků.")
+    salt = secrets.token_bytes(16).hex()
+    digest = _password_digest(payload.password, salt)
+    now = utc_now()
+    with database() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if db.execute("SELECT 1 FROM local_auth WHERE id=1").fetchone() is not None:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Místní zabezpečení už bylo nastaveno.")
+        db.execute(
+            "INSERT INTO local_auth(id, salt, password_hash, created_at, updated_at) VALUES (1, ?, ?, ?, ?)",
+            (salt, digest, now, now),
+        )
+        db.commit()
+    response = JSONResponse(status_code=201, content={"configured": True, "authenticated": True})
+    _issue_local_session(request, response)
+    return response
+
+
+@app.post("/v1/auth/login")
+async def login_local_auth(payload: LocalAuthRequest, request: Request):
+    key = _auth_failure_key(request)
+    if _auth_login_blocked(key):
+        raise HTTPException(status_code=429, detail="Příliš mnoho neúspěšných pokusů. Zkus to za 15 minut.")
+    with database() as db:
+        row = db.execute("SELECT salt, password_hash FROM local_auth WHERE id=1").fetchone()
+    if row is None:
+        raise HTTPException(status_code=409, detail="Nejdřív nastav místní zabezpečení.")
+    candidate = _password_digest(payload.password, row["salt"])
+    if not secrets.compare_digest(candidate, row["password_hash"]):
+        _record_auth_failure(key)
+        raise HTTPException(status_code=401, detail="Přihlášení se nepodařilo.")
+    _clear_auth_failures(key)
+    response = JSONResponse(content={"authenticated": True})
+    _issue_local_session(request, response)
+    return response
+
+
+@app.post("/v1/auth/logout")
+async def logout_local_auth(request: Request):
+    token = request.cookies.get(AUTH_COOKIE_NAME, "")
+    if token:
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        with database() as db:
+            db.execute("DELETE FROM local_sessions WHERE token_hash=?", (token_hash,))
+            db.commit()
+    response = JSONResponse(content={"authenticated": False})
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=request.url.scheme.lower() == "https",
+        samesite="strict",
+    )
+    return response
 
 
 class ChatRequest(BaseModel):
@@ -596,7 +816,7 @@ async def status():
         "implemented": [
             "web_chat_ui", "health", "status", "ollama_chat_adapter",
             "persistent_local_profile", "persistent_local_memory",
-            "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences",
+            "persistent_conversation_history", "memory_crud", "conversation_clear", "persistent_task_queue", "adaptive_user_preferences", "local_api_session_authentication",
             "capability_catalog", "browser_voice_input", "browser_voice_output",
             "tool_policy_gate", "one_time_action_confirmation", "tool_audit_log", "rest_mutation_policy_gate", "full_backup_restore",
         ],
