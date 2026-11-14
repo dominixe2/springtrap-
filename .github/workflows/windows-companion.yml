@@ -2,6 +2,12 @@ name: Build Micro Helper Windows Companion
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [micro-helper, "security/**"]
+    paths:
+      - "windows-companion/**"
+      - "cloud-relay/**"
+      - ".github/workflows/windows-companion.yml"
   push:
     branches: [micro-helper]
     paths:
@@ -17,9 +23,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Validate Python source
@@ -35,7 +41,7 @@ jobs:
         working-directory: windows-companion
         run: pyinstaller --onefile --clean --name MicroHelperCompanion companion.py
       - name: Upload Windows Companion
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: micro-helper-windows-companion
           path: windows-companion/dist/MicroHelperCompanion.exe
