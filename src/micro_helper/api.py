@@ -452,6 +452,8 @@ async def local_auth_status(request: Request):
 
 @app.post("/v1/auth/setup", status_code=201)
 async def setup_local_auth(payload: LocalAuthRequest, request: Request):
+    if not _is_same_origin_auth_request(request):
+        raise HTTPException(status_code=403, detail="Požadavek na nastavení musí pocházet ze stejného původu.")
     if len(payload.password) < 12:
         raise HTTPException(status_code=422, detail="Heslo musí mít alespoň 12 znaků.")
     salt = secrets.token_bytes(16).hex()
@@ -474,6 +476,8 @@ async def setup_local_auth(payload: LocalAuthRequest, request: Request):
 
 @app.post("/v1/auth/login")
 async def login_local_auth(payload: LocalAuthRequest, request: Request):
+    if not _is_same_origin_auth_request(request):
+        raise HTTPException(status_code=403, detail="Přihlášení musí pocházet ze stejného původu.")
     key = _auth_failure_key(request)
     if _auth_login_blocked(key):
         raise HTTPException(status_code=429, detail="Příliš mnoho neúspěšných pokusů. Zkus to za 15 minut.")
@@ -493,6 +497,8 @@ async def login_local_auth(payload: LocalAuthRequest, request: Request):
 
 @app.post("/v1/auth/logout")
 async def logout_local_auth(request: Request):
+    if not _is_same_origin_auth_request(request):
+        raise HTTPException(status_code=403, detail="Odhlášení musí pocházet ze stejného původu.")
     token = request.cookies.get(AUTH_COOKIE_NAME, "")
     if token:
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
