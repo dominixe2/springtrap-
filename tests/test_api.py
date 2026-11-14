@@ -148,6 +148,21 @@ def test_local_auth_login_cookie_is_httponly_strict_and_revocable():
     assert "samesite=strict" in cookie_header
     assert "max-age=43200" in cookie_header
     assert "mh_session" not in response.text
+    session_value = raw_client.cookies.get("mh_session")
+    assert session_value
+    session_hash = hashlib.sha256(session_value.encode("utf-8")).hexdigest()
+    with api.database() as db:
+        stored_session = db.execute(
+            "SELECT token_hash FROM local_sessions WHERE token_hash=?",
+            (session_hash,),
+        ).fetchone()
+        auth_record = db.execute(
+            "SELECT salt, password_hash FROM local_auth WHERE id=1"
+        ).fetchone()
+    assert stored_session is not None
+    assert session_value not in stored_session["token_hash"]
+    assert auth_record["password_hash"] != TEST_LOCAL_PASSWORD
+    assert len(auth_record["password_hash"]) == 64
     assert raw_client.get("/v1/profile").status_code == 200
 
     logout = raw_client.post("/v1/auth/logout", json={}, headers={"Origin": TEST_ORIGIN})
