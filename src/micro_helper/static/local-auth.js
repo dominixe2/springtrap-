@@ -1,4 +1,4 @@
-/* Local single-user session gate. The browser never receives or stores the session token. */
+/* Local single-user session gate. JavaScript never reads or writes the HttpOnly session cookie. */
 (() => {
   const endpoint = "/v1/auth";
 
