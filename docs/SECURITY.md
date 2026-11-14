@@ -68,7 +68,7 @@
 
 - The first run requires an exact same-origin setup request and a password of at least 12 characters.
 - Passwords are stored only as salted scrypt hashes in the local SQLite database; plaintext passwords are not persisted.
-- Successful setup/login issues an opaque 12-hour HttpOnly, SameSite=Strict session cookie. Only the SHA-256 hash of the cookie value is stored in SQLite; the raw value is never returned in JSON or written to browser storage.
+- Successful setup/login issues an opaque 12-hour HttpOnly, SameSite=Strict session cookie. Only the SHA-256 hash of the cookie value is stored in SQLite; the raw value is never returned in JSON or exposed to JavaScript or Web Storage (localStorage/sessionStorage). The browser holds it only as an HttpOnly cookie.
 - All private /v1 routes require a valid unexpired local session, except the minimal status/setup/login/logout endpoints.
 - All state-changing /v1 requests require an exact Origin; setup, login and logout always require the exact same origin.
 - Failed login attempts are rate-limited to five per 15 minutes per local process. This in-memory limiter resets when the process restarts.
