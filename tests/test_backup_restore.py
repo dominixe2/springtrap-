@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import secrets
 import uuid
 from urllib.parse import urlsplit
 
@@ -22,6 +23,7 @@ class PolicyAwareTestClient:
         path = urlsplit(str(url)).path
         if method in {"POST", "PUT", "PATCH", "DELETE"} and path.startswith("/v1/"):
             headers = dict(kwargs.get("headers") or {})
+            headers.setdefault("Origin", "http://127.0.0.1:8000")
             if method == "POST" and path == "/v1/backup/restore":
                 payload = kwargs.pop("json", None)
                 body_text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
@@ -29,6 +31,7 @@ class PolicyAwareTestClient:
                 confirmation = raw_client.post(
                     "/v1/actions/confirm",
                     json={"method": method, "path": path, "arguments": {"body_sha256": digest}},
+                    headers={"Origin": "http://127.0.0.1:8000"},
                 )
                 if confirmation.status_code == 200:
                     headers["X-Micro-Helper-Confirmation"] = confirmation.json()["confirmation_token"]
@@ -41,6 +44,7 @@ class PolicyAwareTestClient:
                 confirmation = raw_client.post(
                     "/v1/actions/confirm",
                     json={"method": method, "path": path, "arguments": arguments},
+                    headers={"Origin": "http://127.0.0.1:8000"},
                 )
                 if confirmation.status_code == 200:
                     headers["X-Micro-Helper-Confirmation"] = confirmation.json()["confirmation_token"]
@@ -78,6 +82,7 @@ def issue_restore_token(payload: bytes) -> str:
             "path": "/v1/backup/restore",
             "arguments": {"body_sha256": digest},
         },
+        headers={"Origin": "http://127.0.0.1:8000"},
     )
     assert response.status_code == 200
     return response.json()["confirmation_token"]
@@ -89,6 +94,14 @@ STAMP = "2026-11-08T00:00:00+00:00"
 @pytest.fixture(autouse=True)
 def isolated_database(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "DATABASE_PATH", tmp_path / "backup-tests.sqlite3")
+    raw_client.cookies.clear()
+    api._AUTH_LOGIN_FAILURES.clear()
+    setup = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": secrets.token_urlsafe(24)},
+        headers={"Origin": "http://127.0.0.1:8000"},
+    )
+    assert setup.status_code == 201
 
 
 def valid_backup():
@@ -210,6 +223,7 @@ def test_restore_without_confirmation_does_not_replace_existing_data():
     response = raw_client.post(
         "/v1/backup/restore",
         json={"backup": valid_backup(), "confirm_replace": False},
+        headers={"Origin": "http://127.0.0.1:8000"},
     )
     assert response.status_code == 403
     assert client.get("/v1/profile").json()["agent_name"] == "Původní"
@@ -412,7 +426,7 @@ def test_restore_confirmation_is_bound_to_exact_bytes_and_is_single_use():
     mismatch = raw_client.post(
         "/v1/backup/restore",
         content=tampered_payload,
-        headers={"content-type": "application/json", "x-micro-helper-confirmation": token},
+        headers={"content-type": "application/json", "origin": "http://127.0.0.1:8000", "x-micro-helper-confirmation": token},
     )
     assert mismatch.status_code == 403
     assert client.get("/v1/profile").json()["agent_name"] == "Původní"
@@ -420,13 +434,13 @@ def test_restore_confirmation_is_bound_to_exact_bytes_and_is_single_use():
     restored = raw_client.post(
         "/v1/backup/restore",
         content=payload,
-        headers={"content-type": "application/json", "x-micro-helper-confirmation": token},
+        headers={"content-type": "application/json", "origin": "http://127.0.0.1:8000", "x-micro-helper-confirmation": token},
     )
     assert restored.status_code == 200
     replay = raw_client.post(
         "/v1/backup/restore",
         content=payload,
-        headers={"content-type": "application/json", "x-micro-helper-confirmation": token},
+        headers={"content-type": "application/json", "origin": "http://127.0.0.1:8000", "x-micro-helper-confirmation": token},
     )
     assert replay.status_code == 403
     assert client.get("/v1/profile").json()["agent_name"] == "Nova"
