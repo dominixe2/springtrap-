@@ -103,9 +103,15 @@
     gate.id = "mh-local-auth-gate";
     const card = document.createElement("section");
     card.id = "mh-local-auth-card";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-labelledby", "mh-local-auth-offline-title");
+    card.setAttribute("aria-describedby", "mh-local-auth-offline-description");
     const title = document.createElement("h2");
+    title.id = "mh-local-auth-offline-title";
     title.textContent = "Offline data jsou uzamčená";
     const description = document.createElement("p");
+    description.id = "mh-local-auth-offline-description";
     description.textContent = "Místní API není dostupné, proto nelze ověřit přihlášení. Soukromá paměť, historie, úkoly a plány se offline nenačítají. Starší offline data zůstávají zachována, ale aplikace je zatím nečte ani nemění.";
     const note = document.createElement("small");
     note.textContent = "Offline soukromé úložiště bude znovu povoleno až po dokončení šifrovaného úložiště.";
@@ -116,7 +122,14 @@
     card.append(title, description, note, retry);
     gate.append(card);
     document.body.append(gate);
+    for (const child of document.body.children) {
+      if (child !== gate) {
+        child.setAttribute("inert", "");
+        child.setAttribute("aria-hidden", "true");
+      }
+    }
     document.body.style.overflow = "hidden";
+    retry.focus();
   }
 
   function addLogout() {
