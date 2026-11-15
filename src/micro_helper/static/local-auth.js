@@ -97,6 +97,28 @@
     password.focus();
   }
 
+  function showOfflineLock() {
+    if (document.getElementById("mh-local-auth-gate")) return;
+    const gate = document.createElement("div");
+    gate.id = "mh-local-auth-gate";
+    const card = document.createElement("section");
+    card.id = "mh-local-auth-card";
+    const title = document.createElement("h2");
+    title.textContent = "Offline data jsou uzamčená";
+    const description = document.createElement("p");
+    description.textContent = "Místní API není dostupné, proto nelze ověřit přihlášení. Soukromá paměť, historie, úkoly a plány se offline nenačítají. Starší offline data zůstávají zachována, ale aplikace je zatím nečte ani nemění.";
+    const note = document.createElement("small");
+    note.textContent = "Offline soukromé úložiště bude znovu povoleno až po dokončení šifrovaného úložiště.";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Zkusit znovu";
+    retry.addEventListener("click", () => window.location.reload());
+    card.append(title, description, note, retry);
+    gate.append(card);
+    document.body.append(gate);
+    document.body.style.overflow = "hidden";
+  }
+
   function addLogout() {
     const header = document.querySelector("header");
     if (!header || document.getElementById("mh-local-auth-logout")) return;
@@ -136,11 +158,7 @@
       }
       showGate(Boolean(state.configured));
     } catch {
-      const banner = document.createElement("div");
-      banner.id = "mh-local-auth-offline";
-      banner.textContent = "Místní API není dostupné. Zůstává pouze omezený offline režim tohoto prohlížeče.";
-      const main = document.querySelector("main");
-      if (main) main.prepend(banner);
+      showOfflineLock();
     }
   }
 
