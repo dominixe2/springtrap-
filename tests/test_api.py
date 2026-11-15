@@ -68,7 +68,9 @@ def isolated_database(tmp_path):
     # Keep tests hermetic and independent of a real user's home directory.
     api.DATABASE_PATH = tmp_path / "micro-helper-tests.sqlite3"
     raw_client.cookies.clear()
-    api._AUTH_LOGIN_FAILURES.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
     setup = raw_client.post(
         "/v1/auth/setup",
         json={"password": TEST_LOCAL_PASSWORD},
@@ -171,9 +173,11 @@ def test_local_auth_login_cookie_is_httponly_strict_and_revocable():
     assert raw_client.get("/v1/profile").status_code == 401
 
 
-def test_local_auth_rate_limits_failed_logins():
+def test_local_auth_rate_limits_failed_logins_and_persists_the_window():
     raw_client.cookies.clear()
-    api._AUTH_LOGIN_FAILURES.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
     for _ in range(api.AUTH_FAILURE_LIMIT):
         response = raw_client.post(
             "/v1/auth/login",
@@ -181,12 +185,49 @@ def test_local_auth_rate_limits_failed_logins():
             headers={"Origin": TEST_ORIGIN},
         )
         assert response.status_code == 401
+
+    # The lockout state lives in SQLite, not in process memory.
+    with api.database() as db:
+        stored = db.execute(
+            "SELECT attempts FROM local_auth_failures WHERE client_key='loopback'"
+        ).fetchone()
+    assert stored["attempts"] == api.AUTH_FAILURE_LIMIT
+
+    # Opening a fresh database connection does not reset the rate limit.
+    with api.database() as db:
+        db.execute("SELECT 1").fetchone()
     limited = raw_client.post(
         "/v1/auth/login",
         json={"password": "incorrect-password"},
         headers={"Origin": TEST_ORIGIN},
     )
     assert limited.status_code == 429
+
+
+def test_successful_local_login_clears_persisted_failures():
+    raw_client.cookies.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
+    for _ in range(api.AUTH_FAILURE_LIMIT - 1):
+        response = raw_client.post(
+            "/v1/auth/login",
+            json={"password": "incorrect-password"},
+            headers={"Origin": TEST_ORIGIN},
+        )
+        assert response.status_code == 401
+
+    successful = raw_client.post(
+        "/v1/auth/login",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert successful.status_code == 200
+    with api.database() as db:
+        remaining = db.execute(
+            "SELECT 1 FROM local_auth_failures WHERE client_key='loopback'"
+        ).fetchone()
+    assert remaining is None
 
 
 def test_private_mutations_require_origin_even_with_a_valid_session():
