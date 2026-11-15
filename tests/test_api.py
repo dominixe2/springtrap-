@@ -832,6 +832,18 @@ def test_expired_local_session_is_rejected_even_when_cookie_is_present():
     }
 
 
+def test_private_offline_fallback_is_locked_until_encryption_is_available():
+    home = raw_client.get("/").text
+    auth_script = raw_client.get("/static/local-auth.js").text
+    service_worker = raw_client.get("/static/sw.js").text
+
+    assert "micro_helper_offline_v1" not in home
+    assert "Offline private data is locked" in home
+    assert "Offline data jsou uzamčená" in auth_script
+    assert "Starší offline data zůstávají zachována" in auth_script
+    assert "micro-helper-pwa-v4" in service_worker
+
+
 def test_local_auth_ui_discloses_recovery_limit_and_never_stores_credentials():
     response = raw_client.get("/static/local-auth.js")
     assert response.status_code == 200
