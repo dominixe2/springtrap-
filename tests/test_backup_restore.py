@@ -95,7 +95,9 @@ STAMP = "2026-11-08T00:00:00+00:00"
 def isolated_database(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "DATABASE_PATH", tmp_path / "backup-tests.sqlite3")
     raw_client.cookies.clear()
-    api._AUTH_LOGIN_FAILURES.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
     setup = raw_client.post(
         "/v1/auth/setup",
         json={"password": secrets.token_urlsafe(24)},
