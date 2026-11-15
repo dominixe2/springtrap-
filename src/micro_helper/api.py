@@ -565,13 +565,13 @@ async def setup_local_auth(payload: LocalAuthRequest, request: Request):
 async def login_local_auth(payload: LocalAuthRequest, request: Request):
     if not _is_same_origin_auth_request(request):
         raise HTTPException(status_code=403, detail="Přihlášení musí pocházet ze stejného původu.")
-    key = _auth_failure_key(request)
-    if not _reserve_auth_attempt(key):
-        raise HTTPException(status_code=429, detail="Příliš mnoho neúspěšných pokusů. Zkus to za 15 minut.")
     with database() as db:
         row = db.execute("SELECT salt, password_hash FROM local_auth WHERE id=1").fetchone()
     if row is None:
         raise HTTPException(status_code=409, detail="Nejdřív nastav místní zabezpečení.")
+    key = _auth_failure_key(request)
+    if not _reserve_auth_attempt(key):
+        raise HTTPException(status_code=429, detail="Příliš mnoho neúspěšných pokusů. Zkus to za 15 minut.")
     candidate = _password_digest(payload.password, row["salt"])
     if not secrets.compare_digest(candidate, row["password_hash"]):
         raise HTTPException(status_code=401, detail="Přihlášení se nepodařilo.")
