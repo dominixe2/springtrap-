@@ -173,6 +173,38 @@ def test_local_auth_login_cookie_is_httponly_strict_and_revocable():
     assert raw_client.get("/v1/profile").status_code == 401
 
 
+def test_unconfigured_login_does_not_consume_the_rate_limit(tmp_path):
+    api.DATABASE_PATH = tmp_path / "unconfigured-local-auth.sqlite3"
+    raw_client.cookies.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
+
+    before_setup = raw_client.post(
+        "/v1/auth/login",
+        json={"password": "not-configured-yet"},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert before_setup.status_code == 409
+
+    password = secrets.token_urlsafe(24)
+    setup = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": password},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert setup.status_code == 201
+
+    raw_client.cookies.clear()
+    for _ in range(api.AUTH_FAILURE_LIMIT):
+        failed = raw_client.post(
+            "/v1/auth/login",
+            json={"password": "incorrect-password"},
+            headers={"Origin": TEST_ORIGIN},
+        )
+        assert failed.status_code == 401
+
+
 def test_local_auth_rate_limits_failed_logins_and_persists_the_window():
     raw_client.cookies.clear()
     with api.database() as db:
