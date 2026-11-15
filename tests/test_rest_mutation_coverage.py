@@ -22,7 +22,7 @@ SEPARATE_GATE_CALLS = {
     },
     # Login is same-origin, rate-limited, constant-time verified and issues a short-lived session.
     ("POST", "/v1/auth/login"): {
-        "_is_same_origin_auth_request", "_auth_login_blocked", "_password_digest",
+        "_is_same_origin_auth_request", "_reserve_auth_attempt", "_password_digest",
         "compare_digest", "_issue_local_session",
     },
     # Logout requires the exact same origin and revokes the server-side session.
