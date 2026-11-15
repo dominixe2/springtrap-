@@ -389,16 +389,17 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert icon.status_code == 200
     assert "<svg" in icon.text
     assert worker.status_code == 200
-    assert "micro-helper-pwa-v3" in worker.text
+    assert "micro-helper-pwa-v4" in worker.text
     assert "/static/local-auth.js" in worker.text
     assert 'url.pathname.startsWith("/v1/")' in worker.text
 
 
-def test_home_page_has_offline_local_fallback():
+def test_home_page_locks_private_data_when_offline():
     response = client.get("/")
     assert response.status_code == 200
-    assert "micro_helper_offline_v1" in response.text
-    assert "offline-local" in response.text
+    assert "Offline private data is locked" in response.text
+    assert "micro_helper_offline_v1" not in response.text
+    assert "status: 503" in response.text
 
 
 
@@ -721,7 +722,8 @@ def test_home_page_exposes_learning_plan_ui_and_offline_support():
     assert 'id="learningPlanList"' in html
     assert 'id="learningPlanFilter"' in html
     assert "Learning plans UI" in html
-    assert 'url.pathname === "/v1/learning-plans" && method === "POST"' in html
+    assert "Offline private data is locked" in html
+    assert "micro_helper_offline_v1" not in html
 
 
 
@@ -803,7 +805,8 @@ def test_home_page_exposes_rest_confirmation_flow():
     html = client.get("/").text
     assert "/v1/actions/confirm" in html
     assert "X-Micro-Helper-Confirmation" in html
-    assert "localConfirmations" in html
+    assert "window.confirm" in html
+    assert "micro_helper_offline_v1" not in html
 
 
 def test_expired_local_session_is_rejected_even_when_cookie_is_present():
