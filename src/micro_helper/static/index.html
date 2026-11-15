@@ -35,7 +35,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 <section class="settings" style="align-items:stretch;flex-direction:column">
   <section class="settings" style="align-items:stretch;flex-direction:column">
 <strong>🎯 Moje učební plány</strong>
-<small>Rozděl si cíl na malé kroky. Plány se ukládají do místní databáze; offline režim je uchová v tomto prohlížeči.</small>
+<small>Rozděl si cíl na malé kroky. Plány se ukládají do místní databáze; soukromá offline data zůstávají uzamčená do dokončení šifrovaného úložiště.</small>
 <form id="learningPlanForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0">
 <input id="learningPlanTitle" maxlength="120" placeholder="Název plánu" required>
 <input id="learningPlanGoal" maxlength="2000" placeholder="Čeho chceš dosáhnout?" required>
@@ -105,94 +105,26 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
 </script>
 
 <script>
-/* Offline-first local fallback: keeps notes/profile/history on this device when the API is unreachable.
-   AI replies are not fabricated offline; the user is told when no local model is available. */
+/* Fail closed while private offline storage is not encrypted. Never read the legacy plaintext store. */
 (() => {
   const nativeFetch = window.fetch.bind(window);
-  const key = "micro_helper_offline_v1";
-  const localConfirmations = new Map();
-  const isOfflineProtectedMutation = (method, path) =>
-    (method === "PUT" && path === "/v1/profile") ||
-    (method === "POST" && ["/v1/tasks", "/v1/learning-plans", "/v1/memories", "/v1/preferences"].includes(path)) ||
-    ((method === "PUT" || method === "DELETE") && /^\/v1\/memories\/\d+$/.test(path)) ||
-    (method === "DELETE" && /^\/v1\/preferences\/\d+$/.test(path)) ||
-    (method === "DELETE" && path === "/v1/conversations") ||
-    (method === "POST" && /^\/v1\/tasks\/[^/]+\/cancel$/.test(path)) ||
-    (method === "PATCH" && /^\/v1\/learning-plans\/[^/]+\/status$/.test(path)) ||
-    (method === "DELETE" && /^\/v1\/learning-plans\/[^/]+$/.test(path));
-  const load = () => { try { return JSON.parse(localStorage.getItem(key)) || {profile:{agent_name:"Micro Helper",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } catch { return {profile:{agent_name:"Micro Helper",language:"cs-CZ",style:"friendly"},memories:[],preferences:[],plans:[],messages:[],nextId:1}; } };
-  const save = data => localStorage.setItem(key, JSON.stringify(data));
-  const reply = (data, status=200) => new Response(JSON.stringify(data), {status, headers:{"Content-Type":"application/json"}});
-  window.fetch = async (input, init={}) => {
-    try { return await nativeFetch(input, init); }
-    catch (error) {
+  window.fetch = async (input, init = {}) => {
+    try {
+      return await nativeFetch(input, init);
+    } catch (error) {
       const url = new URL(typeof input === "string" ? input : input.url, location.href);
       if (url.origin !== location.origin || !url.pathname.startsWith("/v1/")) throw error;
-      const method = (init.method || (typeof input !== "string" && input.method) || "GET").toUpperCase();
-      let body = {}; try { body = JSON.parse(init.body || "{}"); } catch {}
-      const db = load();
-      if (url.pathname === "/v1/actions/confirm" && method === "POST") {
-        const requestedMethod = String(body.method || "").toUpperCase();
-        const requestedPath = String(body.path || "");
-        if (!isOfflineProtectedMutation(requestedMethod, requestedPath)) return reply({detail:"Neznámá nebo nepovolená změna."},404);
-        const token = crypto.randomUUID() + crypto.randomUUID();
-        const expiresAt = Date.now() + 60000;
-        localConfirmations.set(token, {method:requestedMethod,path:requestedPath,arguments:JSON.stringify(body.arguments || {}),expiresAt});
-        return reply({confirmation_token:token,expires_at:new Date(expiresAt).toISOString()});
-      }
-      if (isOfflineProtectedMutation(method, url.pathname)) {
-        const headers = new Headers(init.headers || (typeof input !== "string" ? input.headers : undefined));
-        const token = headers.get("X-Micro-Helper-Confirmation");
-        const confirmation = localConfirmations.get(token);
-        if (!confirmation || confirmation.method !== method || confirmation.path !== url.pathname ||
-            confirmation.expiresAt <= Date.now() || confirmation.arguments !== JSON.stringify(body)) {
-          return reply({detail:"Offline změna vyžaduje čerstvé potvrzení pro přesný obsah."},403);
+      return new Response(JSON.stringify({
+        detail: "Offline private data is locked until the local API is available."
+      }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
         }
-        localConfirmations.delete(token);
-      }
-      if (url.pathname === "/v1/profile" && method === "GET") return reply(db.profile);
-      db.plans = db.plans || [];
-      if (url.pathname === "/v1/learning-plans" && method === "GET") { const status=url.searchParams.get("status"); if(status&&!["active","paused","completed"].includes(status))return reply({detail:"Neplatný stav plánu."},422); return reply({plans:[...db.plans].filter(p=>!status||p.status===status).sort((a,b)=>b.updated_at.localeCompare(a.updated_at))}); }
-      if (url.pathname === "/v1/learning-plans" && method === "POST") { const title=String(body.title||"").trim(),goal=String(body.goal||"").trim(),steps=Array.isArray(body.steps)?body.steps.map(x=>String(x).trim()).filter(Boolean):[]; if(!title||!goal||!steps.length||title.length>120||goal.length>2000||steps.some(x=>x.length>500))return reply({detail:"Vyplň název, cíl a platné kroky."},422); const plan={id:crypto.randomUUID(),title,goal,steps,status:"active",created_at:new Date().toISOString(),updated_at:new Date().toISOString()};db.plans.push(plan);save(db);return reply(plan,201); }
-      const planMatch=url.pathname.match(/^\/v1\/learning-plans\/([^/]+)(?:\/(status))?$/);
-      if(planMatch){const index=db.plans.findIndex(p=>p.id===decodeURIComponent(planMatch[1]));if(method==="GET")return index<0?reply({detail:"Učební plán nebyl nalezen."},404):reply(db.plans[index]);if(method==="PATCH"&&planMatch[2]==="status"){if(index<0)return reply({detail:"Učební plán nebyl nalezen."},404);if(!["active","paused","completed"].includes(body.status))return reply({detail:"Neplatný stav plánu."},422);db.plans[index].status=body.status;db.plans[index].updated_at=new Date().toISOString();save(db);return reply(db.plans[index]);}if(method==="DELETE"&&!planMatch[2]){if(index<0)return reply({detail:"Učební plán nebyl nalezen."},404);db.plans.splice(index,1);save(db);return reply({deleted:true,id:planMatch[1]});}}
-
-      if (url.pathname === "/v1/profile" && method === "PUT") { db.profile = {...db.profile,...body}; save(db); return reply(db.profile); }
-      if (url.pathname === "/v1/memories" && method === "GET") return reply({memories:[...db.memories].reverse()});
-      if (url.pathname === "/v1/preferences" && method === "GET") return reply({preferences:db.preferences||[]});
-      if (url.pathname === "/v1/preferences" && method === "POST") {
-        db.preferences=db.preferences||[];
-        const category=String(body.category||"other"), preference=String(body.preference||"").trim(), value=String(body.value||"").trim();
-        if(!preference||!value)return reply({detail:"Preference nesmí být prázdná."},422);
-        let item=db.preferences.find(x=>x.category===category&&x.preference===preference);
-        if(item)item.value=value;
-        else {item={id:db.nextId++,category,preference,value,source:"user",updated_at:new Date().toISOString()};db.preferences.push(item);}
-        save(db);return reply(item,201);
-      }
-      const preferenceId = url.pathname.split("/").pop();
-      if (url.pathname.startsWith("/v1/preferences/") && method === "DELETE") { db.preferences=(db.preferences||[]).filter(x=>x.id!==Number(preferenceId)); save(db); return reply({deleted:true}); }
-      if (url.pathname === "/v1/memories" && method === "POST") {
-        const memory = {id:db.nextId++,content:String(body.content||"").trim(),category:body.category||"preference",created_at:new Date().toISOString()};
-        if (!memory.content) return reply({detail:"Poznámka nesmí být prázdná."},422);
-        db.memories.push(memory); save(db); return reply(memory,201);
-      }
-      const memoryMatch = url.pathname.match(/^\/v1\/memories\/(\d+)$/);
-      if (memoryMatch && method === "PUT") { const m=db.memories.find(x=>x.id===Number(memoryMatch[1])); if(!m)return reply({detail:"Poznámka nenalezena"},404); m.content=String(body.content||"").trim();m.category=body.category||m.category;save(db);return reply(m); }
-      if (memoryMatch && method === "DELETE") { db.memories=db.memories.filter(x=>x.id!==Number(memoryMatch[1]));save(db);return reply({deleted:true}); }
-      if (url.pathname === "/v1/conversations" && method === "GET") return reply({messages:db.messages});
-      if (url.pathname === "/v1/conversations" && method === "DELETE") { db.messages=[];save(db);return reply({deleted:true}); }
-      if (url.pathname === "/v1/models") return reply({available:false,models:[]});
-      if (url.pathname === "/v1/status") return reply({product:"Micro Helper",mode:"offline-local",paid_api_required:false,storage:{type:"browser-localStorage",memories:db.memories.length,messages:db.messages.length}});
-      if (url.pathname === "/v1/chat" && method === "POST") {
-        const message=String(body.message||"").trim();
-        if(message){db.messages.push({id:db.nextId++,role:"user",content:message,created_at:new Date().toISOString()});save(db);}
-        return reply({reply:"Jsem v offline režimu. Poznámky a nastavení můžeš používat, ale pro skutečnou AI odpověď potřebuji dostupný lokální model nebo online službu. Zprávu jsem uložil pouze do tohoto zařízení."});
-      }
-      throw error;
+      });
     }
   };
-  window.addEventListener("online",()=>{const status=document.getElementById("status");if(status)status.textContent="Síť dostupná · ověřuji připojení";});
-  window.addEventListener("offline",()=>{const status=document.getElementById("status");if(status)status.textContent="Offline · místní režim";});
 })();
 </script>
 

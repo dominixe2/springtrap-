@@ -97,6 +97,41 @@
     password.focus();
   }
 
+  function showOfflineLock() {
+    if (document.getElementById("mh-local-auth-gate")) return;
+    const gate = document.createElement("div");
+    gate.id = "mh-local-auth-gate";
+    const card = document.createElement("section");
+    card.id = "mh-local-auth-card";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-labelledby", "mh-local-auth-offline-title");
+    card.setAttribute("aria-describedby", "mh-local-auth-offline-description");
+    const title = document.createElement("h2");
+    title.id = "mh-local-auth-offline-title";
+    title.textContent = "Offline data jsou uzamčená";
+    const description = document.createElement("p");
+    description.id = "mh-local-auth-offline-description";
+    description.textContent = "Místní API není dostupné, proto nelze ověřit přihlášení. Soukromá paměť, historie, úkoly a plány se offline nenačítají. Starší offline data zůstávají zachována, ale aplikace je zatím nečte ani nemění.";
+    const note = document.createElement("small");
+    note.textContent = "Offline soukromé úložiště bude znovu povoleno až po dokončení šifrovaného úložiště.";
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Zkusit znovu";
+    retry.addEventListener("click", () => window.location.reload());
+    card.append(title, description, note, retry);
+    gate.append(card);
+    document.body.append(gate);
+    for (const child of document.body.children) {
+      if (child !== gate) {
+        child.setAttribute("inert", "");
+        child.setAttribute("aria-hidden", "true");
+      }
+    }
+    document.body.style.overflow = "hidden";
+    retry.focus();
+  }
+
   function addLogout() {
     const header = document.querySelector("header");
     if (!header || document.getElementById("mh-local-auth-logout")) return;
@@ -136,11 +171,7 @@
       }
       showGate(Boolean(state.configured));
     } catch {
-      const banner = document.createElement("div");
-      banner.id = "mh-local-auth-offline";
-      banner.textContent = "Místní API není dostupné. Zůstává pouze omezený offline režim tohoto prohlížeče.";
-      const main = document.querySelector("main");
-      if (main) main.prepend(banner);
+      showOfflineLock();
     }
   }
 

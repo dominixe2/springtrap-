@@ -77,6 +77,8 @@
 - Password recovery is not implemented yet. Keep a separate backup before any manual recovery procedure.
 - The browser UI does not put the password or session value into localStorage or sessionStorage.
 
+- If the local API is unavailable, the browser fails closed: private memories, conversation history, tasks and learning plans are not loaded from browser storage. The legacy plaintext offline store is preserved but is not read or modified by the app. Private offline mode remains disabled until an encrypted vault is implemented.
+
 ## Local SQLite file permissions
 
 - On POSIX systems, the default ~/.micro-helper data directory is restricted to mode 0700.
