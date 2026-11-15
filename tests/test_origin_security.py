@@ -13,7 +13,9 @@ client = TestClient(api.app, base_url="http://127.0.0.1:8000", client=("127.0.0.
 def isolated_database(tmp_path, monkeypatch):
     monkeypatch.setattr(api, "DATABASE_PATH", tmp_path / "origin-tests.sqlite3")
     client.cookies.clear()
-    api._AUTH_LOGIN_FAILURES.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
     setup = client.post(
         "/v1/auth/setup",
         json={"password": secrets.token_urlsafe(24)},
