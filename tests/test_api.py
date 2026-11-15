@@ -847,6 +847,17 @@ def test_private_offline_fallback_is_locked_until_encryption_is_available():
     assert "micro-helper-pwa-v4" in service_worker
 
 
+def test_offline_lock_is_modal_and_disables_underlying_page():
+    auth_script = raw_client.get("/static/local-auth.js").text
+
+    assert 'card.setAttribute("role", "dialog")' in auth_script
+    assert 'card.setAttribute("aria-modal", "true")' in auth_script
+    assert 'card.setAttribute("aria-labelledby", "mh-local-auth-offline-title")' in auth_script
+    assert 'child.setAttribute("inert", "")' in auth_script
+    assert 'child.setAttribute("aria-hidden", "true")' in auth_script
+    assert "retry.focus()" in auth_script
+
+
 def test_local_auth_ui_discloses_recovery_limit_and_never_stores_credentials():
     response = raw_client.get("/static/local-auth.js")
     assert response.status_code == 200
