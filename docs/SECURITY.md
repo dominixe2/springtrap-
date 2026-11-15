@@ -31,3 +31,35 @@
 - The Windows EXE is not code-signed; Windows SmartScreen may display a warning.
 - The browser-local fallback uses browser storage and is not encrypted by this app. Treat device access and browser profile security accordingly.
 - A successful CI build proves packaging and static checks, not behavior on the user's physical phone or notebook.
+
+
+## Local API tool policy integration (2026-11-07)
+
+- The local Python API now evaluates registered tool calls through `src/micro_helper/trust_policy.py`.
+- Only the exact low-risk reads `profile.read` and `memory.list` have built-in grants. Unknown tool IDs remain unavailable.
+- `memory.create` is classified as a state-changing local write and requires a one-time confirmation token bound to the normalized arguments. Tokens expire after 60 seconds, are stored only as SHA-256 hashes, and are consumed atomically once.
+- The `/v1/audit` endpoint records tool ID, capability, operation, policy decision, reason and outcome. It deliberately does not store tool arguments, results, or confirmation tokens.
+- This integration covers only the three registered local API tools. It does not yet protect every hosted, Windows Companion, or JARVIS adapter. There is no user-managed grant editor/revocation UI yet; do not imply otherwise.
+- The confirmation endpoint must only be called after the client has displayed the exact action and received explicit user approval. The token is a short-lived server-side replay guard, not authentication. The local API must remain bound to loopback; Origin/Fetch-Metadata checks are defense in depth, not a substitute for authentication.
+
+
+## Shared REST mutation authorization (2026-11-09)
+
+- Every state-changing local REST route present in the trust-gateway branch is classified by one shared route resolver and evaluated by the deterministic trust policy.
+- Profile, memory, preference, learning-plan, task-queue and conversation-clear writes require a short-lived, single-use confirmation token bound to the exact HTTP method, path and canonical JSON body. The token is stored only as a SHA-256 hash and is consumed atomically.
+- Chat submission has one narrow built-in grant because the user explicitly presses Send; it does not authorize any other conversation or memory mutation.
+- The browser UI displays the exact method, path and request body before requesting a token. The offline localStorage fallback uses an in-memory, one-time token with the same method/path/body binding; reloading the page invalidates outstanding offline confirmations.
+- Audit events store action metadata only, never private request bodies or confirmation tokens.
+- These tokens are an explicit-action/replay guard, **not authentication**. The local API must remain loopback-only. This branch is stacked on PR #23; the separate PR #25 backup-restore endpoint must be brought through this same gate when the two branches are integrated.
+
+
+## Full local backup/restore policy gate (2026-11-09)
+
+- Full backup export uses `Cache-Control: no-store` and is capped at the same 8 MiB format limit accepted by restore.
+- Exported backups are plaintext JSON, not encrypted by the app, and contain the complete local profile, memories, conversation history, tasks, learning plans and preferences. The UI must warn before download; users should store the file privately and never send it as a public attachment.
+- The separate memory-notes export is also plaintext JSON and contains private notes; the UI must warn before downloading it as well.
+- Restore is classified as a destructive `backup.restore` action and passes through the shared Adaptive Trust Engine route gate before database replacement.
+- The browser displays a restore-specific summary (collection counts and byte size). It hashes the exact request bytes with Web Crypto; only the SHA-256 digest is sent to the confirmation endpoint, so the private backup body is not copied into confirmation storage or audit events.
+- The resulting token is short-lived, single-use and bound to the exact restore body bytes. The ASGI body-limit middleware enforces 8 MiB on both declared and chunked requests before JSON parsing.
+- All `/v1` local API responses, including private reads and rejected requests, use `Cache-Control: no-store` and `Pragma: no-cache` to reduce retention of profile, memory, history and backup data by browsers or intermediaries.
+- The local API remains loopback-only. Middleware checks both the Host/Origin hostname and the actual ASGI socket peer IP; a caller cannot bypass the boundary by sending `Host: localhost` from a LAN address. The confirmation token is an action/replay guard, not authentication.
