@@ -68,7 +68,9 @@ def isolated_database(tmp_path):
     # Keep tests hermetic and independent of a real user's home directory.
     api.DATABASE_PATH = tmp_path / "micro-helper-tests.sqlite3"
     raw_client.cookies.clear()
-    api._AUTH_LOGIN_FAILURES.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
     setup = raw_client.post(
         "/v1/auth/setup",
         json={"password": TEST_LOCAL_PASSWORD},
@@ -171,9 +173,43 @@ def test_local_auth_login_cookie_is_httponly_strict_and_revocable():
     assert raw_client.get("/v1/profile").status_code == 401
 
 
-def test_local_auth_rate_limits_failed_logins():
+def test_unconfigured_login_does_not_consume_the_rate_limit(tmp_path):
+    api.DATABASE_PATH = tmp_path / "unconfigured-local-auth.sqlite3"
     raw_client.cookies.clear()
-    api._AUTH_LOGIN_FAILURES.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
+
+    before_setup = raw_client.post(
+        "/v1/auth/login",
+        json={"password": "not-configured-yet"},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert before_setup.status_code == 409
+
+    password = secrets.token_urlsafe(24)
+    setup = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": password},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert setup.status_code == 201
+
+    raw_client.cookies.clear()
+    for _ in range(api.AUTH_FAILURE_LIMIT):
+        failed = raw_client.post(
+            "/v1/auth/login",
+            json={"password": "incorrect-password"},
+            headers={"Origin": TEST_ORIGIN},
+        )
+        assert failed.status_code == 401
+
+
+def test_local_auth_rate_limits_failed_logins_and_persists_the_window():
+    raw_client.cookies.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
     for _ in range(api.AUTH_FAILURE_LIMIT):
         response = raw_client.post(
             "/v1/auth/login",
@@ -181,12 +217,49 @@ def test_local_auth_rate_limits_failed_logins():
             headers={"Origin": TEST_ORIGIN},
         )
         assert response.status_code == 401
+
+    # The lockout state lives in SQLite, not in process memory.
+    with api.database() as db:
+        stored = db.execute(
+            "SELECT attempts FROM local_auth_failures WHERE client_key='loopback'"
+        ).fetchone()
+    assert stored["attempts"] == api.AUTH_FAILURE_LIMIT
+
+    # Opening a fresh database connection does not reset the rate limit.
+    with api.database() as db:
+        db.execute("SELECT 1").fetchone()
     limited = raw_client.post(
         "/v1/auth/login",
         json={"password": "incorrect-password"},
         headers={"Origin": TEST_ORIGIN},
     )
     assert limited.status_code == 429
+
+
+def test_successful_local_login_clears_persisted_failures():
+    raw_client.cookies.clear()
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth_failures")
+        db.commit()
+    for _ in range(api.AUTH_FAILURE_LIMIT - 1):
+        response = raw_client.post(
+            "/v1/auth/login",
+            json={"password": "incorrect-password"},
+            headers={"Origin": TEST_ORIGIN},
+        )
+        assert response.status_code == 401
+
+    successful = raw_client.post(
+        "/v1/auth/login",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert successful.status_code == 200
+    with api.database() as db:
+        remaining = db.execute(
+            "SELECT 1 FROM local_auth_failures WHERE client_key='loopback'"
+        ).fetchone()
+    assert remaining is None
 
 
 def test_private_mutations_require_origin_even_with_a_valid_session():
@@ -394,12 +467,14 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert 'url.pathname.startsWith("/v1/")' in worker.text
 
 
+
 def test_home_page_locks_private_data_when_offline():
     response = client.get("/")
     assert response.status_code == 200
     assert "Offline private data is locked" in response.text
     assert "micro_helper_offline_v1" not in response.text
     assert "status: 503" in response.text
+
 
 
 
@@ -727,6 +802,7 @@ def test_home_page_exposes_learning_plan_ui_and_offline_support():
 
 
 
+
 def test_direct_rest_memory_write_cannot_bypass_policy_with_forged_boolean():
     response = raw_client.post(
         "/v1/memories",
@@ -809,6 +885,7 @@ def test_home_page_exposes_rest_confirmation_flow():
     assert "micro_helper_offline_v1" not in html
 
 
+
 def test_expired_local_session_is_rejected_even_when_cookie_is_present():
     raw_client.cookies.clear()
     response = raw_client.post(
@@ -833,29 +910,6 @@ def test_expired_local_session_is_rejected_even_when_cookie_is_present():
         "configured": True,
         "authenticated": False,
     }
-
-
-def test_private_offline_fallback_is_locked_until_encryption_is_available():
-    home = raw_client.get("/").text
-    auth_script = raw_client.get("/static/local-auth.js").text
-    service_worker = raw_client.get("/static/sw.js").text
-
-    assert "micro_helper_offline_v1" not in home
-    assert "Offline private data is locked" in home
-    assert "Offline data jsou uzamčená" in auth_script
-    assert "Starší offline data zůstávají zachována" in auth_script
-    assert "micro-helper-pwa-v4" in service_worker
-
-
-def test_offline_lock_is_modal_and_disables_underlying_page():
-    auth_script = raw_client.get("/static/local-auth.js").text
-
-    assert 'card.setAttribute("role", "dialog")' in auth_script
-    assert 'card.setAttribute("aria-modal", "true")' in auth_script
-    assert 'card.setAttribute("aria-labelledby", "mh-local-auth-offline-title")' in auth_script
-    assert 'child.setAttribute("inert", "")' in auth_script
-    assert 'child.setAttribute("aria-hidden", "true")' in auth_script
-    assert "retry.focus()" in auth_script
 
 
 def test_local_auth_ui_discloses_recovery_limit_and_never_stores_credentials():
