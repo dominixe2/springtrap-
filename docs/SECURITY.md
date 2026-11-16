@@ -71,7 +71,7 @@
 - Successful setup/login issues an opaque 12-hour HttpOnly, SameSite=Strict session cookie. Only the SHA-256 hash of the cookie value is stored in SQLite; the raw value is never returned in JSON or exposed to JavaScript or Web Storage (localStorage/sessionStorage). The browser holds it only as an HttpOnly cookie.
 - All private /v1 routes require a valid unexpired local session, except the minimal status/setup/login/logout endpoints.
 - All state-changing /v1 requests require an exact Origin; setup, login and logout always require the exact same origin.
-- Failed login attempts are rate-limited to five per 15 minutes per local process. This in-memory limiter resets when the process restarts.
+- Login attempts share one loopback-only rate-limit bucket: five attempts per 15-minute window. The counter and window are updated atomically in SQLite, so restarting the local service does not reset the lockout. A successful login clears the bucket. No client IP address is persisted.
 - Logout revokes the server-side session immediately. The cookie expires after 12 hours.
 - This is single-user authentication for a loopback-only local instance, not multi-user cloud authentication or a way to expose the API to a LAN.
 - Password recovery is not implemented yet. Keep a separate backup before any manual recovery procedure.
