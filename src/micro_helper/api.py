@@ -9,7 +9,6 @@ import re
 import secrets
 import sqlite3
 import stat
-import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -40,8 +39,6 @@ AUTH_COOKIE_NAME = "mh_session"
 AUTH_SESSION_SECONDS = 12 * 60 * 60
 AUTH_FAILURE_WINDOW_SECONDS = 15 * 60
 AUTH_FAILURE_LIMIT = 5
-_AUTH_LOGIN_FAILURES: dict[str, list[float]] = {}
-_AUTH_LOGIN_LOCK = threading.Lock()
 
 
 def _is_loopback_hostname(hostname: str | None) -> bool:
@@ -373,6 +370,12 @@ def database() -> Iterator[sqlite3.Connection]:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS local_auth_failures (
+                client_key TEXT PRIMARY KEY,
+                window_started_at REAL NOT NULL,
+                attempts INTEGER NOT NULL CHECK (attempts >= 0),
+                updated_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS local_sessions (
                 token_hash TEXT PRIMARY KEY,
                 created_at TEXT NOT NULL,
@@ -455,35 +458,49 @@ def _has_valid_local_session(request: Request) -> bool:
 
 
 def _auth_failure_key(request: Request) -> str:
-    return request.client.host if request.client is not None else "unknown"
+    """Use one shared bucket for all loopback forms without persisting an IP address."""
+    host = request.client.host if request.client is not None else ""
+    return "loopback" if _is_loopback_peer(host) else "unknown"
 
 
-def _auth_login_blocked(key: str) -> bool:
-    now = time.monotonic()
-    with _AUTH_LOGIN_LOCK:
-        attempts = [stamp for stamp in _AUTH_LOGIN_FAILURES.get(key, []) if now - stamp < AUTH_FAILURE_WINDOW_SECONDS]
-        _AUTH_LOGIN_FAILURES[key] = attempts
-        if len(_AUTH_LOGIN_FAILURES) > 256:
-            oldest = sorted(
-                _AUTH_LOGIN_FAILURES,
-                key=lambda item: max(_AUTH_LOGIN_FAILURES[item], default=0.0),
+def _reserve_auth_attempt(key: str) -> bool:
+    """Atomically persist a login attempt so restarts cannot reset the lockout."""
+    now = time.time()
+    with database() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            "SELECT window_started_at, attempts FROM local_auth_failures WHERE client_key=?",
+            (key,),
+        ).fetchone()
+        if row is None or now - float(row["window_started_at"]) >= AUTH_FAILURE_WINDOW_SECONDS:
+            db.execute(
+                """
+                INSERT INTO local_auth_failures(client_key, window_started_at, attempts, updated_at)
+                VALUES (?, ?, 1, ?)
+                ON CONFLICT(client_key) DO UPDATE SET
+                    window_started_at=excluded.window_started_at,
+                    attempts=1,
+                    updated_at=excluded.updated_at
+                """,
+                (key, now, utc_now()),
             )
-            for item in oldest[: len(_AUTH_LOGIN_FAILURES) - 256]:
-                _AUTH_LOGIN_FAILURES.pop(item, None)
-        return len(attempts) >= AUTH_FAILURE_LIMIT
-
-
-def _record_auth_failure(key: str) -> None:
-    now = time.monotonic()
-    with _AUTH_LOGIN_LOCK:
-        attempts = [stamp for stamp in _AUTH_LOGIN_FAILURES.get(key, []) if now - stamp < AUTH_FAILURE_WINDOW_SECONDS]
-        attempts.append(now)
-        _AUTH_LOGIN_FAILURES[key] = attempts
+            db.commit()
+            return True
+        if int(row["attempts"]) >= AUTH_FAILURE_LIMIT:
+            db.commit()
+            return False
+        db.execute(
+            "UPDATE local_auth_failures SET attempts=attempts+1, updated_at=? WHERE client_key=?",
+            (utc_now(), key),
+        )
+        db.commit()
+        return True
 
 
 def _clear_auth_failures(key: str) -> None:
-    with _AUTH_LOGIN_LOCK:
-        _AUTH_LOGIN_FAILURES.pop(key, None)
+    with database() as db:
+        db.execute("DELETE FROM local_auth_failures WHERE client_key=?", (key,))
+        db.commit()
 
 
 def _issue_local_session(request: Request, response: JSONResponse) -> None:
@@ -548,16 +565,15 @@ async def setup_local_auth(payload: LocalAuthRequest, request: Request):
 async def login_local_auth(payload: LocalAuthRequest, request: Request):
     if not _is_same_origin_auth_request(request):
         raise HTTPException(status_code=403, detail="Přihlášení musí pocházet ze stejného původu.")
-    key = _auth_failure_key(request)
-    if _auth_login_blocked(key):
-        raise HTTPException(status_code=429, detail="Příliš mnoho neúspěšných pokusů. Zkus to za 15 minut.")
     with database() as db:
         row = db.execute("SELECT salt, password_hash FROM local_auth WHERE id=1").fetchone()
     if row is None:
         raise HTTPException(status_code=409, detail="Nejdřív nastav místní zabezpečení.")
+    key = _auth_failure_key(request)
+    if not _reserve_auth_attempt(key):
+        raise HTTPException(status_code=429, detail="Příliš mnoho neúspěšných pokusů. Zkus to za 15 minut.")
     candidate = _password_digest(payload.password, row["salt"])
     if not secrets.compare_digest(candidate, row["password_hash"]):
-        _record_auth_failure(key)
         raise HTTPException(status_code=401, detail="Přihlášení se nepodařilo.")
     _clear_auth_failures(key)
     response = JSONResponse(content={"authenticated": True})
