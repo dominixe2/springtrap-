@@ -398,7 +398,8 @@ def test_local_ui_uses_micro_helper_as_the_default_identity():
     assert 'value="Micro Helper"' in html
     assert "Mykla" not in html
     assert "localStorage.getItem('mh_name')||'Micro Helper'" in html
-    assert 'profile:{agent_name:"Micro Helper"' in html
+    assert "micro_helper_offline_v1" not in html
+
 
 
 
