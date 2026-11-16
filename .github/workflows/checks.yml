@@ -38,6 +38,8 @@ jobs:
               path = Path(f"/tmp/micro-helper-ui-{index}.js")
               path.write_text(script, encoding="utf-8")
               subprocess.run(["node", "--check", str(path)], check=True)
+          subprocess.run(["node", "--check", "src/micro_helper/static/local-auth.js"], check=True)
+          subprocess.run(["node", "--check", "src/micro_helper/static/sw.js"], check=True)
           PY
       - name: Compile source
         run: python -m compileall -q src tests cloud-relay

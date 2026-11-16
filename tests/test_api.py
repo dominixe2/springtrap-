@@ -1,6 +1,10 @@
-from fastapi.testclient import TestClient
+import hashlib
+import secrets
 from urllib.parse import urlsplit
+
 import pytest
+from fastapi.testclient import TestClient
+
 import micro_helper.api as api
 
 
@@ -13,6 +17,10 @@ class PolicyAwareTestClient:
     def request(self, method, url, **kwargs):
         method = method.upper()
         path = urlsplit(str(url)).path
+        if method in {"POST", "PUT", "PATCH", "DELETE"} and path.startswith("/v1/"):
+            headers = dict(kwargs.get("headers") or {})
+            headers.setdefault("Origin", "http://127.0.0.1:8000")
+            kwargs["headers"] = headers
         exempt = path == "/v1/chat" or path == "/v1/actions/confirm" or path.startswith("/v1/tools/")
         if method in {"POST", "PUT", "PATCH", "DELETE"} and path.startswith("/v1/") and not exempt:
             arguments = kwargs.get("json")
@@ -21,6 +29,7 @@ class PolicyAwareTestClient:
             confirmation = raw_client.post(
                 "/v1/actions/confirm",
                 json={"method": method, "path": path, "arguments": arguments},
+                headers={"Origin": "http://127.0.0.1:8000"},
             )
             if confirmation.status_code == 200:
                 headers = dict(kwargs.get("headers") or {})
@@ -50,10 +59,196 @@ class PolicyAwareTestClient:
 client = PolicyAwareTestClient()
 
 
+TEST_LOCAL_PASSWORD = secrets.token_urlsafe(24)
+TEST_ORIGIN = "http://127.0.0.1:8000"
+
+
 @pytest.fixture(autouse=True)
 def isolated_database(tmp_path):
     # Keep tests hermetic and independent of a real user's home directory.
     api.DATABASE_PATH = tmp_path / "micro-helper-tests.sqlite3"
+    raw_client.cookies.clear()
+    api._AUTH_LOGIN_FAILURES.clear()
+    setup = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert setup.status_code == 201
+
+
+def test_local_api_requires_a_valid_session_for_private_routes():
+    raw_client.cookies.clear()
+    assert raw_client.get("/v1/profile").status_code == 401
+    assert raw_client.get("/v1/memories").status_code == 401
+    assert raw_client.post(
+        "/v1/memories",
+        json={"content": "private", "category": "context"},
+        headers={"Origin": TEST_ORIGIN},
+    ).status_code == 401
+    status = raw_client.get("/v1/auth/status").json()
+    assert status == {"configured": True, "authenticated": False}
+
+
+def test_local_auth_setup_is_one_time_strong_and_same_origin(tmp_path):
+    api.DATABASE_PATH = tmp_path / "fresh-local-auth.sqlite3"
+    raw_client.cookies.clear()
+    assert raw_client.get("/v1/auth/status").json() == {"configured": False, "authenticated": False}
+
+    missing_origin = raw_client.post("/v1/auth/setup", json={"password": secrets.token_urlsafe(24)})
+    assert missing_origin.status_code == 403
+    foreign_origin = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": secrets.token_urlsafe(24)},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert foreign_origin.status_code == 403
+    weak_password = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": "short"},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert weak_password.status_code == 422
+
+    password = secrets.token_urlsafe(24)
+    created = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": password},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert created.status_code == 201
+    assert created.json() == {"configured": True, "authenticated": True}
+    assert "mh_session" in raw_client.cookies
+    repeated = raw_client.post(
+        "/v1/auth/setup",
+        json={"password": password},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert repeated.status_code == 409
+
+
+def test_local_auth_login_cookie_is_httponly_strict_and_revocable():
+    raw_client.cookies.clear()
+    failed = raw_client.post(
+        "/v1/auth/login",
+        json={"password": "definitely-wrong-password"},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert failed.status_code == 401
+
+    response = raw_client.post(
+        "/v1/auth/login",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"authenticated": True}
+    cookie_header = response.headers["set-cookie"].lower()
+    assert "httponly" in cookie_header
+    assert "samesite=strict" in cookie_header
+    assert "max-age=43200" in cookie_header
+    assert "mh_session" not in response.text
+    session_value = raw_client.cookies.get("mh_session")
+    assert session_value not in response.text
+    assert session_value
+    session_hash = hashlib.sha256(session_value.encode("utf-8")).hexdigest()
+    with api.database() as db:
+        stored_session = db.execute(
+            "SELECT token_hash FROM local_sessions WHERE token_hash=?",
+            (session_hash,),
+        ).fetchone()
+        auth_record = db.execute(
+            "SELECT salt, password_hash FROM local_auth WHERE id=1"
+        ).fetchone()
+    assert stored_session is not None
+    assert session_value not in stored_session["token_hash"]
+    assert auth_record["password_hash"] != TEST_LOCAL_PASSWORD
+    assert len(auth_record["password_hash"]) == 64
+    assert raw_client.get("/v1/profile").status_code == 200
+
+    logout = raw_client.post("/v1/auth/logout", json={}, headers={"Origin": TEST_ORIGIN})
+    assert logout.status_code == 200
+    assert raw_client.get("/v1/profile").status_code == 401
+
+
+def test_local_auth_rate_limits_failed_logins():
+    raw_client.cookies.clear()
+    api._AUTH_LOGIN_FAILURES.clear()
+    for _ in range(api.AUTH_FAILURE_LIMIT):
+        response = raw_client.post(
+            "/v1/auth/login",
+            json={"password": "incorrect-password"},
+            headers={"Origin": TEST_ORIGIN},
+        )
+        assert response.status_code == 401
+    limited = raw_client.post(
+        "/v1/auth/login",
+        json={"password": "incorrect-password"},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert limited.status_code == 429
+
+
+def test_private_mutations_require_origin_even_with_a_valid_session():
+    missing_origin = raw_client.post(
+        "/v1/memories",
+        json={"content": "blocked", "category": "context"},
+    )
+    assert missing_origin.status_code == 403
+    foreign_origin = raw_client.post(
+        "/v1/memories",
+        json={"content": "blocked", "category": "context"},
+        headers={"Origin": "https://attacker.example"},
+    )
+    assert foreign_origin.status_code == 403
+
+
+def test_local_auth_marks_cookie_secure_on_https():
+    https_client = TestClient(
+        api.app,
+        base_url="https://127.0.0.1:8000",
+        client=("127.0.0.1", 8000),
+    )
+    response = https_client.post(
+        "/v1/auth/login",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": "https://127.0.0.1:8000"},
+    )
+    assert response.status_code == 200
+    cookie_header = response.headers["set-cookie"].lower()
+    assert "secure" in cookie_header
+    assert "httponly" in cookie_header
+    assert "samesite=strict" in cookie_header
+
+
+def test_local_session_is_invalidated_if_local_auth_record_is_removed():
+    with api.database() as db:
+        db.execute("DELETE FROM local_auth WHERE id=1")
+        db.commit()
+    assert raw_client.get("/v1/profile").status_code == 401
+    assert raw_client.get("/v1/auth/status").json() == {"configured": False, "authenticated": False}
+
+
+def test_local_session_expiry_invalidates_the_cookie():
+    token = raw_client.cookies.get("mh_session")
+    assert token
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    expired = (api.datetime.now(api.timezone.utc) - api.timedelta(seconds=1)).isoformat()
+    with api.database() as db:
+        db.execute("UPDATE local_sessions SET expires_at=? WHERE token_hash=?", (expired, token_hash))
+        db.commit()
+    assert raw_client.get("/v1/profile").status_code == 401
+
+
+def test_home_page_loads_local_auth_gate_without_browser_token_storage():
+    home = client.get("/")
+    assert '/static/local-auth.js' in home.text
+    script = client.get("/static/local-auth.js")
+    assert script.status_code == 200
+    assert 'credentials: "same-origin"' in script.text
+    assert "localStorage.setItem" not in script.text
+    assert "sessionStorage.setItem" not in script.text
+    assert "window.location.reload()" in script.text
 
 
 def test_health():
@@ -73,6 +268,7 @@ def test_status_is_honest_about_scope():
     assert "browser_voice_input" in body["implemented"]
     assert "browser_voice_output" in body["implemented"]
     assert "adaptive_user_preferences" in body["implemented"]
+    assert "local_api_session_authentication" in body["implemented"]
     assert "live_duplex_voice" in body["not_yet_implemented"]
     assert body["storage"]["type"] == "local_sqlite"
 
@@ -193,7 +389,9 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert icon.status_code == 200
     assert "<svg" in icon.text
     assert worker.status_code == 200
-    assert "micro-helper-pwa-v2" in worker.text
+    assert "micro-helper-pwa-v3" in worker.text
+    assert "/static/local-auth.js" in worker.text
+    assert 'url.pathname.startsWith("/v1/")' in worker.text
 
 
 def test_home_page_has_offline_local_fallback():
@@ -531,6 +729,7 @@ def test_direct_rest_memory_write_cannot_bypass_policy_with_forged_boolean():
     response = raw_client.post(
         "/v1/memories",
         json={"content": "nepovolený zápis", "category": "context", "confirmed": True},
+        headers={"Origin": TEST_ORIGIN},
     )
     assert response.status_code == 403
     assert raw_client.get("/v1/memories").json()["memories"] == []
@@ -541,10 +740,11 @@ def test_rest_confirmation_is_bound_to_method_path_arguments_and_single_use():
     issued = raw_client.post(
         "/v1/actions/confirm",
         json={"method": "POST", "path": "/v1/memories", "arguments": arguments},
+        headers={"Origin": TEST_ORIGIN},
     )
     assert issued.status_code == 200
     token = issued.json()["confirmation_token"]
-    headers = {"X-Micro-Helper-Confirmation": token}
+    headers = {"Origin": TEST_ORIGIN, "X-Micro-Helper-Confirmation": token}
 
     mismatch = raw_client.post(
         "/v1/memories",
@@ -563,17 +763,19 @@ def test_rest_confirmation_rejects_wrong_path_and_unknown_mutation():
     issued = raw_client.post(
         "/v1/actions/confirm",
         json={"method": "POST", "path": "/v1/memories", "arguments": {"content": "x", "category": "context"}},
+        headers={"Origin": TEST_ORIGIN},
     )
     token = issued.json()["confirmation_token"]
     wrong_path = raw_client.put(
         "/v1/profile",
         json={"agent_name": "Forged", "language": "cs-CZ", "style": "friendly"},
-        headers={"X-Micro-Helper-Confirmation": token},
+        headers={"Origin": TEST_ORIGIN, "X-Micro-Helper-Confirmation": token},
     )
     assert wrong_path.status_code == 403
     unknown = raw_client.post(
         "/v1/actions/confirm",
         json={"method": "POST", "path": "/v1/admin/reset", "arguments": {}},
+        headers={"Origin": TEST_ORIGIN},
     )
     assert unknown.status_code == 404
 
@@ -602,3 +804,38 @@ def test_home_page_exposes_rest_confirmation_flow():
     assert "/v1/actions/confirm" in html
     assert "X-Micro-Helper-Confirmation" in html
     assert "localConfirmations" in html
+
+
+def test_expired_local_session_is_rejected_even_when_cookie_is_present():
+    raw_client.cookies.clear()
+    response = raw_client.post(
+        "/v1/auth/login",
+        json={"password": TEST_LOCAL_PASSWORD},
+        headers={"Origin": TEST_ORIGIN},
+    )
+    assert response.status_code == 200
+    session_value = raw_client.cookies.get("mh_session")
+    assert session_value
+    session_hash = hashlib.sha256(session_value.encode("utf-8")).hexdigest()
+
+    with api.database() as db:
+        db.execute(
+            "UPDATE local_sessions SET expires_at=? WHERE token_hash=?",
+            ("2000-01-01T00:00:00+00:00", session_hash),
+        )
+        db.commit()
+
+    assert raw_client.get("/v1/profile").status_code == 401
+    assert raw_client.get("/v1/auth/status").json() == {
+        "configured": True,
+        "authenticated": False,
+    }
+
+
+def test_local_auth_ui_discloses_recovery_limit_and_never_stores_credentials():
+    response = raw_client.get("/static/local-auth.js")
+    assert response.status_code == 200
+    assert "obnovení" in response.text.lower()
+    assert "localStorage.setItem" not in response.text
+    assert "sessionStorage.setItem" not in response.text
+    assert "HttpOnly cookie" in response.text
