@@ -19,15 +19,31 @@
     document.head.append(style);
   }
 
+  function isolateBackground(gate) {
+    for (const child of document.body.children) {
+      if (child !== gate) {
+        child.setAttribute("inert", "");
+        child.setAttribute("aria-hidden", "true");
+      }
+    }
+    document.body.style.overflow = "hidden";
+  }
+
   function showGate(configured) {
     if (document.getElementById("mh-local-auth-gate")) return;
     const gate = document.createElement("div");
     gate.id = "mh-local-auth-gate";
     const card = document.createElement("section");
     card.id = "mh-local-auth-card";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
     const title = document.createElement("h2");
+    title.id = "mh-local-auth-title";
     title.textContent = configured ? "Přihlášení do Micro Helperu" : "Zabezpečení Micro Helperu";
     const description = document.createElement("p");
+    description.id = "mh-local-auth-description";
+    card.setAttribute("aria-labelledby", "mh-local-auth-title");
+    card.setAttribute("aria-describedby", "mh-local-auth-description");
     description.textContent = configured
       ? "Tato místní instance je chráněná heslem. Relace se drží v HttpOnly cookie a po 12 hodinách vyprší."
       : "Při prvním spuštění si nastav místní heslo. Musí mít alespoň 12 znaků. Ukládá se pouze jeho odvozený hash.";
@@ -65,7 +81,7 @@
     card.append(title, description, form, note);
     gate.append(card);
     document.body.append(gate);
-    document.body.style.overflow = "hidden";
+    isolateBackground(gate);
 
     form.addEventListener("submit", async event => {
       event.preventDefault();
@@ -122,13 +138,7 @@
     card.append(title, description, note, retry);
     gate.append(card);
     document.body.append(gate);
-    for (const child of document.body.children) {
-      if (child !== gate) {
-        child.setAttribute("inert", "");
-        child.setAttribute("aria-hidden", "true");
-      }
-    }
-    document.body.style.overflow = "hidden";
+    isolateBackground(gate);
     retry.focus();
   }
 
