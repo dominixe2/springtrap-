@@ -5,13 +5,23 @@ import vm from "node:vm";
 import { webcrypto } from "node:crypto";
 
 const source = await readFile(new URL("../src/micro_helper/static/offline-vault.js", import.meta.url), "utf8");
+const activeTimers = new Map();
+let nextTimerId = 0;
 const context = vm.createContext({
   crypto: webcrypto,
   TextEncoder,
   TextDecoder,
   Uint8Array,
   btoa,
-  atob
+  atob,
+  setTimeout(callback, delay) {
+    const id = ++nextTimerId;
+    activeTimers.set(id, { callback, delay });
+    return id;
+  },
+  clearTimeout(id) {
+    activeTimers.delete(id);
+  }
 });
 vm.runInContext(source, context);
 const vault = context.MicroHelperOfflineVault;
@@ -83,4 +93,29 @@ test("supports in-memory read, write, reseal and explicit lock", async () => {
 test("rejects weak passphrases and keeps persistence outside the crypto module", async () => {
   await assert.rejects(() => vault.create("short", payload), /alespoň 12 znaků/);
   assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB/);
+});
+
+
+test("locks automatically after the configured inactivity timeout", async () => {
+  const envelope = await vault.create(passphrase, payload);
+  const before = activeTimers.size;
+  const session = await vault.unlock(passphrase, envelope, { idleTimeoutMs: 15000 });
+  assert.equal(activeTimers.size, before + 1);
+  const firstTimerId = Array.from(activeTimers.keys()).at(-1);
+  assert.equal(activeTimers.get(firstTimerId).delay, 15000);
+
+  session.read();
+  assert.equal(activeTimers.has(firstTimerId), false, "activity must replace the previous timer");
+  const currentTimerId = Array.from(activeTimers.keys()).at(-1);
+  activeTimers.get(currentTimerId).callback();
+
+  assert.equal(session.isLocked(), true);
+  assert.throws(() => session.read(), /trezor je uzamčený/);
+});
+
+test("rejects unsafe or unsupported inactivity timeout values", async () => {
+  const envelope = await vault.create(passphrase, payload);
+  await assert.rejects(() => vault.unlock(passphrase, envelope, { idleTimeoutMs: 999 }), /mezi 1 sekundou/);
+  await assert.rejects(() => vault.unlock(passphrase, envelope, { idleTimeoutMs: 86400001 }), /mezi 1 sekundou/);
+  await assert.rejects(() => vault.unlock(passphrase, envelope, { idleTimeoutMs: "60000" }), /mezi 1 sekundou/);
 });
