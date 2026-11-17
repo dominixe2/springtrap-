@@ -40,12 +40,15 @@ jobs:
               subprocess.run(["node", "--check", str(path)], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/local-auth.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault.js"], check=True)
+          subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault-storage.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/sw.js"], check=True)
           PY
       - name: Run browser auth UI regression tests
         run: node --test tests/local-auth-ui.test.mjs
       - name: Run encrypted offline vault crypto tests
         run: node --test tests/offline-vault.test.mjs
+      - name: Run encrypted offline vault storage tests
+        run: node --test tests/offline-vault-storage.test.mjs
       - name: Compile source
         run: python -m compileall -q src tests cloud-relay
       - name: Run project tests
