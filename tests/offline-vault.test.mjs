@@ -71,6 +71,13 @@ test("rejects malformed and unsupported envelope versions before decryption", as
   await assert.rejects(() => vault.unlock(passphrase, { ...envelope, extra: true }), /Neplatný formát/);
 });
 
+test("rejects oversized base64url ciphertext before decoding it", async () => {
+  const envelope = JSON.parse(JSON.stringify(await vault.create(passphrase, payload)));
+  const maxEncodedLength = Math.ceil((vault.maxPlaintextBytes + 16) * 4 / 3);
+  const oversized = { ...envelope, ciphertext: "A".repeat(maxEncodedLength + 1) };
+  await assert.rejects(() => vault.unlock(passphrase, oversized), /trezor je příliš velký/);
+});
+
 test("supports in-memory read, write, reseal and explicit lock", async () => {
   const envelope = await vault.create(passphrase, payload);
   const session = await vault.unlock(passphrase, envelope);
