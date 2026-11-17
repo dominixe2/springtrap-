@@ -12,6 +12,9 @@
   const SALT_BYTES = 16;
   const IV_BYTES = 12;
   const MAX_PLAINTEXT_BYTES = 8 * 1024 * 1024;
+  const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+  const MIN_IDLE_TIMEOUT_MS = 1000;
+  const MAX_IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000;
   const AAD = new TextEncoder().encode(
     [FORMAT, VERSION, KDF_NAME, KDF_HASH, KDF_ITERATIONS, CIPHER_NAME, CIPHER_LENGTH].join("|")
   );
@@ -110,6 +113,19 @@
     return { salt, iv, ciphertext };
   }
 
+  function resolveIdleTimeout(options) {
+    if (options === undefined) return DEFAULT_IDLE_TIMEOUT_MS;
+    if (!options || typeof options !== "object" || Array.isArray(options) ||
+        Object.keys(options).some(key => key !== "idleTimeoutMs")) {
+      throw new TypeError("Neplatné nastavení automatického uzamčení trezoru.");
+    }
+    const value = options.idleTimeoutMs === undefined ? DEFAULT_IDLE_TIMEOUT_MS : options.idleTimeoutMs;
+    if (!Number.isSafeInteger(value) || value < MIN_IDLE_TIMEOUT_MS || value > MAX_IDLE_TIMEOUT_MS) {
+      throw new RangeError("Čas nečinnosti musí být mezi 1 sekundou a 24 hodinami.");
+    }
+    return value;
+  }
+
   async function deriveKey(passphrase, salt) {
     const material = await globalThis.crypto.subtle.importKey(
       "raw",
@@ -153,9 +169,10 @@
     return encryptPayload(key, salt, payload);
   }
 
-  async function unlock(passphrase, envelope) {
+  async function unlock(passphrase, envelope, options = {}) {
     requireCrypto();
     validatePassphrase(passphrase);
+    const idleTimeoutMs = resolveIdleTimeout(options);
     const parsed = validateEnvelope(envelope);
     const key = await deriveKey(passphrase, parsed.salt);
     let data;
@@ -175,12 +192,28 @@
     let activeSalt = parsed.salt;
     let activeData = data;
     let locked = false;
-    const assertUnlocked = () => {
-      if (locked || !activeKey || !activeData && activeData !== null) {
-        throw new Error("Offline trezor je uzamčený.");
+    let idleTimer = null;
+
+    const lock = () => {
+      if (idleTimer !== null) {
+        globalThis.clearTimeout(idleTimer);
+        idleTimer = null;
       }
+      activeData = null;
+      activeKey = null;
+      activeSalt = null;
+      locked = true;
+    };
+    const scheduleLock = () => {
+      if (idleTimer !== null) globalThis.clearTimeout(idleTimer);
+      idleTimer = globalThis.setTimeout(lock, idleTimeoutMs);
+    };
+    const assertUnlocked = () => {
+      if (locked || !activeKey) throw new Error("Offline trezor je uzamčený.");
+      scheduleLock();
     };
 
+    scheduleLock();
     return Object.freeze({
       isLocked: () => locked,
       read: () => {
@@ -193,14 +226,14 @@
       },
       seal: async () => {
         assertUnlocked();
-        return encryptPayload(activeKey, activeSalt, activeData);
+        const keyAtStart = activeKey;
+        const saltAtStart = activeSalt;
+        const dataAtStart = cloneJson(activeData);
+        const envelope = await encryptPayload(keyAtStart, saltAtStart, dataAtStart);
+        if (locked || activeKey !== keyAtStart) throw new Error("Offline trezor je uzamčený.");
+        return envelope;
       },
-      lock: () => {
-        activeData = null;
-        activeKey = null;
-        activeSalt = null;
-        locked = true;
-      }
+      lock
     });
   }
 
@@ -210,6 +243,7 @@
     format: FORMAT,
     version: VERSION,
     kdfIterations: KDF_ITERATIONS,
-    maxPlaintextBytes: MAX_PLAINTEXT_BYTES
+    maxPlaintextBytes: MAX_PLAINTEXT_BYTES,
+    defaultIdleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS
   });
 })();
