@@ -86,6 +86,11 @@ function makeIndexedDB() {
       const state = databases.get("micro-helper-offline-vault");
       const store = state?.stores.get("vaults");
       return JSON.stringify(store ? Array.from(store.records.entries()) : []);
+    },
+    corrupt(record) {
+      const state = databases.get("micro-helper-offline-vault");
+      const store = state?.stores.get("vaults");
+      store.records.set("primary", JSON.parse(JSON.stringify(record)));
     }
   };
 }
@@ -121,7 +126,7 @@ test("persists only the validated encrypted envelope across store instances", as
   first.close();
 
   const second = loadStorage(indexedDB.factory);
-  assert.deepEqual(await second.load(), envelope);
+  assert.equal(JSON.stringify(await second.load()), JSON.stringify(envelope));
   assert.equal(indexedDB.openCount, 2);
   assert.equal(indexedDB.dump().includes("soukromá testovací vzpomínka"), false);
   assert.equal(indexedDB.dump().includes("testovací historie"), false);
@@ -152,27 +157,16 @@ test("rejects a corrupted stored record without overwriting it", async () => {
   const indexedDB = makeIndexedDB();
   const store = loadStorage(indexedDB.factory);
   await store.save(envelope);
-  const before = indexedDB.dump();
   store.close();
 
-  const state = loadStorage(indexedDB.factory);
-  const originalOpen = indexedDB.factory.open.bind(indexedDB.factory);
-  indexedDB.factory.open = (name, version) => {
-    const request = originalOpen(name, version);
-    const success = request.onsuccess;
-    request.onsuccess = () => {
-      const db = request.result;
-      const transaction = db.transaction("vaults", "readwrite");
-      transaction.objectStore("vaults").put({
-        id: "primary",
-        envelope: { ...envelope, version: 99 }
-      });
-      success?.();
-    };
-    return request;
-  };
+  indexedDB.corrupt({
+    id: "primary",
+    envelope: { ...envelope, version: 99 }
+  });
+  const before = indexedDB.dump();
 
+  const state = loadStorage(indexedDB.factory);
   await assert.rejects(() => state.load(), /poškozený nebo nepodporovaný/);
-  assert.notEqual(indexedDB.dump(), before);
+  assert.equal(indexedDB.dump(), before, "a rejected envelope must remain untouched");
   state.close();
 });
