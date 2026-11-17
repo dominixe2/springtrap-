@@ -64,7 +64,17 @@
   }
 
   function decodeBase64Url(value, expectedLength, maxLength) {
-    if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) {
+    if (typeof value !== "string") {
+      throw new TypeError("Neplatný formát šifrovaného trezoru.");
+    }
+    // Reject oversized encoded input before atob allocates a second large string.
+    if (maxLength !== undefined && value.length > Math.ceil(maxLength * 4 / 3)) {
+      throw new RangeError("Šifrovaný trezor je příliš velký.");
+    }
+    if (expectedLength !== undefined && value.length !== Math.ceil(expectedLength * 4 / 3)) {
+      throw new TypeError("Neplatná délka kryptografických parametrů trezoru.");
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(value) || value.length % 4 === 1) {
       throw new TypeError("Neplatný formát šifrovaného trezoru.");
     }
     const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
