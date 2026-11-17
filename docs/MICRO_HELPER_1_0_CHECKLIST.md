@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.25
+- **Checklist version:** 1.0.0-checklist.26
 - **Snapshot date:** 2026-11-17
-- **Snapshot source:** Current security/auth stack through PR #48 (`feature/encrypted-offline-vault-core-20261117`), stacked on PR #47 → #46 → #45 → #43 → #40 → #37. PR #48 head `935fe45ec3aeac87a8474109623567eb1c3df3a4` passed Micro Helper checks run #44098616360: 123 project tests, 11 relay tests, two browser-auth UI tests, nine encrypted-vault crypto tests, embedded JavaScript syntax and Python compilation. Two non-blocking Starlette/httpx TestClient deprecation warnings remain. All work remains in unmerged draft PRs.
+- **Snapshot source:** Current security/auth and encrypted-offline-vault stack through PR #49 (`feature/offline-vault-indexeddb-storage-20261117`), stacked on PR #48 → #47 → #46 → #45 → #43 → #40 → #37. PR #49 head `504e58e196bd92db5a469503cc1a631c553cf4a7` passed Micro Helper checks run [#44153939656](https://github.com/dominixe2/springtrap-/actions/runs/44153939656): 123 project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests, five IndexedDB storage tests, embedded JavaScript syntax and Python compilation. Two non-blocking Starlette/httpx TestClient deprecation warnings remain. All work remains in unmerged draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -144,3 +144,18 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The cryptographic primitive and regression coverage are now present, but the vault is not integrated with persistence/UI and has no browser or physical-device acceptance.
 - **Change this run:** 0.00 percentage points; the feature remains a draft implementation component rather than an integrated user-facing capability.
 - **Release decision:** NOT READY. No merge, deployment, legacy-data migration, or physical Android/Windows acceptance is claimed.
+
+
+## Verified update — 2026-11-17 (checklist v26)
+
+- **PR #49 — IndexedDB persistence adapter:** adds `src/micro_helper/static/offline-vault-storage.js`, a separate storage boundary that accepts only the exact version-1 encrypted vault envelope. It validates fixed PBKDF2-HMAC-SHA-256 (600,000 iterations) and AES-256-GCM metadata, salt/IV/ciphertext encodings and the ciphertext size limit before opening IndexedDB. The adapter writes one fixed record in an atomic read/write transaction, returns only the validated envelope, and fails closed for unavailable, blocked or corrupt storage. It does not accept plaintext records, passphrases or CryptoKey values.
+- **Regression coverage:** `tests/offline-vault-storage.test.mjs` covers empty storage, persistence across adapter instances, plaintext absence, malformed/unsupported envelopes, missing IndexedDB and preservation of a corrupt stored record without silently replacing it. The workflow now syntax-checks the adapter and runs this suite.
+- **PASS — PR #49 head:** `504e58e196bd92db5a469503cc1a631c553cf4a7`, Actions run [#44153939656](https://github.com/dominixe2/springtrap-/actions/runs/44153939656): 123 project tests, 11 relay tests, two browser-auth UI tests, nine crypto tests and five storage tests passed; embedded JavaScript syntax and Python compilation passed. Two non-blocking Starlette/httpx TestClient deprecation warnings remain.
+- **Not integrated:** the adapter is not yet wired to the app UI or service-worker lifecycle. Offline private mode remains disabled; no legacy plaintext data was read, migrated, overwritten or deleted. The five IndexedDB tests use a deterministic Node test double, not a real browser.
+- **Acceptance gap:** real-browser IndexedDB behavior, offline unlock/read/write/lock flow, explicit user-controlled migration, Android and Windows physical-device acceptance remain NOT RUN.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The new adapter is isolated and CI-tested, but the user-facing offline flow and browser/platform acceptance are not integrated; no weighted criterion reaches the 0.75 evidence threshold.
+- **Change this run:** 0.00 percentage points. This is a concrete implementation step toward issue #44, not a complete offline feature.
+- **Release decision:** NOT READY. PR #49 remains a draft stacked on PR #48. No merge, deployment, migration or physical-device acceptance is claimed.
