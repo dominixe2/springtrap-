@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.24
-- **Snapshot date:** 2026-11-16
-- **Snapshot source:** Current security/auth stack through PR #47 (`test/auth-throttle-process-restart-20261116`), stacked on PR #46 → #45 → #43 → #40 → #37. PR #47 head `43e69ac5eb9029709cfb1c46953069cdb7ae90a7` passed Micro Helper checks run #43927582477: 123 project tests, 11 relay tests, two browser-auth UI tests, embedded JavaScript syntax and Python compilation. All work remains in unmerged draft PRs.
+- **Checklist version:** 1.0.0-checklist.25
+- **Snapshot date:** 2026-11-17
+- **Snapshot source:** Current security/auth stack through PR #48 (`feature/encrypted-offline-vault-core-20261117`), stacked on PR #47 → #46 → #45 → #43 → #40 → #37. PR #48 head `935fe45ec3aeac87a8474109623567eb1c3df3a4` passed Micro Helper checks run #44098616360: 123 project tests, 11 relay tests, two browser-auth UI tests, nine encrypted-vault crypto tests, embedded JavaScript syntax and Python compilation. Two non-blocking Starlette/httpx TestClient deprecation warnings remain. All work remains in unmerged draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -129,3 +129,18 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The existing ten weighted criteria remain at evidence level 0.50 each. This update records additional auth/security implementation and passing CI, but no criterion has yet met the checklist's 0.75 threshold (integrated implementation, automated regression coverage and an end-to-end check on at least one target platform).
 - **Change this run:** 0.00 percentage points in the release score; PR #47 adds stronger verified auth regressions, but physical platform acceptance and an end-to-end target-platform check remain absent.
 - **Release decision:** NOT READY. No merge, production deployment, signed release, encrypted offline vault, or physical Android/Windows acceptance is claimed.
+
+
+## Verified update — 2026-11-17 (checklist v25)
+
+- **PR #48 — encrypted offline vault cryptographic core:** adds versioned AES-256-GCM envelopes, 128-bit random per-vault salt, fresh 96-bit IV per seal, PBKDF2-HMAC-SHA-256 at 600,000 iterations, non-extractable CryptoKey, authenticated metadata, strict envelope validation and an 8 MiB plaintext limit. Oversized base64url input is rejected before decoding/allocation.
+- **In-memory session behavior:** read/write/reseal, explicit lock and configurable inactivity lock (default five minutes; accepted range 1 second to 24 hours). JavaScript cannot guarantee physical memory zeroization.
+- **PASS — PR #48 head:** `935fe45ec3aeac87a8474109623567eb1c3df3a4`, Actions run [#44098616360](https://github.com/dominixe2/springtrap-/actions/runs/44098616360): 123 project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests, embedded JavaScript syntax and Python compilation passed. Two non-blocking Starlette/httpx TestClient deprecation warnings remain.
+- **Not integrated:** the crypto core is not yet connected to IndexedDB or the app UI. It does not enable private offline mode or migrate legacy plaintext records. The fail-closed offline lock remains active; no existing data is read, modified or deleted.
+- **Acceptance gap:** Node Web Crypto tests are not browser-level acceptance. Android and Windows physical-device checks remain NOT RUN.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The cryptographic primitive and regression coverage are now present, but the vault is not integrated with persistence/UI and has no browser or physical-device acceptance.
+- **Change this run:** 0.00 percentage points; the feature remains a draft implementation component rather than an integrated user-facing capability.
+- **Release decision:** NOT READY. No merge, deployment, legacy-data migration, or physical Android/Windows acceptance is claimed.
