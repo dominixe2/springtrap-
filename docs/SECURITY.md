@@ -32,7 +32,6 @@
 - The browser-local fallback uses browser storage and is not encrypted by this app. Treat device access and browser profile security accordingly.
 - A successful CI build proves packaging and static checks, not behavior on the user's physical phone or notebook.
 
-
 ## Local API tool policy integration (2026-11-07)
 
 - The local Python API now evaluates registered tool calls through `src/micro_helper/trust_policy.py`.
@@ -42,16 +41,14 @@
 - This integration covers only the three registered local API tools. It does not yet protect every hosted, Windows Companion, or JARVIS adapter. There is no user-managed grant editor/revocation UI yet; do not imply otherwise.
 - The confirmation endpoint must only be called after the client has displayed the exact action and received explicit user approval. The token is a short-lived server-side replay guard, not authentication. The local API must remain bound to loopback; Origin/Fetch-Metadata checks are defense in depth, not a substitute for authentication.
 
-
 ## Shared REST mutation authorization (2026-11-09)
 
 - Every state-changing local REST route present in the trust-gateway branch is classified by one shared route resolver and evaluated by the deterministic trust policy.
 - Profile, memory, preference, learning-plan, task-queue and conversation-clear writes require a short-lived, single-use confirmation token bound to the exact HTTP method, path and canonical JSON body. The token is stored only as a SHA-256 hash and is consumed atomically.
 - Chat submission has one narrow built-in grant because the user explicitly presses Send; it does not authorize any other conversation or memory mutation.
-- The browser UI displays the exact method, path and request body before requesting a token. The offline localStorage fallback uses an in-memory, one-time token with the same method/path/body binding; reloading the page invalidates outstanding offline confirmations.
+- The browser UI displays the exact method, path and request body before requesting a token. The offline localStorage fallback uses an in-memory, one-time token with the same method/path/body binding; reloading the page invalidates outstanding offline confirmations. The offline fallback is disabled in the current auth stack until an encrypted vault is integrated.
 - Audit events store action metadata only, never private request bodies or confirmation tokens.
 - These tokens are an explicit-action/replay guard, **not authentication**. The local API must remain loopback-only. This branch is stacked on PR #23; the separate PR #25 backup-restore endpoint must be brought through this same gate when the two branches are integrated.
-
 
 ## Full local backup/restore policy gate (2026-11-09)
 
@@ -62,7 +59,7 @@
 - The browser displays a restore-specific summary (collection counts and byte size). It hashes the exact request bytes with Web Crypto; only the SHA-256 digest is sent to the confirmation endpoint, so the private backup body is not copied into confirmation storage or audit events.
 - The resulting token is short-lived, single-use and bound to the exact restore body bytes. The ASGI body-limit middleware enforces 8 MiB on both declared and chunked requests before JSON parsing.
 - All `/v1` local API responses, including private reads and rejected requests, use `Cache-Control: no-store` and `Pragma: no-cache` to reduce retention of profile, memory, history and backup data by browsers or intermediaries.
-- The local API remains loopback-only. Middleware checks both the Host/Origin hostname and the actual ASGI socket peer IP; a caller cannot bypass the boundary by sending `Host: localhost` from a LAN address. The confirmation token is an action/replay guard, not authentication.
+- The local API remains loopback-only. Middleware checks both the Host/Origin hostname and the actual ASGI socket peer IP; a caller cannot bypass the boundary by sending `Host: localhost` from a LAN address. The confirmation token is a short-lived replay guard, not authentication.
 
 ## Local single-user API authentication
 
@@ -76,8 +73,7 @@
 - This is single-user authentication for a loopback-only local instance, not multi-user cloud authentication or a way to expose the API to a LAN.
 - Password recovery is not implemented yet. Keep a separate backup before any manual recovery procedure.
 - The browser UI does not put the password or session value into localStorage or sessionStorage.
-
-- If the local API is unavailable, the browser fails closed: private memories, conversation history, tasks and learning plans are not loaded from browser storage. The legacy plaintext offline store is preserved but is not read or modified by the app. Private offline mode remains disabled until an encrypted vault is implemented.
+- If the local API is unavailable, the browser fails closed: private memories, conversation history, tasks and learning plans are not loaded from browser storage. The legacy plaintext offline store is preserved but is not read or modified by the app. Private offline mode remains disabled until an encrypted vault is fully integrated.
 
 ## Local SQLite file permissions
 
@@ -85,3 +81,12 @@
 - The SQLite database and its WAL/SHM/journal sidecars are restricted to mode 0600; symlink targets and non-regular files are refused.
 - When MICRO_HELPER_DB points into a custom directory, the database files are restricted but the custom parent directory is left unchanged.
 - On Windows, file access remains governed by the inherited Windows user profile ACL. This code does not claim to configure or verify Windows ACLs.
+
+## Encrypted offline vault cryptographic core (2026-11-17, not yet integrated)
+
+- `src/micro_helper/static/offline-vault.js` provides a version-1 Web Crypto envelope using AES-256-GCM with a 128-bit authentication tag, a fresh 96-bit IV for every seal, and a random 128-bit per-vault salt.
+- The passphrase is converted into a non-extractable AES-GCM key using PBKDF2-HMAC-SHA-256 with 600,000 iterations. The passphrase and raw key are not written to browser storage or logs.
+- Envelope metadata is strictly validated and authenticated as additional authenticated data. Wrong passphrases, modified ciphertext, malformed envelopes and unsupported versions fail closed.
+- The core supports in-memory read/write/reseal and an explicit lock operation. It holds the CryptoKey and decrypted value only in a closure; JavaScript runtimes do not guarantee physical memory zeroization.
+- The module has no localStorage, sessionStorage or IndexedDB access. It does not yet persist an envelope, integrate with the application UI, implement inactivity locking, or migrate legacy plaintext data. The fail-closed offline UI remains in force until those parts and browser-level acceptance tests are complete.
+- Automated Node Web Crypto tests validate the cryptographic core only; they are not a substitute for browser, Android or Windows acceptance.
