@@ -148,6 +148,21 @@ test("rejects malformed and unsupported envelopes before opening IndexedDB", asy
   store.close();
 });
 
+test("rejects non-canonical base64url trailing bits before opening IndexedDB", async () => {
+  const indexedDB = makeIndexedDB();
+  const store = loadStorage(indexedDB.factory);
+  await assert.rejects(
+    () => store.save({ ...envelope, salt: "A".repeat(21) + "B" }),
+    /salt/
+  );
+  await assert.rejects(
+    () => store.save({ ...envelope, ciphertext: "A".repeat(62) + "B" }),
+    /ciphertext/
+  );
+  assert.equal(indexedDB.openCount, 0, "invalid encodings must be rejected before opening storage");
+  store.close();
+});
+
 test("fails closed when IndexedDB is unavailable", async () => {
   const store = loadStorage(undefined);
   await assert.rejects(() => store.load(), /nepodporuje IndexedDB/);

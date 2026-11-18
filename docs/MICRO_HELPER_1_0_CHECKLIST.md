@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.26
-- **Snapshot date:** 2026-11-17
-- **Snapshot source:** Current security/auth and encrypted-offline-vault stack through PR #49 (`feature/offline-vault-indexeddb-storage-20261117`), stacked on PR #48 → #47 → #46 → #45 → #43 → #40 → #37. PR #49 head `504e58e196bd92db5a469503cc1a631c553cf4a7` passed Micro Helper checks run [#44153939656](https://github.com/dominixe2/springtrap-/actions/runs/44153939656): 123 project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests, five IndexedDB storage tests, embedded JavaScript syntax and Python compilation. Two non-blocking Starlette/httpx TestClient deprecation warnings remain. All work remains in unmerged draft PRs.
+- **Checklist version:** 1.0.0-checklist.27
+- **Snapshot date:** 2026-11-18
+- **Snapshot source:** Current security/auth and encrypted-offline-vault stack through PR #50, stacked on PR #49 → #48 → #47 → #46 → #45 → #43 → #40 → #37. PR #49 head `71e0522105f2900a6f49f8fc8de2511a9f4acb4f` passed Micro Helper checks run [#44154244060](https://github.com/dominixe2/springtrap-/actions/runs/44154244060): 123 project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests, six IndexedDB storage tests, embedded JavaScript syntax and Python compilation. PR #50 adds canonical base64url validation; all work remains in unmerged draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -159,3 +159,17 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The new adapter is isolated and CI-tested, but the user-facing offline flow and browser/platform acceptance are not integrated; no weighted criterion reaches the 0.75 evidence threshold.
 - **Change this run:** 0.00 percentage points. This is a concrete implementation step toward issue #44, not a complete offline feature.
 - **Release decision:** NOT READY. PR #49 remains a draft stacked on PR #48. No merge, deployment, migration or physical-device acceptance is claimed.
+
+
+## Verified update — 2026-11-18 (checklist v27)
+
+- **PR #50 — canonical encrypted-envelope encoding:** the IndexedDB adapter now rejects base64url strings with non-zero unused trailing bits. This prevents alternate/non-canonical encodings from being accepted at the persistence boundary. Salt and ciphertext regression cases verify rejection happens before IndexedDB is opened.
+- **PASS — PR #50 head:** `c831a246ef47760d14bdaae733795db7232a6937`, Actions run [#44315990763](https://github.com/dominixe2/springtrap-/actions/runs/44315990763): 123 Python project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests and six IndexedDB storage tests passed. Embedded JavaScript syntax and Python compilation passed. One non-blocking Starlette/httpx TestClient deprecation warning appeared in each Python suite.
+- **Not integrated:** the vault core and IndexedDB adapter are still not connected to the app UI or service-worker lifecycle. Private offline mode remains fail-closed. No legacy plaintext data was read, migrated, overwritten or deleted.
+- **Acceptance gap:** current IndexedDB tests use a deterministic Node test double. Real-browser IndexedDB, UI unlock/lock, explicit migration, Android and Windows acceptance remain NOT RUN.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** Canonical encoding validation improves the persistence boundary but does not complete the user-facing offline vault or target-platform acceptance.
+- **Change this run:** 0.00 percentage points; the implementation remains a draft security hardening step.
+- **Release decision:** NOT READY. No merge, deployment, legacy-data migration or physical-device acceptance is claimed.
