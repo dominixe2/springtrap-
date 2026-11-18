@@ -21,6 +21,16 @@
         value.length % 4 === 1 || !/^[A-Za-z0-9_-]+$/.test(value)) {
       throw new TypeError("Neplatné šifrované úložiště (pole " + field + ").");
     }
+    // Base64url without padding has canonical trailing-bit requirements:
+    // 2 remaining characters carry 8 bits; 3 carry 16 bits. Non-zero unused
+    // bits create alternate strings for the same bytes and must be rejected.
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const remainder = value.length % 4;
+    const lastValue = alphabet.indexOf(value[value.length - 1]);
+    if ((remainder === 2 && (lastValue & 15) !== 0) ||
+        (remainder === 3 && (lastValue & 3) !== 0)) {
+      throw new TypeError("Neplatné kódování šifrovaného úložiště (pole " + field + ").");
+    }
   }
 
   function validateEnvelope(value) {
