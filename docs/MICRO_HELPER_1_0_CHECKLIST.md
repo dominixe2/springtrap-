@@ -1,6 +1,6 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.27
+- **Checklist version:** 1.0.0-checklist.28
 - **Snapshot date:** 2026-11-18
 - **Snapshot source:** Current security/auth and encrypted-offline-vault stack through PR #50, stacked on PR #49 → #48 → #47 → #46 → #45 → #43 → #40 → #37. PR #49 head `71e0522105f2900a6f49f8fc8de2511a9f4acb4f` passed Micro Helper checks run [#44154244060](https://github.com/dominixe2/springtrap-/actions/runs/44154244060): 123 project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests, six IndexedDB storage tests, embedded JavaScript syntax and Python compilation. PR #50 adds canonical base64url validation; all work remains in unmerged draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
@@ -173,3 +173,17 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** Canonical encoding validation improves the persistence boundary but does not complete the user-facing offline vault or target-platform acceptance.
 - **Change this run:** 0.00 percentage points; the implementation remains a draft security hardening step.
 - **Release decision:** NOT READY. No merge, deployment, legacy-data migration or physical-device acceptance is claimed.
+
+
+## Verified update — 2026-11-18 (checklist v28)
+
+- **PR #52 — service-worker cache boundary regression suite:** adds four Node tests proving that same-origin private `/v1/` reads, writes and deletes are never intercepted by the service worker, that cross-origin resources are not intercepted, and that the existing same-origin static-asset cache path still works. The tests cover auth status, conversations, memories, preferences, backup, tasks, learning plans and confirmation endpoints.
+- **PASS — PR #52 head:** `5549360c402edfdfdfc1dd2919ad3f3989e6493c`, Actions run [#44373266894](https://github.com/dominixe2/springtrap-/actions/runs/44373266894). The workflow passed embedded browser JavaScript syntax checks, 2 browser-auth UI tests, 9 vault crypto tests, 6 IndexedDB storage tests, **4 new service-worker cache-boundary tests**, Python compilation, 123 project tests and 11 relay tests. One non-blocking Starlette/httpx TestClient deprecation warning appeared in each Python suite.
+- **Scope:** this is regression protection only. It does not wire the encrypted vault into the UI or enable offline private data. The private offline experience remains fail-closed; legacy plaintext data remains untouched.
+- **Acceptance gap:** the IndexedDB adapter still uses a deterministic Node test double; real-browser IndexedDB, vault UI unlock/lock, explicit legacy migration, offline reads/writes and physical Android/Windows acceptance remain NOT RUN.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The new tests improve confidence in the service-worker privacy boundary but do not satisfy the integrated offline-vault or target-platform acceptance criteria.
+- **Change this run:** 0.00 percentage points.
+- **Release decision:** NOT READY. PR #52 is a draft stacked on PR #50; no merge, deployment, migration or physical-device acceptance is claimed.
