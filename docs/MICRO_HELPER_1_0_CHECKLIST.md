@@ -1,6 +1,6 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.33
+- **Checklist version:** 1.0.0-checklist.34
 - **Snapshot date:** 2026-11-19
 - **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and background-lock hardening PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 head `5a49ce9fd07a851cc51f4e38560f23c671e806db` passed run [#44592605947](https://github.com/dominixe2/springtrap-/actions/runs/44592605947): 171 automated tests across Python, relay, browser-auth, vault crypto/storage/UI and service-worker suites, plus embedded JavaScript syntax and Python compilation. All current release work remains in draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
@@ -64,6 +64,7 @@ A level may be raised only when new implementation and evidence are linked in th
 6. Cross-device encrypted sync, conflict handling and device-session revocation are not yet proven end to end.
 7. PR #23 → #31 → #32 → #34 → #35 now form a passing stacked trust-gateway/backup/restore/export-safety branch, but remain unmerged. Compare PR #34 against PR #25, then integrate the stack sequentially and run CI on the resulting `micro-helper` branch.
 8. The active Windows Companion endpoint is Render, while the Cloudflare Durable Object relay is a separate replacement. PR #33 hardens the Render source but remains unmerged and undeployed. The Cloudflare Worker is also not deployed; no live WSS pairing or real phone-to-Windows action has been verified, and clients must not be switched between endpoints before a successful staging health check.
+9. The active `micro-helper` integration branch is **diverged** from default `main`: comparison reports 210 commits ahead and 48 behind (merge base `a05bbae1755214fd6c329b1f5322b58c31a32620`). PR #37/#38 and the newer security/offline-vault stack target this non-default integration line. Do not merge the large divergence blindly; reconcile and test the complete stack on a dedicated integration candidate before any release merge.
 
 ## Next development order
 
@@ -252,3 +253,10 @@ A level may be raised only when new implementation and evidence are linked in th
 - **JARVIS integration review:** confirmed PR #9, #10, #11 and #12 are still open. PR #12 is a six-commit follow-up directly on PR #9; PR #11 is a parallel Vite-network hardening branch on PR #10. No Actions runs were returned for the current heads of #9, #10, #11 or #12. The PRs are therefore not yet verified integration inputs for Micro Helper's Windows adapter.
 - **Safety decision:** keep the JARVIS Windows bridge and phone relay separate from Micro Helper until the authenticated relay and trusted-HTTPS listener have passing CI and a physical phone-to-notebook smoke test. No merge or network exposure was performed.
 - **Score:** remains 50.00/100; this repository review changes no weighted acceptance evidence.
+
+
+## Verified update — 2026-11-19 (checklist v34)
+
+- **Branch integration state:** repository default branch is `main`; the active `micro-helper` branch is 210 commits ahead and 48 behind `main`, with merge base `a05bbae1755214fd6c329b1f5322b58c31a32620`. PR #37 and #38 target `micro-helper`; the encrypted-vault stack ultimately builds on that integration line. This is a material release-integration risk, not a reason to overwrite or reset either branch.
+- **Release safety:** keep the PR chain stacked and unmerged. Before release, prepare a reviewed integration branch that reconciles the 48 commits on `main`, then run the full combined CI and platform builds. No merge or branch rewrite was performed in this run.
+- **Score:** remains 50.00/100; branch topology is a blocker, not earned acceptance evidence.
