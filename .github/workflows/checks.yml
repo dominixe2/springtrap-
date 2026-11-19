@@ -41,6 +41,7 @@ jobs:
           subprocess.run(["node", "--check", "src/micro_helper/static/local-auth.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault-storage.js"], check=True)
+          subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault-ui.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/sw.js"], check=True)
           PY
       - name: Run browser auth UI regression tests
@@ -49,6 +50,8 @@ jobs:
         run: node --test tests/offline-vault.test.mjs
       - name: Run encrypted offline vault storage tests
         run: node --test tests/offline-vault-storage.test.mjs
+      - name: Run encrypted offline vault UI tests
+        run: node --test tests/offline-vault-ui.test.mjs
       - name: Run service-worker cache-boundary tests
         run: node --test tests/service-worker-cache.test.mjs
       - name: Compile source

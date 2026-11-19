@@ -18,6 +18,9 @@ input{min-width:0;flex:1}button{cursor:pointer;background:#1b3447}button.primary
 form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
 @media(max-width:600px){main{padding:14px}.msg{max-width:94%}#messages{max-height:none}}
 </style> <script src="/static/local-auth.js" defer></script>
+<script src="/static/offline-vault.js" defer></script>
+<script src="/static/offline-vault-storage.js" defer></script>
+<script src="/static/offline-vault-ui.js" defer></script>
 </head>
 <body><main>
 <header><div class="orb"></div><div><h1 id="title">Micro Helper</h1><small>Tvůj osobní lokální AI agent</small></div><span class="status" id="status">Připraven</span></header>
@@ -53,7 +56,29 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
   <div id="taskList" class="muted" aria-live="polite">Načítám úkoly…</div>
 </section>
 <section class="settings"><span>Režim: lokální</span><span id="modelState">Model: neověřen</span><button id="check">Ověřit Ollamu</button><button id="clear">Vymazat konverzaci</button></section>
-<section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="exportMemory" type="button">Exportovat poznámky</button><button id="exportBackup" type="button">Exportovat úplnou zálohu</button><button id="importBackup" type="button">Obnovit ze zálohy</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div></div><form id="memoryForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0"><input id="memoryText" maxlength="1000" placeholder="Např. Odpovídej mi stručně a česky…" aria-label="Nová poznámka do paměti" required><select id="memoryCategory" aria-label="Kategorie paměti"><option value="preference">Preference</option><option value="project">Projekt</option><option value="context">Kontext</option><option value="goal">Cíl</option></select><button class="primary" type="submit">Uložit poznámku</button></form><div id="memoryList" class="muted" aria-live="polite">Načítám paměť…</div><small>Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani tajné klíče.</small></section>
+<section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="exportMemory" type="button">Exportovat poznámky</button><button id="exportBackup" type="button">Exportovat úplnou zálohu</button><button id="importBackup" type="button">Obnovit ze zálohy</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div></div><section id="offlineVaultPanel" class="settings" aria-labelledby="offlineVaultTitle" style="align-items:stretch;flex-direction:column">
+<strong id="offlineVaultTitle">🔐 Šifrovaná záloha v tomto prohlížeči</strong>
+<small>Vytvoří šifrovanou kopii úplné zálohy, uloženou v IndexedDB. Heslo se neukládá. Tato funkce zatím neslouží jako plnohodnotný offline přístup k paměti a historii.</small>
+<small>Obnova nahradí aktuální místní data a vyžaduje samostatné potvrzení bezpečnostního dialogu.</small>
+<label for="offlineVaultPassphrase">Heslo trezoru (alespoň 12 znaků)</label>
+<input id="offlineVaultPassphrase" type="password" minlength="12" maxlength="128" autocomplete="current-password" placeholder="Zadej heslo trezoru" aria-describedby="offlineVaultStatus">
+<label for="offlineVaultPassphraseConfirm">Potvrzení hesla při vytváření nové zálohy</label>
+<input id="offlineVaultPassphraseConfirm" type="password" minlength="12" maxlength="128" autocomplete="new-password" placeholder="Zopakuj heslo" hidden>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button type="button" class="primary" id="offlineVaultCreate">Vytvořit šifrovanou zálohu</button>
+<button type="button" id="offlineVaultUnlock" disabled>Odemknout</button>
+<button type="button" id="offlineVaultLock" disabled>Uzamknout</button>
+<button type="button" id="offlineVaultRestore" disabled>Obnovit do aplikace</button>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button type="button" id="offlineVaultExport" disabled>Exportovat šifrovaný soubor</button>
+<button type="button" id="offlineVaultImport">Importovat šifrovaný soubor</button>
+<input id="offlineVaultFile" type="file" accept="application/json,.json" hidden>
+</div>
+<small id="offlineVaultStatus" role="status" aria-live="polite">Kontroluji šifrované úložiště…</small>
+<small id="offlineVaultSummary" aria-live="polite">Soukromý obsah zůstává skrytý.</small>
+</section>
+<form id="memoryForm" style="display:flex;gap:8px;flex-wrap:wrap;margin:0"><input id="memoryText" maxlength="1000" placeholder="Např. Odpovídej mi stručně a česky…" aria-label="Nová poznámka do paměti" required><select id="memoryCategory" aria-label="Kategorie paměti"><option value="preference">Preference</option><option value="project">Projekt</option><option value="context">Kontext</option><option value="goal">Cíl</option></select><button class="primary" type="submit">Uložit poznámku</button></form><div id="memoryList" class="muted" aria-live="polite">Načítám paměť…</div><small>Paměti lze zkontrolovat a jednotlivě smazat. Neukládej sem hesla ani tajné klíče.</small></section>
 
 <section class="settings" style="align-items:stretch;flex-direction:column">
   <strong>🎛️ Jak se mám přizpůsobit</strong>
