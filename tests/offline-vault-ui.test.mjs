@@ -339,4 +339,5 @@ test("pagehide locks the in-memory session and closes IndexedDB", async () => {
   assert.equal(h.controller.getState().unlocked, false);
   assert.equal(h.isSessionLocked(), true);
   assert.equal(h.lifecycle.closed, true);
+  assert.equal(h.visibility.listeners.has("visibilitychange"), false);
 });
