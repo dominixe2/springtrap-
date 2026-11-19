@@ -119,6 +119,7 @@
       }
       busy = true;
       updateControls();
+      setStatus("Ověřuji importovaný šifrovaný soubor…");
       try {
         const existing = await storage.load();
         if (existing && !confirmImpl(
@@ -127,6 +128,8 @@
           setStatus("Nahrazení šifrované zálohy bylo zrušeno.");
           return false;
         }
+        if (session) lock({silent: true});
+        setStatus("Načítám aktuální zálohu a šifruji ji…");
         const response = await fetchImpl("/v1/backup", {
           method: "GET",
           credentials: "same-origin",
@@ -162,6 +165,7 @@
       }
       busy = true;
       updateControls();
+      setStatus("Ověřuji heslo šifrovaného trezoru…");
       let candidate = null;
       try {
         const envelope = storedEnvelope || await storage.load();
@@ -209,6 +213,7 @@
       }
       busy = true;
       updateControls();
+      setStatus("Předávám obnovu bezpečnostnímu potvrzení…");
       try {
         const backup = session.read();
         if (!isBackupPayload(backup)) throw new Error("format");
