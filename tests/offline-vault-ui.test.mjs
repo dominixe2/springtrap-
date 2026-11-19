@@ -34,6 +34,7 @@ const envelope = {
 
 function makeHarness(options = {}) {
   let stored = options.existing ?? null;
+  let saveCompleted = false;
   const saves = [];
   const downloads = [];
   const requests = [];
@@ -53,13 +54,17 @@ function makeHarness(options = {}) {
     import: {disabled: false}
   };
   const storage = {
-    async load() { return stored ? JSON.parse(JSON.stringify(stored)) : null; },
+    async load() {
+      if (options.failLoadAfterSave && saveCompleted) throw new Error("simulated readback failure");
+      return stored ? JSON.parse(JSON.stringify(stored)) : null;
+    },
     async save(value) {
       if (value?.format !== "micro-helper-offline-vault") {
         throw new Error("invalid envelope");
       }
       stored = JSON.parse(JSON.stringify(value));
       saves.push(JSON.parse(JSON.stringify(value)));
+      saveCompleted = true;
     },
     close() { lifecycle.closed = true; }
   };
@@ -221,6 +226,14 @@ test("rejects an oversized encrypted import before reading the file", async () =
   assert.equal(read, false);
   assert.equal(h.saves.length, 0);
   assert.equal(h.getStored(), null);
+});
+
+test("does not report a successful IndexedDB write as failed because of a redundant readback", async () => {
+  const h = makeHarness({failLoadAfterSave: true});
+  const file = {size: 300, async text() { return JSON.stringify(envelope); }};
+  assert.equal(await h.controller.importEncryptedFile(file), true);
+  assert.deepEqual(h.getStored(), envelope);
+  assert.equal(h.saves.length, 1);
 });
 
 test("exports the encrypted envelope and never exports the decrypted backup", async () => {
