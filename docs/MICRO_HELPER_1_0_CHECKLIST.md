@@ -1,6 +1,6 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.32
+- **Checklist version:** 1.0.0-checklist.33
 - **Snapshot date:** 2026-11-19
 - **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and background-lock hardening PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 head `5a49ce9fd07a851cc51f4e38560f23c671e806db` passed run [#44592605947](https://github.com/dominixe2/springtrap-/actions/runs/44592605947): 171 automated tests across Python, relay, browser-auth, vault crypto/storage/UI and service-worker suites, plus embedded JavaScript syntax and Python compilation. All current release work remains in draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
@@ -57,7 +57,7 @@ A level may be raised only when new implementation and evidence are linked in th
 ## Known release blockers (not a bug count)
 
 1. The trust policy is not yet enforced through every hosted and desktop tool/action path.
-2. JARVIS PR #5 remains the original unauthenticated LAN Ollama implementation and must not be merged. Draft PR #9 (`security/ollama-relay-auth-20261110`) adds per-launch bearer pairing, HTTPS-only phone token use, rate/concurrency limits and chat-only relay tests. The same PR branch now also carries PR #7's loopback-only Windows bridge binding and a listener-address regression test; latest JARVIS CI has not yet been observed. Keep both relay and Vite development server off the public internet.
+2. JARVIS PR #5 remains the original unauthenticated LAN Ollama implementation and must not be merged. Draft PR #9 (`security/ollama-relay-auth-20261110`) adds per-launch pairing, an HttpOnly session, HTTPS-only phone token use, rate/concurrency limits, redacted upstream errors and a chat-only relay; it also carries the loopback-only Windows bridge restriction. Draft PR #12 is six commits ahead of #9 and applies loopback-by-default Vite networking, permitting LAN binding only when both HTTPS certificate and key paths are configured. PR #11 is a parallel copy of that Vite hardening stacked on PR #10, so avoid treating #11 and #12 as two independent features. **No GitHub Actions run was observed** for current heads #9 (`0ae636d`), #10 (`01202ec`), #11 (`e421bda`) or #12 (`b5ac575`); do not count their local-only test claims as CI evidence. PR #10 adds explicit security-branch and ready-for-review triggers but is itself unvalidated. Keep the relay and Vite development server off the public internet; no real phone/Windows pairing is verified.
 3. The active `micro-helper` base includes the loopback/Origin/Fetch-Metadata protections from merged PR #19. PR #37 now also verifies the actual ASGI socket peer IP, so a non-loopback client cannot bypass the Host check by spoofing `Host: localhost`. PR #13 remains open against the older `main` API and should not be confused with the active product-branch fix. These checks are defense in depth, not authentication; the local API must remain loopback-only and they do not secure hosted routes or the JARVIS relay.
 4. Android/Windows physical-device acceptance tests are not recorded.
 5. The hosted source mirror and AppDeploy live snapshot need explicit parity evidence before a source change can be called deployed.
@@ -70,7 +70,7 @@ A level may be raised only when new implementation and evidence are linked in th
 1. Review the passing PR #23 → #31 → #32 → #34 stack against PR #25, then integrate the trust gateway and policy-gated backup/restore sequentially into `micro-helper`; run a fresh full suite on the integrated branch.
 2. Review PR #33's active Render relay hardening, integrate it separately, then run a staging pairing test before any live endpoint change.
 3. Extend the policy gate to the first hosted action adapter only after its authenticated identity, explicit approval UI and audit boundary are covered by integration tests.
-4. Complete JARVIS PR #9 review and obtain current CI for the authenticated Ollama relay plus loopback-only Windows bridge; keep it chat-only and physically test only after the HTTPS certificate is trusted by Android.
+4. Obtain real CI for JARVIS PR #10/#9/#12 (and resolve the duplicate #11 path) before considering the Windows bridge or phone relay reusable. Keep the phone path chat-only; perform physical pairing only after a trusted HTTPS certificate is installed on Android and the notebook.
 5. Add a single capability matrix shared by hosted tools, local Python, Android and Windows Companion.
 6. Run signed-in hosted end-to-end tests, then physical Android and Windows smoke tests.
 7. Recalculate this checklist only after updating the evidence links and levels.
@@ -245,3 +245,10 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The new tests establish the controller regression behavior in CI but do not satisfy the 0.75 end-to-end target-platform evidence threshold. No weighted criterion is raised.
 - **Change this run:** 0.00 percentage points.
 - **Known warning:** one unique Starlette/httpx TestClient deprecation warning per Python suite (two warning emissions in this run); no failing tests.
+
+
+## Verified update — 2026-11-19 (checklist v33)
+
+- **JARVIS integration review:** confirmed PR #9, #10, #11 and #12 are still open. PR #12 is a six-commit follow-up directly on PR #9; PR #11 is a parallel Vite-network hardening branch on PR #10. No Actions runs were returned for the current heads of #9, #10, #11 or #12. The PRs are therefore not yet verified integration inputs for Micro Helper's Windows adapter.
+- **Safety decision:** keep the JARVIS Windows bridge and phone relay separate from Micro Helper until the authenticated relay and trusted-HTTPS listener have passing CI and a physical phone-to-notebook smoke test. No merge or network exposure was performed.
+- **Score:** remains 50.00/100; this repository review changes no weighted acceptance evidence.
