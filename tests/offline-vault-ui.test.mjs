@@ -106,6 +106,7 @@ function makeHarness(options = {}) {
     controller, elements, storage, saves, downloads, requests, lifecycle,
     getStored: () => stored,
     getReloads: () => reloads,
+    expireSession: () => { locked = true; },
     isSessionLocked: () => locked
   };
 }
@@ -184,6 +185,42 @@ test("restores only after successful unlock through the guarded local API route"
   assert.deepEqual(JSON.parse(request.init.body), {backup, confirm_replace: true});
   assert.equal(h.getReloads(), 1);
   assert.equal(h.controller.getState().unlocked, false);
+});
+
+test("keeps the vault unlocked when the guarded restore is cancelled", async () => {
+  const h = makeHarness({existing: envelope, restoreFails: true});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  assert.equal(h.elements.summary.textContent.includes("soukromá historie"), false);
+  assert.equal(await h.controller.restore(), false);
+  assert.equal(h.requests.at(-1).url, "/v1/backup/restore");
+  assert.equal(h.getReloads(), 0);
+  assert.equal(h.controller.getState().unlocked, true);
+});
+
+test("does not send a restore request after the vault inactivity lock expires", async () => {
+  const h = makeHarness({existing: envelope});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  h.expireSession();
+  assert.equal(await h.controller.restore(), false);
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.controller.getState().unlocked, false);
+});
+
+test("rejects an oversized encrypted import before reading the file", async () => {
+  const h = makeHarness();
+  let read = false;
+  const file = {
+    size: 12 * 1024 * 1024 + 1,
+    async text() { read = true; return JSON.stringify(envelope); }
+  };
+  assert.equal(await h.controller.importEncryptedFile(file), false);
+  assert.equal(read, false);
+  assert.equal(h.saves.length, 0);
+  assert.equal(h.getStored(), null);
 });
 
 test("exports the encrypted envelope and never exports the decrypted backup", async () => {
