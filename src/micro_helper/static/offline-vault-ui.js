@@ -169,6 +169,7 @@
           setStatus("V tomto prohlížeči není uložená šifrovaná záloha.");
           return false;
         }
+        if (session) lock({silent: true});
         candidate = await vault.unlock(passphrase, envelope);
         const backup = candidate.read();
         if (!isBackupPayload(backup)) throw new Error("format");
