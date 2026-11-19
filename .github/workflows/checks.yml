@@ -41,6 +41,7 @@ jobs:
           subprocess.run(["node", "--check", "src/micro_helper/static/local-auth.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault-storage.js"], check=True)
+          subprocess.run(["node", "--check", "src/micro_helper/static/offline-vault-ui.js"], check=True)
           subprocess.run(["node", "--check", "src/micro_helper/static/sw.js"], check=True)
           PY
       - name: Run browser auth UI regression tests
