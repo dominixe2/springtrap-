@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.28
-- **Snapshot date:** 2026-11-18
-- **Snapshot source:** Current security/auth and encrypted-offline-vault stack through PR #50, stacked on PR #49 → #48 → #47 → #46 → #45 → #43 → #40 → #37. PR #49 head `71e0522105f2900a6f49f8fc8de2511a9f4acb4f` passed Micro Helper checks run [#44154244060](https://github.com/dominixe2/springtrap-/actions/runs/44154244060): 123 project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests, six IndexedDB storage tests, embedded JavaScript syntax and Python compilation. PR #50 adds canonical base64url validation; all work remains in unmerged draft PRs.
+- **Checklist version:** 1.0.0-checklist.31
+- **Snapshot date:** 2026-11-19
+- **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and the background-lock hardening draft PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed Micro Helper checks run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 adds hidden-page locking and three controller regressions; its CI result is pending and is not counted as passing evidence. All current release work remains in draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -216,3 +216,18 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The import reliability fix improves the user-facing encrypted backup workflow but does not satisfy full offline private-data or target-platform acceptance.
 - **Change this run:** 0.00 percentage points.
 - **Release decision:** NOT READY. PR #53 remains a draft stacked on PR #52 → #50 → #49 → #48 → #47. No merge, deployment, legacy-data migration or deletion is claimed.
+
+
+## Verified update — 2026-11-19 (checklist v31)
+
+- **PR #54 — background-lock hardening:** the encrypted backup controller now locks the in-memory session immediately when the document becomes hidden, reports the locked state on return, and requires a fresh passphrase. A visibility epoch also prevents a hidden → visible race from completing an in-flight PBKDF2 unlock. Backup creation is aborted before or after encryption if the page was backgrounded during the operation. The visibility listener is removed during controller disposal.
+- **Regression coverage:** three new controller tests cover immediate lock and restore denial, a hidden → visible transition during unlock, and backgrounding during encrypted-backup creation. The code and tests are on branch security/offline-vault-lock-on-hidden-20261119; latest code/test commit at checklist update: 0b98a0f0ff1295758e73df83ff518273489d222d.
+- **CI:** NOT RUN / no PR-triggered workflow run is currently returned for PR #54's latest head. Do not treat the added tests as passing until GitHub Actions reports success. Real-browser lifecycle behavior, Android, Windows and physical-device acceptance remain NOT RUN.
+- **Security scope:** this closes the background-unlock lifecycle gap in the UI only. It does not enable offline private-data access, change the fail-closed service-worker boundary, migrate legacy plaintext data or alter the explicit body-bound restore confirmation. JavaScript cannot guarantee physical zeroization of immutable passphrase strings.
+- **Bug accounting:** one unique background-session lifecycle security defect addressed; no additional confirmed defects are introduced by this change. Existing non-blocking Starlette/httpx TestClient deprecation warnings remain outside this UI change.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The weighted criteria still require integrated end-to-end evidence and target-platform acceptance; PR #54's CI and browser lifecycle checks are not yet verified. No evidence level is raised.
+- **Change this run:** 0.00 percentage points.
+- **Release decision:** NOT READY. PR #54 is a draft stacked on PR #53 and its base chain. No merge, deployment, offline private-data migration or physical-device acceptance is claimed.
