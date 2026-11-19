@@ -30,7 +30,7 @@
     const {
       vault, storage, fetchImpl, confirmImpl = () => false,
       downloadImpl = () => {}, reloadImpl = () => {}, lifecycle = null,
-      elements = {}
+      visibility = null, elements = {}
     } = options;
     if (!vault || typeof vault.create !== "function" || typeof vault.unlock !== "function" ||
         !storage || typeof storage.load !== "function" || typeof storage.save !== "function" ||
@@ -41,6 +41,8 @@
     let storedEnvelope = null;
     let session = null;
     let busy = false;
+    let pageHidden = visibility?.visibilityState === "hidden";
+    let visibilityEpoch = 0;
 
     const setStatus = value => {
       if (elements.status) elements.status.textContent = value;
@@ -98,6 +100,7 @@
 
     async function createBackup() {
       if (busy) return false;
+      const operationVisibilityEpoch = visibilityEpoch;
       const passphrase = String(elements.passphrase?.value ?? "");
       if (passphrase.length < 12) {
         clearPassphrase();
@@ -139,6 +142,10 @@
         const payload = await response.json();
         if (!isBackupPayload(payload)) throw new Error("format");
         const envelope = await vault.create(passphrase, payload);
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch) {
+          setStatus("Šifrování bylo přerušeno přechodem aplikace do pozadí. Záloha nebyla uložena.");
+          return false;
+        }
         await storage.save(envelope);
         storedEnvelope = envelope;
         if (elements.passphraseConfirm) elements.passphraseConfirm.hidden = true;
@@ -158,6 +165,11 @@
 
     async function unlock() {
       if (busy) return false;
+      if (pageHidden) {
+        setStatus("Trezor lze odemknout pouze při zobrazené aplikaci.");
+        return false;
+      }
+      const operationVisibilityEpoch = visibilityEpoch;
       const passphrase = String(elements.passphrase?.value ?? "");
       if (!passphrase) {
         setStatus("Zadej heslo šifrovaného trezoru.");
@@ -175,6 +187,13 @@
         }
         if (session) lock({silent: true});
         candidate = await vault.unlock(passphrase, envelope);
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch) {
+          candidate.lock();
+          candidate = null;
+          setSummary("Obsah zálohy zůstává skrytý.");
+          setStatus("Trezor zůstal uzamčený, protože aplikace během odemykání přešla do pozadí.");
+          return false;
+        }
         const backup = candidate.read();
         if (!isBackupPayload(backup)) throw new Error("format");
         session = candidate;
@@ -290,13 +309,25 @@
       }
     }
 
+    const onVisibilityChange = () => {
+      pageHidden = visibility?.visibilityState === "hidden";
+      if (pageHidden) {
+        visibilityEpoch += 1;
+        lock({silent: true});
+      }
+    };
+
     function dispose() {
       lock({silent: true});
       try { storage.close?.(); } catch {}
+      try { visibility?.removeEventListener?.("visibilitychange", onVisibilityChange); } catch {}
     }
 
     if (lifecycle && typeof lifecycle.addEventListener === "function") {
       lifecycle.addEventListener("pagehide", dispose, {once: true});
+    }
+    if (visibility && typeof visibility.addEventListener === "function") {
+      visibility.addEventListener("visibilitychange", onVisibilityChange);
     }
 
     return Object.freeze({
@@ -360,6 +391,7 @@
       downloadImpl: downloadEncryptedEnvelope,
       reloadImpl: () => globalThis.location.reload(),
       lifecycle: globalThis,
+      visibility: globalThis.document,
       elements
     });
     elements.create?.addEventListener("click", () => { void controller.createBackup(); });
