@@ -42,6 +42,7 @@ function makeHarness(options = {}) {
   let locked = false;
   const elements = {
     passphrase: {value: ""},
+    passphraseConfirm: {value: "", hidden: false, focus() { this.focused = true; }},
     status: {textContent: ""},
     summary: {textContent: ""},
     create: {disabled: false},
@@ -111,7 +112,9 @@ function makeHarness(options = {}) {
 
 test("creates an encrypted backup and stores only the ciphertext envelope", async () => {
   const h = makeHarness();
+  await h.controller.refresh();
   h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  h.elements.passphraseConfirm.value = "dostatecne-dlouhe-heslo";
   assert.equal(await h.controller.createBackup(), true);
   assert.equal(h.requests.length, 1);
   assert.equal(h.requests[0].url, "/v1/backup");
@@ -132,10 +135,26 @@ test("rejects a short passphrase before fetching private backup data", async () 
   assert.equal(h.elements.passphrase.value, "");
 });
 
+test("rejects mismatched passphrase confirmation before fetching backup data", async () => {
+  const h = makeHarness();
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  h.elements.passphraseConfirm.value = "jine-dostatecne-heslo";
+  assert.equal(await h.controller.createBackup(), false);
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.getStored(), null);
+  assert.equal(h.elements.passphrase.value, "");
+  assert.equal(h.elements.passphraseConfirm.value, "");
+});
+
 test("does not overwrite an existing encrypted vault when confirmation is declined", async () => {
   const h = makeHarness({existing: envelope, confirmImpl: () => false});
   h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
   await h.controller.refresh();
+  assert.equal(h.elements.passphraseConfirm.hidden, true);
+  assert.equal(await h.controller.createBackup(), false);
+  assert.equal(h.elements.passphraseConfirm.hidden, false);
+  h.elements.passphraseConfirm.value = "dostatecne-dlouhe-heslo";
   assert.equal(await h.controller.createBackup(), false);
   assert.equal(h.requests.length, 0);
   assert.deepEqual(h.getStored(), envelope);
