@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.31
+- **Checklist version:** 1.0.0-checklist.32
 - **Snapshot date:** 2026-11-19
-- **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and the background-lock hardening draft PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed Micro Helper checks run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 adds hidden-page locking and three controller regressions; its CI result is pending and is not counted as passing evidence. All current release work remains in draft PRs.
+- **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and background-lock hardening PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 head `5a49ce9fd07a851cc51f4e38560f23c671e806db` passed run [#44592605947](https://github.com/dominixe2/springtrap-/actions/runs/44592605947): 171 automated tests across Python, relay, browser-auth, vault crypto/storage/UI and service-worker suites, plus embedded JavaScript syntax and Python compilation. All current release work remains in draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -231,3 +231,17 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The weighted criteria still require integrated end-to-end evidence and target-platform acceptance; PR #54's CI and browser lifecycle checks are not yet verified. No evidence level is raised.
 - **Change this run:** 0.00 percentage points.
 - **Release decision:** NOT READY. PR #54 is a draft stacked on PR #53 and its base chain. No merge, deployment, offline private-data migration or physical-device acceptance is claimed.
+
+
+## Verified update — 2026-11-19 (checklist v32)
+
+- **PR #54 — background-lock hardening CI:** GitHub Actions run [#44592605947](https://github.com/dominixe2/springtrap-/actions/runs/44592605947) completed successfully on head `5a49ce9fd07a851cc51f4e38560f23c671e806db`.
+- **PASS — 171 automated tests, 0 failures:** 123 Python project tests; 11 relay tests; 2 browser-auth UI tests; 9 encrypted-vault crypto tests; 6 IndexedDB storage tests; 16 encrypted-vault UI controller tests (including the three new background-lifecycle regressions); and 4 service-worker cache-boundary tests. Embedded browser JavaScript syntax checks and Python compilation passed. The two Python suites each emitted one non-blocking Starlette/httpx TestClient deprecation warning.
+- **Scope:** CI verifies the controller's hidden-page lock, restore denial after backgrounding, rejection of the hidden → visible unlock race, and cancellation of encrypted-backup creation during backgrounding. This remains an encrypted backup feature, not full offline private-data access. Real-browser IndexedDB/WebCrypto lifecycle, Android, Windows and physical-device acceptance remain NOT RUN.
+- **Release decision:** NOT READY. PR #54 remains a draft stacked on PR #53. No evidence level is raised solely from mocked controller tests and CI; real-browser/platform acceptance and full private offline workflow remain outstanding.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The new tests establish the controller regression behavior in CI but do not satisfy the 0.75 end-to-end target-platform evidence threshold. No weighted criterion is raised.
+- **Change this run:** 0.00 percentage points.
+- **Known warning:** one unique Starlette/httpx TestClient deprecation warning per Python suite (two warning emissions in this run); no failing tests.
