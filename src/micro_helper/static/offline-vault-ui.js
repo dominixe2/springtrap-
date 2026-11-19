@@ -317,7 +317,7 @@
       pageHidden = visibility?.visibilityState === "hidden";
       if (pageHidden) {
         visibilityEpoch += 1;
-        lock({silent: true});
+        lock();
       }
     };
 
