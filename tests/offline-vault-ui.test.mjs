@@ -303,6 +303,7 @@ test("locks the in-memory session as soon as the page becomes hidden", async () 
   assert.equal(h.isSessionLocked(), true);
   assert.equal(h.elements.passphrase.value, "");
   assert.equal(h.elements.lock.disabled, true);
+  assert.match(h.elements.status.textContent, /uzamčený/);
   assert.equal(await h.controller.restore(), false);
   assert.equal(h.requests.length, 0);
   h.visibility.setState("visible");
