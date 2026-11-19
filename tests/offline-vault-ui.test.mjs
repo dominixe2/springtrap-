@@ -39,6 +39,8 @@ function makeHarness(options = {}) {
   const downloads = [];
   const requests = [];
   const lifecycle = {};
+  let markCreateStarted;
+  const createStarted = new Promise(resolve => { markCreateStarted = resolve; });
   const visibility = {
     visibilityState: "visible",
     listeners: new Map(),
@@ -80,6 +82,8 @@ function makeHarness(options = {}) {
   };
   const vault = {
     async create(passphrase, payload) {
+      markCreateStarted();
+      if (options.createGate) await options.createGate;
       assert.equal(passphrase, "dostatecne-dlouhe-heslo");
       assert.deepEqual(JSON.parse(JSON.stringify(payload)), backup);
       return JSON.parse(JSON.stringify(envelope));
@@ -121,6 +125,7 @@ function makeHarness(options = {}) {
   });
   return {
     controller, elements, storage, saves, downloads, requests, lifecycle, visibility,
+    waitForCreate: () => createStarted,
     getStored: () => stored,
     getReloads: () => reloads,
     expireSession: () => { locked = true; },
@@ -267,6 +272,24 @@ test("imports only an encrypted envelope and keeps the previous record on invali
   assert.equal(await h.controller.importEncryptedFile(valid), true);
   assert.deepEqual(h.getStored(), envelope);
   assert.equal(h.saves.length, 1);
+});
+
+test("does not save a new encrypted backup when the page is hidden during encryption", async () => {
+  let releaseCreate;
+  const createGate = new Promise(resolve => { releaseCreate = resolve; });
+  const h = makeHarness({createGate});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  h.elements.passphraseConfirm.value = "dostatecne-dlouhe-heslo";
+  const pendingCreate = h.controller.createBackup();
+  await h.waitForCreate();
+  h.visibility.setState("hidden");
+  h.visibility.setState("visible");
+  releaseCreate();
+  assert.equal(await pendingCreate, false);
+  assert.equal(h.saves.length, 0);
+  assert.equal(h.getStored(), null);
+  assert.match(h.elements.status.textContent, /Záloha nebyla uložena/);
 });
 
 test("locks the in-memory session as soon as the page becomes hidden", async () => {
