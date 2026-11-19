@@ -50,6 +50,7 @@
     };
     const clearPassphrase = () => {
       if (elements.passphrase) elements.passphrase.value = "";
+      if (elements.passphraseConfirm) elements.passphraseConfirm.value = "";
     };
     const hasUnlockedSession = () => Boolean(session && !session.isLocked());
 
@@ -78,6 +79,7 @@
     async function refresh() {
       try {
         storedEnvelope = await storage.load();
+        if (elements.passphraseConfirm) elements.passphraseConfirm.hidden = Boolean(storedEnvelope);
         if (storedEnvelope) {
           setStatus("Šifrovaná záloha je uložená v tomto prohlížeči.");
           setSummary("Odemkni trezor heslem. Soukromý obsah se zatím nenačítá.");
@@ -102,6 +104,19 @@
         setStatus("Heslo trezoru musí mít alespoň 12 znaků.");
         return false;
       }
+      if (elements.passphraseConfirm) {
+        if (elements.passphraseConfirm.hidden) {
+          elements.passphraseConfirm.hidden = false;
+          elements.passphraseConfirm.focus?.();
+          setStatus("Pro vytvoření nové zálohy zadej stejné heslo ještě jednou.");
+          return false;
+        }
+        if (String(elements.passphraseConfirm.value ?? "") !== passphrase) {
+          clearPassphrase();
+          setStatus("Hesla se neshodují. Zadej je znovu.");
+          return false;
+        }
+      }
       busy = true;
       updateControls();
       try {
@@ -123,6 +138,7 @@
         const envelope = await vault.create(passphrase, payload);
         await storage.save(envelope);
         storedEnvelope = envelope;
+        if (elements.passphraseConfirm) elements.passphraseConfirm.hidden = true;
         lock({silent: true});
         setSummary("Záloha je zašifrovaná. V IndexedDB je uložen pouze šifrovaný obal.");
         setStatus("Šifrovaná záloha byla bezpečně uložena.");
@@ -255,6 +271,7 @@
         if (session) lock({silent: true});
         await storage.save(parsed);
         storedEnvelope = await storage.load();
+        if (elements.passphraseConfirm) elements.passphraseConfirm.hidden = true;
         setSummary("Šifrovaný soubor byl uložen. Pro zobrazení souhrnu jej odemkni heslem.");
         setStatus("Šifrovaná záloha byla importována.");
         return true;
@@ -317,6 +334,7 @@
     }
     const elements = {
       passphrase: document.getElementById("offlineVaultPassphrase"),
+      passphraseConfirm: document.getElementById("offlineVaultPassphraseConfirm"),
       status: document.getElementById("offlineVaultStatus"),
       summary: document.getElementById("offlineVaultSummary"),
       create: document.getElementById("offlineVaultCreate"),
