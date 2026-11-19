@@ -55,7 +55,7 @@ function makeHarness(options = {}) {
   const storage = {
     async load() { return stored ? JSON.parse(JSON.stringify(stored)) : null; },
     async save(value) {
-      if (!ui.isBackupPayload(value) && value?.format !== "micro-helper-offline-vault") {
+      if (value?.format !== "micro-helper-offline-vault") {
         throw new Error("invalid envelope");
       }
       stored = JSON.parse(JSON.stringify(value));
