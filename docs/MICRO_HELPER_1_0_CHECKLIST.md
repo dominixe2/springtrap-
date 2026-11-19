@@ -187,3 +187,18 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The new tests improve confidence in the service-worker privacy boundary but do not satisfy the integrated offline-vault or target-platform acceptance criteria.
 - **Change this run:** 0.00 percentage points.
 - **Release decision:** NOT READY. PR #52 is a draft stacked on PR #50; no merge, deployment, migration or physical-device acceptance is claimed.
+
+
+## Verified update — 2026-11-19 (checklist v29)
+
+- **PR #53 — encrypted backup vault UI:** loads the existing WebCrypto vault core and IndexedDB adapter into the app; creates an encrypted copy of the authenticated local backup; requires matching passphrase confirmation for creation/replacement; imports/exports encrypted envelopes only; unlocks in memory; shows counts rather than private contents; and sends restore through the existing body-bound Trust Engine confirmation wrapper. The page-hide lifecycle locks the session and closes the storage adapter.
+- **PASS — PR #53 final head:** f9514482c78846aa38abe7fba4853cbcf165c980, Actions run [#44539529981](https://github.com/dominixe2/springtrap-/actions/runs/44539529981). Passed 123 Python project tests, 11 relay tests, 2 browser-auth UI tests, 9 vault crypto tests, 6 IndexedDB adapter tests, 12 encrypted-vault UI controller tests, 4 service-worker cache-boundary tests, embedded JavaScript syntax checks (including the new UI controller), and Python compilation. One non-blocking Starlette/httpx TestClient deprecation warning appeared in each Python suite.
+- **Scope:** this is an encrypted backup workflow, not full offline private-data access. The private /v1/ API remains excluded from service-worker caching; memories/history/tasks/preferences still require the authenticated local API. The existing offline lock remains fail-closed. No legacy plaintext browser data is read, migrated, overwritten or deleted.
+- **Acceptance gap:** vault UI tests use Node mocks and the IndexedDB adapter uses a deterministic test double. Real-browser IndexedDB, actual WebCrypto behavior in target browsers, offline reads/writes, Android and Windows acceptance remain NOT RUN. No physical device is claimed.
+- **Safety:** restore remains an explicit destructive action handled by the shared fetch policy wrapper and the one-time body-bound confirmation. Import accepts encrypted envelopes only. No merge, deployment, data migration or deletion is included.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The new user-facing encrypted-backup flow is a meaningful feature step, but it does not yet enable private offline reads/writes or satisfy browser/platform acceptance.
+- **Change this run:** 0.00 percentage points; the existing weighted acceptance criteria remain unchanged.
+- **Release decision:** NOT READY. PR #53 is a draft stacked on PR #52 → #50 → #49 → #48 → #47. Do not merge it independently of its base. No merge, deployment or legacy-data migration is claimed.
