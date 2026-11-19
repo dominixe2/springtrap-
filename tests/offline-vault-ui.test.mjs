@@ -39,6 +39,18 @@ function makeHarness(options = {}) {
   const downloads = [];
   const requests = [];
   const lifecycle = {};
+  let markCreateStarted;
+  const createStarted = new Promise(resolve => { markCreateStarted = resolve; });
+  const visibility = {
+    visibilityState: "visible",
+    listeners: new Map(),
+    addEventListener(name, callback) { this.listeners.set(name, callback); },
+    removeEventListener(name, callback) { this.listeners.delete(name); },
+    setState(value) {
+      this.visibilityState = value;
+      this.listeners.get("visibilitychange")?.();
+    }
+  };
   let reloads = 0;
   let locked = false;
   const elements = {
@@ -70,11 +82,14 @@ function makeHarness(options = {}) {
   };
   const vault = {
     async create(passphrase, payload) {
+      markCreateStarted();
+      if (options.createGate) await options.createGate;
       assert.equal(passphrase, "dostatecne-dlouhe-heslo");
       assert.deepEqual(JSON.parse(JSON.stringify(payload)), backup);
       return JSON.parse(JSON.stringify(envelope));
     },
     async unlock(passphrase, value) {
+      if (options.unlockGate) await options.unlockGate;
       if (options.rejectUnlock || passphrase !== "dostatecne-dlouhe-heslo") {
         throw new Error("wrong passphrase");
       }
@@ -105,10 +120,12 @@ function makeHarness(options = {}) {
     downloadImpl: (value, filename) => downloads.push({value, filename}),
     reloadImpl: () => { reloads += 1; },
     lifecycle: {addEventListener(name, callback) { lifecycle[name] = callback; }},
+    visibility,
     elements
   });
   return {
-    controller, elements, storage, saves, downloads, requests, lifecycle,
+    controller, elements, storage, saves, downloads, requests, lifecycle, visibility,
+    waitForCreate: () => createStarted,
     getStored: () => stored,
     getReloads: () => reloads,
     expireSession: () => { locked = true; },
@@ -257,6 +274,62 @@ test("imports only an encrypted envelope and keeps the previous record on invali
   assert.equal(h.saves.length, 1);
 });
 
+test("does not save a new encrypted backup when the page is hidden during encryption", async () => {
+  let releaseCreate;
+  const createGate = new Promise(resolve => { releaseCreate = resolve; });
+  const h = makeHarness({createGate});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  h.elements.passphraseConfirm.value = "dostatecne-dlouhe-heslo";
+  const pendingCreate = h.controller.createBackup();
+  await h.waitForCreate();
+  h.visibility.setState("hidden");
+  h.visibility.setState("visible");
+  releaseCreate();
+  assert.equal(await pendingCreate, false);
+  assert.equal(h.saves.length, 0);
+  assert.equal(h.getStored(), null);
+  assert.match(h.elements.status.textContent, /Záloha nebyla uložena/);
+});
+
+test("locks the in-memory session as soon as the page becomes hidden", async () => {
+  const h = makeHarness({existing: envelope});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  h.elements.passphrase.value = "must be cleared";
+  h.visibility.setState("hidden");
+  assert.equal(h.controller.getState().unlocked, false);
+  assert.equal(h.isSessionLocked(), true);
+  assert.equal(h.elements.passphrase.value, "");
+  assert.equal(h.elements.lock.disabled, true);
+  assert.match(h.elements.status.textContent, /uzamčený/);
+  assert.equal(await h.controller.restore(), false);
+  assert.equal(h.requests.length, 0);
+  h.visibility.setState("visible");
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true, "visibility returning must require a fresh unlock");
+});
+
+test("does not finish unlocking if the page was hidden during key derivation", async () => {
+  let releaseUnlock;
+  const unlockGate = new Promise(resolve => { releaseUnlock = resolve; });
+  const h = makeHarness({existing: envelope, unlockGate});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  const pendingUnlock = h.controller.unlock();
+  await Promise.resolve();
+  h.visibility.setState("hidden");
+  h.visibility.setState("visible");
+  releaseUnlock();
+  assert.equal(await pendingUnlock, false);
+  assert.equal(h.controller.getState().unlocked, false);
+  assert.equal(h.isSessionLocked(), true);
+  assert.match(h.elements.status.textContent, /během odemykání přešla do pozadí/);
+  assert.equal(await h.controller.restore(), false);
+  assert.equal(h.requests.length, 0);
+});
+
 test("pagehide locks the in-memory session and closes IndexedDB", async () => {
   const h = makeHarness({existing: envelope});
   await h.controller.refresh();
@@ -266,4 +339,5 @@ test("pagehide locks the in-memory session and closes IndexedDB", async () => {
   assert.equal(h.controller.getState().unlocked, false);
   assert.equal(h.isSessionLocked(), true);
   assert.equal(h.lifecycle.closed, true);
+  assert.equal(h.visibility.listeners.has("visibilitychange"), false);
 });

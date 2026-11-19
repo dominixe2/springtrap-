@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.28
-- **Snapshot date:** 2026-11-18
-- **Snapshot source:** Current security/auth and encrypted-offline-vault stack through PR #50, stacked on PR #49 → #48 → #47 → #46 → #45 → #43 → #40 → #37. PR #49 head `71e0522105f2900a6f49f8fc8de2511a9f4acb4f` passed Micro Helper checks run [#44154244060](https://github.com/dominixe2/springtrap-/actions/runs/44154244060): 123 project tests, 11 relay tests, two browser-auth UI tests, nine vault crypto tests, six IndexedDB storage tests, embedded JavaScript syntax and Python compilation. PR #50 adds canonical base64url validation; all work remains in unmerged draft PRs.
+- **Checklist version:** 1.0.0-checklist.35
+- **Snapshot date:** 2026-11-19
+- **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and background-lock hardening PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 latest head `f52040e8e183c61034f14972543df7a0b4b734b6` passed run [#44593137867](https://github.com/dominixe2/springtrap-/actions/runs/44593137867): 171 automated tests across Python, relay, browser-auth, vault crypto/storage/UI and service-worker suites, plus embedded JavaScript syntax and Python compilation. All current release work remains in draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -57,20 +57,21 @@ A level may be raised only when new implementation and evidence are linked in th
 ## Known release blockers (not a bug count)
 
 1. The trust policy is not yet enforced through every hosted and desktop tool/action path.
-2. JARVIS PR #5 remains the original unauthenticated LAN Ollama implementation and must not be merged. Draft PR #9 (`security/ollama-relay-auth-20261110`) adds per-launch bearer pairing, HTTPS-only phone token use, rate/concurrency limits and chat-only relay tests. The same PR branch now also carries PR #7's loopback-only Windows bridge binding and a listener-address regression test; latest JARVIS CI has not yet been observed. Keep both relay and Vite development server off the public internet.
+2. JARVIS PR #5 remains the original unauthenticated LAN Ollama implementation and must not be merged. Draft PR #9 (`security/ollama-relay-auth-20261110`) adds per-launch pairing, an HttpOnly session, HTTPS-only phone token use, rate/concurrency limits, redacted upstream errors and a chat-only relay; it also carries the loopback-only Windows bridge restriction. Draft PR #12 is six commits ahead of #9 and applies loopback-by-default Vite networking, permitting LAN binding only when both HTTPS certificate and key paths are configured. PR #11 is a parallel copy of that Vite hardening stacked on PR #10, so avoid treating #11 and #12 as two independent features. **No GitHub Actions run was observed** for current heads #9 (`0ae636d`), #10 (`01202ec`), #11 (`e421bda`) or #12 (`b5ac575`); do not count their local-only test claims as CI evidence. PR #10 adds explicit security-branch and ready-for-review triggers but is itself unvalidated. Keep the relay and Vite development server off the public internet; no real phone/Windows pairing is verified.
 3. The active `micro-helper` base includes the loopback/Origin/Fetch-Metadata protections from merged PR #19. PR #37 now also verifies the actual ASGI socket peer IP, so a non-loopback client cannot bypass the Host check by spoofing `Host: localhost`. PR #13 remains open against the older `main` API and should not be confused with the active product-branch fix. These checks are defense in depth, not authentication; the local API must remain loopback-only and they do not secure hosted routes or the JARVIS relay.
 4. Android/Windows physical-device acceptance tests are not recorded.
 5. The hosted source mirror and AppDeploy live snapshot need explicit parity evidence before a source change can be called deployed.
 6. Cross-device encrypted sync, conflict handling and device-session revocation are not yet proven end to end.
 7. PR #23 → #31 → #32 → #34 → #35 now form a passing stacked trust-gateway/backup/restore/export-safety branch, but remain unmerged. Compare PR #34 against PR #25, then integrate the stack sequentially and run CI on the resulting `micro-helper` branch.
 8. The active Windows Companion endpoint is Render, while the Cloudflare Durable Object relay is a separate replacement. PR #33 hardens the Render source but remains unmerged and undeployed. The Cloudflare Worker is also not deployed; no live WSS pairing or real phone-to-Windows action has been verified, and clients must not be switched between endpoints before a successful staging health check.
+9. The active `micro-helper` integration branch is **diverged** from default `main`: comparison reports 210 commits ahead and 48 behind (merge base `a05bbae1755214fd6c329b1f5322b58c31a32620`). PR #37/#38 and the newer security/offline-vault stack target this non-default integration line. Do not merge the large divergence blindly; reconcile and test the complete stack on a dedicated integration candidate before any release merge.
 
 ## Next development order
 
 1. Review the passing PR #23 → #31 → #32 → #34 stack against PR #25, then integrate the trust gateway and policy-gated backup/restore sequentially into `micro-helper`; run a fresh full suite on the integrated branch.
 2. Review PR #33's active Render relay hardening, integrate it separately, then run a staging pairing test before any live endpoint change.
 3. Extend the policy gate to the first hosted action adapter only after its authenticated identity, explicit approval UI and audit boundary are covered by integration tests.
-4. Complete JARVIS PR #9 review and obtain current CI for the authenticated Ollama relay plus loopback-only Windows bridge; keep it chat-only and physically test only after the HTTPS certificate is trusted by Android.
+4. Obtain real CI for JARVIS PR #10/#9/#12 (and resolve the duplicate #11 path) before considering the Windows bridge or phone relay reusable. Keep the phone path chat-only; perform physical pairing only after a trusted HTTPS certificate is installed on Android and the notebook.
 5. Add a single capability matrix shared by hosted tools, local Python, Android and Windows Companion.
 6. Run signed-in hosted end-to-end tests, then physical Android and Windows smoke tests.
 7. Recalculate this checklist only after updating the evidence links and levels.
@@ -216,3 +217,61 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The import reliability fix improves the user-facing encrypted backup workflow but does not satisfy full offline private-data or target-platform acceptance.
 - **Change this run:** 0.00 percentage points.
 - **Release decision:** NOT READY. PR #53 remains a draft stacked on PR #52 → #50 → #49 → #48 → #47. No merge, deployment, legacy-data migration or deletion is claimed.
+
+
+## Verified update — 2026-11-19 (checklist v31)
+
+- **PR #54 — background-lock hardening:** the encrypted backup controller now locks the in-memory session immediately when the document becomes hidden, reports the locked state on return, and requires a fresh passphrase. A visibility epoch also prevents a hidden → visible race from completing an in-flight PBKDF2 unlock. Backup creation is aborted before or after encryption if the page was backgrounded during the operation. The visibility listener is removed during controller disposal.
+- **Regression coverage:** three new controller tests cover immediate lock and restore denial, a hidden → visible transition during unlock, and backgrounding during encrypted-backup creation. The code and tests are on branch security/offline-vault-lock-on-hidden-20261119; latest code/test commit at checklist update: 0b98a0f0ff1295758e73df83ff518273489d222d.
+- **CI:** NOT RUN / no PR-triggered workflow run is currently returned for PR #54's latest head. Do not treat the added tests as passing until GitHub Actions reports success. Real-browser lifecycle behavior, Android, Windows and physical-device acceptance remain NOT RUN.
+- **Security scope:** this closes the background-unlock lifecycle gap in the UI only. It does not enable offline private-data access, change the fail-closed service-worker boundary, migrate legacy plaintext data or alter the explicit body-bound restore confirmation. JavaScript cannot guarantee physical zeroization of immutable passphrase strings.
+- **Bug accounting:** one unique background-session lifecycle security defect addressed; no additional confirmed defects are introduced by this change. Existing non-blocking Starlette/httpx TestClient deprecation warnings remain outside this UI change.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The weighted criteria still require integrated end-to-end evidence and target-platform acceptance; PR #54's CI and browser lifecycle checks are not yet verified. No evidence level is raised.
+- **Change this run:** 0.00 percentage points.
+- **Release decision:** NOT READY. PR #54 is a draft stacked on PR #53 and its base chain. No merge, deployment, offline private-data migration or physical-device acceptance is claimed.
+
+
+## Verified update — 2026-11-19 (checklist v32)
+
+- **PR #54 — background-lock hardening CI:** GitHub Actions run [#44592605947](https://github.com/dominixe2/springtrap-/actions/runs/44592605947) completed successfully on head `5a49ce9fd07a851cc51f4e38560f23c671e806db`.
+- **PASS — 171 automated tests, 0 failures:** 123 Python project tests; 11 relay tests; 2 browser-auth UI tests; 9 encrypted-vault crypto tests; 6 IndexedDB storage tests; 16 encrypted-vault UI controller tests (including the three new background-lifecycle regressions); and 4 service-worker cache-boundary tests. Embedded browser JavaScript syntax checks and Python compilation passed. The two Python suites each emitted one non-blocking Starlette/httpx TestClient deprecation warning.
+- **Scope:** CI verifies the controller's hidden-page lock, restore denial after backgrounding, rejection of the hidden → visible unlock race, and cancellation of encrypted-backup creation during backgrounding. This remains an encrypted backup feature, not full offline private-data access. Real-browser IndexedDB/WebCrypto lifecycle, Android, Windows and physical-device acceptance remain NOT RUN.
+- **Release decision:** NOT READY. PR #54 remains a draft stacked on PR #53. No evidence level is raised solely from mocked controller tests and CI; real-browser/platform acceptance and full private offline workflow remain outstanding.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The new tests establish the controller regression behavior in CI but do not satisfy the 0.75 end-to-end target-platform evidence threshold. No weighted criterion is raised.
+- **Change this run:** 0.00 percentage points.
+- **Known warning:** one unique Starlette/httpx TestClient deprecation warning per Python suite (two warning emissions in this run); no failing tests.
+
+
+## Verified update — 2026-11-19 (checklist v33)
+
+- **JARVIS integration review:** confirmed PR #9, #10, #11 and #12 are still open. PR #12 is a six-commit follow-up directly on PR #9; PR #11 is a parallel Vite-network hardening branch on PR #10. No Actions runs were returned for the current heads of #9, #10, #11 or #12. The PRs are therefore not yet verified integration inputs for Micro Helper's Windows adapter.
+- **Safety decision:** keep the JARVIS Windows bridge and phone relay separate from Micro Helper until the authenticated relay and trusted-HTTPS listener have passing CI and a physical phone-to-notebook smoke test. No merge or network exposure was performed.
+- **Score:** remains 50.00/100; this repository review changes no weighted acceptance evidence.
+
+
+## Verified update — 2026-11-19 (checklist v34)
+
+- **Branch integration state:** repository default branch is `main`; the active `micro-helper` branch is 210 commits ahead and 48 behind `main`, with merge base `a05bbae1755214fd6c329b1f5322b58c31a32620`. PR #37 and #38 target `micro-helper`; the encrypted-vault stack ultimately builds on that integration line. This is a material release-integration risk, not a reason to overwrite or reset either branch.
+- **Release safety:** keep the PR chain stacked and unmerged. Before release, prepare a reviewed integration branch that reconciles the 48 commits on `main`, then run the full combined CI and platform builds. No merge or branch rewrite was performed in this run.
+- **Score:** remains 50.00/100; branch topology is a blocker, not earned acceptance evidence.
+
+
+## Verified update — 2026-11-19 (checklist v35)
+
+- **PR #54 final CI:** GitHub Actions run [#44593137867](https://github.com/dominixe2/springtrap-/actions/runs/44593137867) completed successfully on latest PR head `f52040e8e183c61034f14972543df7a0b4b734b6`.
+- **PASS — 171 automated tests, 0 failures:** 123 Python project tests; 11 relay tests; 2 browser-auth UI tests; 9 encrypted-vault crypto tests; 6 IndexedDB storage tests; 16 encrypted-vault UI controller tests (including background-lock, unlock-race, interrupted-create and pagehide-listener-cleanup coverage); and 4 service-worker cache-boundary tests. Embedded browser JavaScript syntax checks and Python compilation passed. Each Python suite emitted one non-blocking Starlette/httpx TestClient deprecation warning.
+- **Platform/build scope:** the Micro Helper checks workflow does not build the Android APK or Windows Companion and does not run a real browser. Android, Windows, real IndexedDB/WebCrypto, physical devices, hosted end-to-end, lint and type-check acceptance remain NOT RUN in this PR.
+- **Security scope:** the in-memory encrypted backup now locks when the page becomes hidden; a visibility epoch blocks a hidden → visible unlock race; interrupted backup creation is not persisted; and pagehide removes the listener and closes IndexedDB. Full offline private-data reads/writes remain disabled and the service worker still bypasses private /v1/ responses.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** CI verifies the controller and regression suites but does not meet the real-browser/target-platform acceptance threshold. No weighted criterion is raised.
+- **Change this run:** 0.00 percentage points.
+- **Bug accounting:** one unique background-session lifecycle security defect fixed; zero failing tests; two non-blocking warning emissions. Release blockers listed above remain open.
+- **Release decision:** NOT READY. PR #54 remains a draft stacked on PR #53; no merge, deployment, legacy-data migration or physical-device acceptance is claimed.
