@@ -61,6 +61,8 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 <small>Vytvoří šifrovanou kopii úplné zálohy, uloženou v IndexedDB. Heslo se neukládá. Tato funkce zatím neslouží jako plnohodnotný offline přístup k paměti a historii.</small>
 <label for="offlineVaultPassphrase">Heslo trezoru (alespoň 12 znaků)</label>
 <input id="offlineVaultPassphrase" type="password" minlength="12" maxlength="128" autocomplete="current-password" placeholder="Zadej heslo trezoru" aria-describedby="offlineVaultStatus">
+<label for="offlineVaultPassphraseConfirm">Potvrzení hesla při vytváření nové zálohy</label>
+<input id="offlineVaultPassphraseConfirm" type="password" minlength="12" maxlength="128" autocomplete="new-password" placeholder="Zopakuj heslo" hidden>
 <div style="display:flex;gap:8px;flex-wrap:wrap">
 <button type="button" class="primary" id="offlineVaultCreate">Vytvořit šifrovanou zálohu</button>
 <button type="button" id="offlineVaultUnlock" disabled>Odemknout</button>
