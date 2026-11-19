@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.34
+- **Checklist version:** 1.0.0-checklist.35
 - **Snapshot date:** 2026-11-19
-- **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and background-lock hardening PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 head `5a49ce9fd07a851cc51f4e38560f23c671e806db` passed run [#44592605947](https://github.com/dominixe2/springtrap-/actions/runs/44592605947): 171 automated tests across Python, relay, browser-auth, vault crypto/storage/UI and service-worker suites, plus embedded JavaScript syntax and Python compilation. All current release work remains in draft PRs.
+- **Snapshot source:** Current evidence includes the encrypted-vault UI stack through PR #53 and background-lock hardening PR #54, stacked on PR #53 → #52 → #50 → #49 → #48 → #47. PR #53 final head `3c1f105cc2d622da161d43adc53cbc812c8ae455` passed run [#44540869378](https://github.com/dominixe2/springtrap-/actions/runs/44540869378). PR #54 latest head `f52040e8e183c61034f14972543df7a0b4b734b6` passed run [#44593137867](https://github.com/dominixe2/springtrap-/actions/runs/44593137867): 171 automated tests across Python, relay, browser-auth, vault crypto/storage/UI and service-worker suites, plus embedded JavaScript syntax and Python compilation. All current release work remains in draft PRs.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -260,3 +260,18 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Branch integration state:** repository default branch is `main`; the active `micro-helper` branch is 210 commits ahead and 48 behind `main`, with merge base `a05bbae1755214fd6c329b1f5322b58c31a32620`. PR #37 and #38 target `micro-helper`; the encrypted-vault stack ultimately builds on that integration line. This is a material release-integration risk, not a reason to overwrite or reset either branch.
 - **Release safety:** keep the PR chain stacked and unmerged. Before release, prepare a reviewed integration branch that reconciles the 48 commits on `main`, then run the full combined CI and platform builds. No merge or branch rewrite was performed in this run.
 - **Score:** remains 50.00/100; branch topology is a blocker, not earned acceptance evidence.
+
+
+## Verified update — 2026-11-19 (checklist v35)
+
+- **PR #54 final CI:** GitHub Actions run [#44593137867](https://github.com/dominixe2/springtrap-/actions/runs/44593137867) completed successfully on latest PR head `f52040e8e183c61034f14972543df7a0b4b734b6`.
+- **PASS — 171 automated tests, 0 failures:** 123 Python project tests; 11 relay tests; 2 browser-auth UI tests; 9 encrypted-vault crypto tests; 6 IndexedDB storage tests; 16 encrypted-vault UI controller tests (including background-lock, unlock-race, interrupted-create and pagehide-listener-cleanup coverage); and 4 service-worker cache-boundary tests. Embedded browser JavaScript syntax checks and Python compilation passed. Each Python suite emitted one non-blocking Starlette/httpx TestClient deprecation warning.
+- **Platform/build scope:** the Micro Helper checks workflow does not build the Android APK or Windows Companion and does not run a real browser. Android, Windows, real IndexedDB/WebCrypto, physical devices, hosted end-to-end, lint and type-check acceptance remain NOT RUN in this PR.
+- **Security scope:** the in-memory encrypted backup now locks when the page becomes hidden; a visibility epoch blocks a hidden → visible unlock race; interrupted backup creation is not persisted; and pagehide removes the listener and closes IndexedDB. Full offline private-data reads/writes remain disabled and the service worker still bypasses private /v1/ responses.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** CI verifies the controller and regression suites but does not meet the real-browser/target-platform acceptance threshold. No weighted criterion is raised.
+- **Change this run:** 0.00 percentage points.
+- **Bug accounting:** one unique background-session lifecycle security defect fixed; zero failing tests; two non-blocking warning emissions. Release blockers listed above remain open.
+- **Release decision:** NOT READY. PR #54 remains a draft stacked on PR #53; no merge, deployment, legacy-data migration or physical-device acceptance is claimed.
