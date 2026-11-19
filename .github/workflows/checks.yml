@@ -49,6 +49,8 @@ jobs:
         run: node --test tests/offline-vault.test.mjs
       - name: Run encrypted offline vault storage tests
         run: node --test tests/offline-vault-storage.test.mjs
+      - name: Run encrypted offline vault UI tests
+        run: node --test tests/offline-vault-ui.test.mjs
       - name: Run service-worker cache-boundary tests
         run: node --test tests/service-worker-cache.test.mjs
       - name: Compile source
