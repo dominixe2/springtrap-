@@ -202,3 +202,17 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Evidence-weighted score remains 50.00/100.** The new user-facing encrypted-backup flow is a meaningful feature step, but it does not yet enable private offline reads/writes or satisfy browser/platform acceptance.
 - **Change this run:** 0.00 percentage points; the existing weighted acceptance criteria remain unchanged.
 - **Release decision:** NOT READY. PR #53 is a draft stacked on PR #52 → #50 → #49 → #48 → #47. Do not merge it independently of its base. No merge, deployment or legacy-data migration is claimed.
+
+
+## Verified update — 2026-11-19 (checklist v30)
+
+- **PR #53 follow-up:** after the first successful run, review found that importing an encrypted file performed a second IndexedDB read after the write transaction had already committed. A transient readback failure could therefore have been reported as an import failure even though the new envelope was saved. The UI now uses the validated input envelope after the successful atomic save and does not make success depend on a redundant readback. Added a regression test that simulates a post-save read failure.
+- **PASS — PR #53 code head:** 5228d9fbd948188fb7098e0e937c4d8fa2bbebae, Actions run [#44540502219](https://github.com/dominixe2/springtrap-/actions/runs/44540502219).
+- **168 test cases passed:** 123 Python project tests, 11 relay tests, 2 browser-auth UI tests, 9 vault crypto tests, 6 IndexedDB adapter tests, 13 encrypted-vault UI controller tests and 4 service-worker cache-boundary tests. Embedded JavaScript syntax checks (including offline-vault-ui.js) and Python compilation passed. One non-blocking Starlette/httpx TestClient deprecation warning appeared in each Python suite.
+- **Scope remains unchanged:** the vault is an encrypted backup workflow, not the source of offline private-data reads/writes. The private API remains excluded from service-worker caching and the offline private-data lock remains fail-closed. Legacy plaintext browser data is untouched. Real-browser, Android and Windows acceptance remain NOT RUN.
+
+### Score and release decision
+
+- **Evidence-weighted score remains 50.00/100.** The import reliability fix improves the user-facing encrypted backup workflow but does not satisfy full offline private-data or target-platform acceptance.
+- **Change this run:** 0.00 percentage points.
+- **Release decision:** NOT READY. PR #53 remains a draft stacked on PR #52 → #50 → #49 → #48 → #47. No merge, deployment, legacy-data migration or deletion is claimed.
