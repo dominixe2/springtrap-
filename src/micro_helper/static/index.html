@@ -59,6 +59,7 @@ form{display:flex;gap:9px;margin-top:12px}form input{flex:1}.settings{margin-top
 <section class="settings" style="align-items:stretch;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong>🧠 Moje soukromá paměť</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="exportMemory" type="button">Exportovat poznámky</button><button id="exportBackup" type="button">Exportovat úplnou zálohu</button><button id="importBackup" type="button">Obnovit ze zálohy</button><input id="backupFile" type="file" accept="application/json,.json" hidden></div></div><section id="offlineVaultPanel" class="settings" aria-labelledby="offlineVaultTitle" style="align-items:stretch;flex-direction:column">
 <strong id="offlineVaultTitle">🔐 Šifrovaná záloha v tomto prohlížeči</strong>
 <small>Vytvoří šifrovanou kopii úplné zálohy, uloženou v IndexedDB. Heslo se neukládá. Tato funkce zatím neslouží jako plnohodnotný offline přístup k paměti a historii.</small>
+<small>Obnova nahradí aktuální místní data a vyžaduje samostatné potvrzení bezpečnostního dialogu.</small>
 <label for="offlineVaultPassphrase">Heslo trezoru (alespoň 12 znaků)</label>
 <input id="offlineVaultPassphrase" type="password" minlength="12" maxlength="128" autocomplete="current-password" placeholder="Zadej heslo trezoru" aria-describedby="offlineVaultStatus">
 <label for="offlineVaultPassphraseConfirm">Potvrzení hesla při vytváření nové zálohy</label>
