@@ -276,7 +276,7 @@
         const parsed = JSON.parse(await file.text());
         if (session) lock({silent: true});
         await storage.save(parsed);
-        storedEnvelope = await storage.load();
+        storedEnvelope = parsed;
         if (elements.passphraseConfirm) elements.passphraseConfirm.hidden = true;
         setSummary("Šifrovaný soubor byl uložen. Pro zobrazení souhrnu jej odemkni heslem.");
         setStatus("Šifrovaná záloha byla importována.");
