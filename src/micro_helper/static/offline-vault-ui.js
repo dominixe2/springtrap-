@@ -141,6 +141,10 @@
         if (!response.ok) throw new Error("backup");
         const payload = await response.json();
         if (!isBackupPayload(payload)) throw new Error("format");
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch) {
+          setStatus("Šifrování bylo přerušeno přechodem aplikace do pozadí. Záloha nebyla uložena.");
+          return false;
+        }
         const envelope = await vault.create(passphrase, payload);
         if (pageHidden || visibilityEpoch !== operationVisibilityEpoch) {
           setStatus("Šifrování bylo přerušeno přechodem aplikace do pozadí. Záloha nebyla uložena.");
