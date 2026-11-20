@@ -72,7 +72,7 @@ function makeHarness(options = {}) {
       if (options.failLoadAfterSave && saveCompleted) throw new Error("simulated readback failure");
       return stored ? JSON.parse(JSON.stringify(stored)) : null;
     },
-    async save(value, options = {}) {
+    async save(value, saveOptions = {}) {
       if (value?.format !== "micro-helper-offline-vault") {
         throw new Error("invalid envelope");
       }
@@ -80,24 +80,24 @@ function makeHarness(options = {}) {
         markSaveStarted();
         await new Promise((resolve, reject) => {
           let settled = false;
-          const cleanup = () => options.signal?.removeEventListener("abort", onAbort);
+          const cleanup = () => saveOptions.signal?.removeEventListener("abort", onAbort);
           const onAbort = () => {
             if (settled) return;
             settled = true;
             cleanup();
             reject(new Error("aborted"));
           };
-          options.signal?.addEventListener("abort", onAbort, {once: true});
+          saveOptions.signal?.addEventListener("abort", onAbort, {once: true});
           Promise.resolve(options.saveGate).then(() => {
             if (settled) return;
             settled = true;
             cleanup();
             resolve();
           }, reject);
-          if (options.signal?.aborted) onAbort();
+          if (saveOptions.signal?.aborted) onAbort();
         });
       }
-      if (options.signal?.aborted) throw new Error("aborted");
+      if (saveOptions.signal?.aborted) throw new Error("aborted");
       stored = JSON.parse(JSON.stringify(value));
       saves.push(JSON.parse(JSON.stringify(value)));
       saveCompleted = true;
