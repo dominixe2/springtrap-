@@ -7,7 +7,7 @@ const source = await readFile(
   new URL("../src/micro_helper/static/offline-vault-ui.js", import.meta.url),
   "utf8"
 );
-const context = vm.createContext({});
+const context = vm.createContext({AbortController});
 vm.runInContext(source, context, {filename: "offline-vault-ui.js"});
 const ui = context.MicroHelperOfflineVaultUI;
 
@@ -41,6 +41,8 @@ function makeHarness(options = {}) {
   const lifecycle = {};
   let markCreateStarted;
   const createStarted = new Promise(resolve => { markCreateStarted = resolve; });
+  let markSaveStarted;
+  const saveStarted = new Promise(resolve => { markSaveStarted = resolve; });
   const visibility = {
     visibilityState: "visible",
     listeners: new Map(),
@@ -70,10 +72,32 @@ function makeHarness(options = {}) {
       if (options.failLoadAfterSave && saveCompleted) throw new Error("simulated readback failure");
       return stored ? JSON.parse(JSON.stringify(stored)) : null;
     },
-    async save(value) {
+    async save(value, saveOptions = {}) {
       if (value?.format !== "micro-helper-offline-vault") {
         throw new Error("invalid envelope");
       }
+      if (options.saveGate) {
+        markSaveStarted();
+        await new Promise((resolve, reject) => {
+          let settled = false;
+          const cleanup = () => saveOptions.signal?.removeEventListener("abort", onAbort);
+          const onAbort = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(new Error("aborted"));
+          };
+          saveOptions.signal?.addEventListener("abort", onAbort, {once: true});
+          Promise.resolve(options.saveGate).then(() => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve();
+          }, reject);
+          if (saveOptions.signal?.aborted) onAbort();
+        });
+      }
+      if (saveOptions.signal?.aborted) throw new Error("aborted");
       stored = JSON.parse(JSON.stringify(value));
       saves.push(JSON.parse(JSON.stringify(value)));
       saveCompleted = true;
@@ -121,11 +145,13 @@ function makeHarness(options = {}) {
     reloadImpl: () => { reloads += 1; },
     lifecycle: {addEventListener(name, callback) { lifecycle[name] = callback; }},
     visibility,
+    abortControllerFactory: () => new AbortController(),
     elements
   });
   return {
     controller, elements, storage, saves, downloads, requests, lifecycle, visibility,
     waitForCreate: () => createStarted,
+    waitForSave: () => saveStarted,
     getStored: () => stored,
     getReloads: () => reloads,
     expireSession: () => { locked = true; },
@@ -290,6 +316,24 @@ test("does not save a new encrypted backup when the page is hidden during encryp
   assert.equal(h.saves.length, 0);
   assert.equal(h.getStored(), null);
   assert.match(h.elements.status.textContent, /Záloha nebyla uložena/);
+});
+
+test("aborts a pending encrypted-backup save when the page becomes hidden", async () => {
+  let releaseSave;
+  const saveGate = new Promise(resolve => { releaseSave = resolve; });
+  const h = makeHarness({saveGate});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  h.elements.passphraseConfirm.value = "dostatecne-dlouhe-heslo";
+  const pendingCreate = h.controller.createBackup();
+  await h.waitForSave();
+  h.visibility.setState("hidden");
+  h.visibility.setState("visible");
+  assert.equal(await pendingCreate, false);
+  assert.equal(h.saves.length, 0);
+  assert.equal(h.getStored(), null);
+  assert.match(h.elements.status.textContent, /Zálohování bylo přerušeno/);
+  releaseSave();
 });
 
 test("locks the in-memory session as soon as the page becomes hidden", async () => {

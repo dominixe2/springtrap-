@@ -185,21 +185,59 @@
       });
     }
 
-    async function save(envelope) {
+    async function save(envelope, options = {}) {
+      if (!options || typeof options !== "object" || Array.isArray(options) ||
+          Object.keys(options).some(key => key !== "signal")) {
+        throw new TypeError("Neplatné možnosti uložení offline trezoru.");
+      }
+      const signal = options.signal ?? null;
+      if (signal !== null && (
+        typeof signal !== "object" ||
+        typeof signal.aborted !== "boolean" ||
+        typeof signal.addEventListener !== "function" ||
+        typeof signal.removeEventListener !== "function"
+      )) {
+        throw new TypeError("Neplatný signál přerušení offline trezoru.");
+      }
       const safeEnvelope = cloneAndValidateEnvelope(envelope);
+      if (signal?.aborted) {
+        throw new Error("Uložení šifrovaného offline trezoru bylo přerušeno.");
+      }
       const database = await getDatabase();
+      if (signal?.aborted) {
+        throw new Error("Uložení šifrovaného offline trezoru bylo přerušeno.");
+      }
       return new Promise((resolve, reject) => {
         let settled = false;
+        let transaction = null;
+        const cleanup = () => {
+          try { signal?.removeEventListener("abort", onAbort); } catch {}
+        };
         const fail = () => {
           if (settled) return;
           settled = true;
+          cleanup();
           reject(new Error("Šifrovaný offline trezor se nepodařilo bezpečně uložit."));
         };
+        const onAbort = () => {
+          if (settled) return;
+          if (!transaction) {
+            fail();
+            return;
+          }
+          try { transaction.abort(); } catch { fail(); }
+        };
         try {
-          const transaction = database.transaction(STORE_NAME, "readwrite");
+          signal?.addEventListener("abort", onAbort, {once: true});
+          if (signal?.aborted) {
+            onAbort();
+            return;
+          }
+          transaction = database.transaction(STORE_NAME, "readwrite");
           transaction.oncomplete = () => {
             if (settled) return;
             settled = true;
+            cleanup();
             resolve();
           };
           transaction.onerror = fail;
@@ -209,6 +247,7 @@
             envelope: safeEnvelope
           });
           request.onerror = fail;
+          if (signal?.aborted) onAbort();
         } catch {
           fail();
         }

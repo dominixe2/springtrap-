@@ -11,6 +11,10 @@ const source = await readFile(
 function makeIndexedDB() {
   const databases = new Map();
   let openCount = 0;
+  let holdNextWrite = false;
+  let markWriteStarted = () => {};
+  let writeStartedPromise = Promise.resolve();
+  let abortCount = 0;
 
   const factory = {
     open(name, version) {
@@ -36,6 +40,8 @@ function makeIndexedDB() {
           },
           transaction(storeName) {
             const store = state.stores.get(storeName);
+            let pendingWrite = null;
+            let aborted = false;
             const transaction = {
               oncomplete: null,
               onerror: null,
@@ -45,25 +51,43 @@ function makeIndexedDB() {
                   get(key) {
                     const result = {};
                     queueMicrotask(() => {
+                      if (aborted) return;
                       result.result = store.records.get(key) ?? null;
                       result.onsuccess?.();
-                      queueMicrotask(() => transaction.oncomplete?.());
+                      queueMicrotask(() => {
+                        if (!aborted) transaction.oncomplete?.();
+                      });
                     });
                     return result;
                   },
                   put(value) {
                     const result = {};
                     queueMicrotask(() => {
-                      store.records.set(value[store.keyPath], JSON.parse(JSON.stringify(value)));
+                      if (aborted) return;
+                      pendingWrite = JSON.parse(JSON.stringify(value));
                       result.result = value[store.keyPath];
                       result.onsuccess?.();
-                      queueMicrotask(() => transaction.oncomplete?.());
+                      if (holdNextWrite) {
+                        holdNextWrite = false;
+                        markWriteStarted();
+                      } else {
+                        queueMicrotask(() => {
+                          if (aborted) return;
+                          store.records.set(pendingWrite[store.keyPath], pendingWrite);
+                          pendingWrite = null;
+                          transaction.oncomplete?.();
+                        });
+                      }
                     });
                     return result;
                   }
                 };
               },
               abort() {
+                if (aborted) return;
+                aborted = true;
+                pendingWrite = null;
+                abortCount += 1;
                 transaction.onabort?.();
               }
             };
@@ -82,6 +106,12 @@ function makeIndexedDB() {
   return {
     factory,
     get openCount() { return openCount; },
+    get abortCount() { return abortCount; },
+    holdNextWrite() {
+      holdNextWrite = true;
+      writeStartedPromise = new Promise(resolve => { markWriteStarted = resolve; });
+    },
+    waitForHeldWrite() { return writeStartedPromise; },
     dump() {
       const state = databases.get("micro-helper-offline-vault");
       const store = state?.stores.get("vaults");
@@ -160,6 +190,36 @@ test("rejects non-canonical base64url trailing bits before opening IndexedDB", a
     /ciphertext/
   );
   assert.equal(indexedDB.openCount, 0, "invalid encodings must be rejected before opening storage");
+  store.close();
+});
+
+test("aborts an in-flight write transaction and preserves the previous encrypted record", async () => {
+  const indexedDB = makeIndexedDB();
+  const store = loadStorage(indexedDB.factory);
+  await store.save(envelope);
+  const before = indexedDB.dump();
+  const replacement = {...envelope, iv: "D".repeat(16), ciphertext: "E".repeat(64)};
+  indexedDB.holdNextWrite();
+  const aborter = new AbortController();
+  const pending = store.save(replacement, {signal: aborter.signal});
+  await indexedDB.waitForHeldWrite();
+  aborter.abort();
+  await assert.rejects(() => pending, /nepodařilo bezpečně uložit/);
+  assert.equal(indexedDB.abortCount, 1);
+  assert.equal(indexedDB.dump(), before, "aborted IndexedDB transactions must not replace the prior record");
+  store.close();
+});
+
+test("rejects a pre-aborted write before opening IndexedDB", async () => {
+  const indexedDB = makeIndexedDB();
+  const store = loadStorage(indexedDB.factory);
+  const aborter = new AbortController();
+  aborter.abort();
+  await assert.rejects(
+    () => store.save(envelope, {signal: aborter.signal}),
+    /Uložení šifrovaného offline trezoru bylo přerušeno/
+  );
+  assert.equal(indexedDB.openCount, 0);
   store.close();
 });
 
