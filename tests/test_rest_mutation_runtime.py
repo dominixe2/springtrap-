@@ -18,7 +18,7 @@ raw_client = TestClient(
 )
 
 STAMP = "2026-11-20T00:00:00+00:00"
-PRIVATE_MARKER = "PRIVATE-REST-GUARD-MUST-NOT-ENTER-AUDIT"
+PRIVATE_MARKER = "PRIVATE-REST-GUARD-MARKER"
 
 
 # (method, route template, concrete request path, valid request body)
