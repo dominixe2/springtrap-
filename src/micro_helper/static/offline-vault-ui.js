@@ -30,11 +30,11 @@
     const {
       vault, storage, fetchImpl, confirmImpl = () => false,
       downloadImpl = () => {}, reloadImpl = () => {}, lifecycle = null,
-      visibility = null, elements = {}
+      visibility = null, abortControllerFactory = () => new AbortController(), elements = {}
     } = options;
     if (!vault || typeof vault.create !== "function" || typeof vault.unlock !== "function" ||
         !storage || typeof storage.load !== "function" || typeof storage.save !== "function" ||
-        typeof fetchImpl !== "function") {
+        typeof fetchImpl !== "function" || typeof abortControllerFactory !== "function") {
       throw new TypeError("Trezor není správně inicializovaný.");
     }
 
@@ -43,6 +43,7 @@
     let busy = false;
     let pageHidden = visibility?.visibilityState === "hidden";
     let visibilityEpoch = 0;
+    let activeCreateAbortController = null;
 
     const setStatus = value => {
       if (elements.status) elements.status.textContent = value;
@@ -100,6 +101,11 @@
 
     async function createBackup() {
       if (busy) return false;
+      if (pageHidden) {
+        clearPassphrase();
+        setStatus("Trezor lze zálohovat pouze při zobrazené aplikaci.");
+        return false;
+      }
       const operationVisibilityEpoch = visibilityEpoch;
       const passphrase = String(elements.passphrase?.value ?? "");
       if (passphrase.length < 12) {
@@ -123,7 +129,14 @@
       busy = true;
       updateControls();
       setStatus("Ověřuji importovaný šifrovaný soubor…");
+      let operationAbortController = null;
       try {
+        operationAbortController = abortControllerFactory();
+        if (!operationAbortController || !operationAbortController.signal ||
+            typeof operationAbortController.abort !== "function") {
+          throw new Error("abort");
+        }
+        activeCreateAbortController = operationAbortController;
         const existing = await storage.load();
         if (existing && !confirmImpl(
           "V tomto prohlížeči už šifrovaná záloha existuje. Nahradit ji novou zálohou aktuálních dat?"
@@ -136,7 +149,8 @@
         const response = await fetchImpl("/v1/backup", {
           method: "GET",
           credentials: "same-origin",
-          cache: "no-store"
+          cache: "no-store",
+          signal: operationAbortController.signal
         });
         if (!response.ok) throw new Error("backup");
         const payload = await response.json();
@@ -150,17 +164,28 @@
           setStatus("Šifrování bylo přerušeno přechodem aplikace do pozadí. Záloha nebyla uložena.");
           return false;
         }
-        await storage.save(envelope);
+        await storage.save(envelope, {signal: operationAbortController.signal});
         storedEnvelope = envelope;
         if (elements.passphraseConfirm) elements.passphraseConfirm.hidden = true;
         lock({silent: true});
         setSummary("Záloha je zašifrovaná. V IndexedDB je uložen pouze šifrovaný obal.");
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch) {
+          setStatus("Záloha byla uložena před uzamčením aplikace. Trezor zůstává uzamčený.");
+          return true;
+        }
         setStatus("Šifrovaná záloha byla bezpečně uložena.");
         return true;
       } catch {
-        setStatus("Zálohu se nepodařilo zašifrovat nebo uložit. Původní uložený záznam zůstává zachován.");
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch) {
+          setStatus("Zálohování bylo přerušeno přechodem aplikace do pozadí. Původní šifrovaná záloha zůstala zachována.");
+        } else {
+          setStatus("Zálohu se nepodařilo zašifrovat nebo uložit. Původní uložený záznam zůstává zachován.");
+        }
         return false;
       } finally {
+        if (activeCreateAbortController === operationAbortController) {
+          activeCreateAbortController = null;
+        }
         clearPassphrase();
         busy = false;
         updateControls();
@@ -317,11 +342,15 @@
       pageHidden = visibility?.visibilityState === "hidden";
       if (pageHidden) {
         visibilityEpoch += 1;
+        try { activeCreateAbortController?.abort(); } catch {}
         lock();
       }
     };
 
     function dispose() {
+      visibilityEpoch += 1;
+      pageHidden = true;
+      try { activeCreateAbortController?.abort(); } catch {}
       lock({silent: true});
       try { storage.close?.(); } catch {}
       try { visibility?.removeEventListener?.("visibilitychange", onVisibilityChange); } catch {}
