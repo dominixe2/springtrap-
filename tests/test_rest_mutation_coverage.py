@@ -4,6 +4,7 @@ A route is not protected merely because an action exists in the policy map:
 its endpoint must actually invoke the shared authorization gate, or implement
 one of the narrowly documented separate confirmation gates.
 """
+import dis
 import re
 
 from micro_helper.api import (
@@ -55,6 +56,26 @@ def endpoint_names(endpoint) -> set[str]:
     return set(code.co_names) if code is not None else set()
 
 
+def endpoint_calls_name(endpoint, name: str) -> bool:
+    """Require a real bytecode call, not a dead reference in co_names."""
+    if getattr(endpoint, "__code__", None) is None:
+        return False
+    instructions = list(dis.get_instructions(endpoint))
+    for index, instruction in enumerate(instructions):
+        if instruction.opname not in {"LOAD_GLOBAL", "LOAD_DEREF", "LOAD_NAME"}:
+            continue
+        if instruction.argval != name:
+            continue
+        for candidate in instructions[index + 1:index + 7]:
+            if candidate.opname in {"CALL", "CALL_FUNCTION", "CALL_METHOD"}:
+                return True
+            if candidate.opname in {
+                "RETURN_VALUE", "POP_TOP", "STORE_FAST", "STORE_DEREF", "STORE_GLOBAL"
+            }:
+                break
+    return False
+
+
 def route_gate_errors(routes) -> list[str]:
     """Return actionable failures for unprotected state-changing local routes."""
     uncovered = []
@@ -81,7 +102,7 @@ def route_gate_errors(routes) -> list[str]:
             resolved = _resolve_rest_action(method, sample_path(route_path))
             if resolved is None:
                 uncovered.append(f"{method} {route_path} has no policy action")
-            if "_authorize_rest_mutation" not in names:
+            if not endpoint_calls_name(route.endpoint, "_authorize_rest_mutation"):
                 uncovered.append(
                     f"{method} {route_path} does not call _authorize_rest_mutation"
                 )
@@ -104,6 +125,23 @@ def test_chat_is_the_only_builtin_allow_grant():
     resolved = _resolve_rest_action("POST", "/v1/chat")
     assert resolved is not None
     assert resolved[0] == "rest:POST:/v1/chat"
+
+
+def test_route_gate_checker_rejects_a_dead_reference_to_the_gate():
+    from micro_helper.api import _authorize_rest_mutation
+    from types import SimpleNamespace
+
+    def endpoint_that_only_references_the_gate():
+        return _authorize_rest_mutation
+
+    route = SimpleNamespace(
+        path="/v1/test-reference-only",
+        methods={"POST"},
+        endpoint=endpoint_that_only_references_the_gate,
+    )
+
+    errors = route_gate_errors([route])
+    assert any("does not call _authorize_rest_mutation" in error for error in errors)
 
 
 def test_route_gate_checker_detects_an_unprotected_handler():
