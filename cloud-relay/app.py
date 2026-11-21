@@ -27,6 +27,73 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
+class RequestBodyLimitMiddleware:
+    """Reject oversized pairing JSON before FastAPI/Pydantic buffers it."""
+
+    def __init__(self, application, max_bytes: int = 8192):
+        self.application = application
+        self.max_bytes = max_bytes
+        self.paths = {"/v1/pair/register", "/v1/pair/claim", "/v1/pair/revoke"}
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http" or scope.get("method") != "POST" or scope.get("path") not in self.paths:
+            await self.application(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        declared = headers.get(b"content-length")
+        if declared is not None:
+            try:
+                length = int(declared)
+            except (TypeError, ValueError):
+                await self._respond(send, 400, "invalid_content_length")
+                return
+            if length < 0 or length > self.max_bytes:
+                await self._respond(send, 413, "request_too_large")
+                return
+
+        body = bytearray()
+        more_body = True
+        while more_body:
+            message = await receive()
+            if message.get("type") == "http.disconnect":
+                return
+            chunk = message.get("body", b"")
+            if len(body) + len(chunk) > self.max_bytes:
+                await self._respond(send, 413, "request_too_large")
+                return
+            body.extend(chunk)
+            more_body = message.get("more_body", False)
+
+        replayed = False
+
+        async def replay_receive():
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": bytes(body), "more_body": False}
+            return await receive()
+
+        await self.application(scope, replay_receive, send)
+
+    @staticmethod
+    async def _respond(send, status: int, code: str):
+        payload = json.dumps({"error": code}).encode("utf-8")
+        await send({
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                (b"content-type", b"application/json; charset=utf-8"),
+                (b"content-length", str(len(payload)).encode("ascii")),
+                (b"cache-control", b"no-store"),
+                (b"connection", b"close"),
+            ],
+        })
+        await send({"type": "http.response.body", "body": payload, "more_body": False})
+
+
+app.add_middleware(RequestBodyLimitMiddleware, max_bytes=8192)
+
 ALLOWED_ACTIONS = {"lock", "explorer", "notepad", "calculator"}
 PAIR_TTL = 300
 SESSION_TTL = 12 * 60 * 60
