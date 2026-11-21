@@ -294,3 +294,21 @@ def test_non_string_mobile_action_is_rejected_without_ending_session(action):
                 "action": "notepad",
                 "request_id": "valid-after-invalid",
             }
+
+
+@pytest.mark.parametrize("frame_type", ["text", "bytes"])
+def test_websocket_rejects_oversized_auth_frame_before_json_parsing(frame_type):
+    assert register().status_code == 200
+    with client.websocket_connect("/v1/ws", headers={"origin": APP_ORIGIN}) as websocket:
+        payload = (
+            '{"type":"auth","token":"' +
+            ("x" * (relay.MAX_WEBSOCKET_MESSAGE_BYTES + 1)) +
+            '"}'
+        )
+        if frame_type == "text":
+            websocket.send_text(payload)
+        else:
+            websocket.send_bytes(payload.encode("utf-8"))
+        with pytest.raises(WebSocketDisconnect) as disconnected:
+            websocket.receive_json()
+        assert disconnected.value.code == 1009
