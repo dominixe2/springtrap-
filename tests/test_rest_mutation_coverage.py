@@ -4,6 +4,7 @@ A route is not protected merely because an action exists in the policy map:
 its endpoint must actually invoke the shared authorization gate, or implement
 one of the narrowly documented separate confirmation gates.
 """
+import builtins
 import dis
 import re
 
@@ -57,22 +58,38 @@ def endpoint_names(endpoint) -> set[str]:
 
 
 def endpoint_calls_name(endpoint, name: str) -> bool:
-    """Require a real bytecode call, not a dead reference in co_names."""
+    """Require the loaded callable to be invoked, not merely referenced.
+
+    A nearby CALL is insufficient: returning the gate reference alongside an
+    unrelated function call used to satisfy the old check.
+    """
     if getattr(endpoint, "__code__", None) is None:
         return False
+
+    namespace = getattr(endpoint, "__globals__", {})
+    builtin_namespace = getattr(endpoint, "__builtins__", builtins)
+    if not isinstance(builtin_namespace, dict):
+        builtin_namespace = vars(builtin_namespace)
+
     instructions = list(dis.get_instructions(endpoint))
     for index, instruction in enumerate(instructions):
         if instruction.opname not in {"LOAD_GLOBAL", "LOAD_DEREF", "LOAD_NAME"}:
             continue
         if instruction.argval != name:
             continue
-        for candidate in instructions[index + 1:index + 7]:
+
+        for candidate in instructions[index + 1:index + 12]:
             if candidate.opname in {"CALL", "CALL_FUNCTION", "CALL_METHOD"}:
                 return True
             if candidate.opname in {
                 "RETURN_VALUE", "POP_TOP", "STORE_FAST", "STORE_DEREF", "STORE_GLOBAL"
             }:
                 break
+            if candidate.opname in {"LOAD_GLOBAL", "LOAD_DEREF", "LOAD_NAME"}:
+                # Another callable may be the real callee before this CALL.
+                value = namespace.get(candidate.argval, builtin_namespace.get(candidate.argval))
+                if callable(value):
+                    break
     return False
 
 
@@ -158,4 +175,24 @@ def test_route_gate_checker_detects_an_unprotected_handler():
 
     errors = route_gate_errors([route])
     assert any("has no policy action" in error for error in errors)
+    assert any("does not call _authorize_rest_mutation" in error for error in errors)
+
+
+def test_route_gate_checker_rejects_a_reference_followed_by_an_unrelated_call():
+    from micro_helper.api import _authorize_rest_mutation
+    from types import SimpleNamespace
+
+    def unrelated_helper():
+        return True
+
+    def endpoint_that_never_calls_the_gate():
+        return _authorize_rest_mutation, unrelated_helper()
+
+    route = SimpleNamespace(
+        path="/v1/test-unrelated-call",
+        methods={"POST"},
+        endpoint=endpoint_that_never_calls_the_gate,
+    )
+
+    errors = route_gate_errors([route])
     assert any("does not call _authorize_rest_mutation" in error for error in errors)
