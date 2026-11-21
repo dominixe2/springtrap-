@@ -273,3 +273,24 @@ def test_browser_pairing_preflight_allows_only_official_origin():
         },
     )
     assert "access-control-allow-origin" not in blocked.headers
+
+
+@pytest.mark.parametrize("action", [[], {}])
+def test_non_string_mobile_action_is_rejected_without_ending_session(action):
+    assert register().status_code == 200
+    desktop_token = "d" * 40
+    mobile_token = claim().json()["token"]
+    with client.websocket_connect("/v1/ws", headers={"origin": APP_ORIGIN}) as desktop:
+        desktop.send_json({"type": "auth", "token": desktop_token})
+        assert desktop.receive_json() == {"type": "ready", "role": "desktop"}
+        with client.websocket_connect("/v1/ws", headers={"origin": APP_ORIGIN}) as mobile:
+            mobile.send_json({"type": "auth", "token": mobile_token})
+            assert mobile.receive_json() == {"type": "ready", "role": "mobile"}
+            mobile.send_json({"type": "command", "action": action, "request_id": "invalid-action"})
+            assert mobile.receive_json() == {"type": "error", "error": "action_not_allowed"}
+            mobile.send_json({"type": "command", "action": "notepad", "request_id": "valid-after-invalid"})
+            assert desktop.receive_json() == {
+                "type": "command",
+                "action": "notepad",
+                "request_id": "valid-after-invalid",
+            }
