@@ -70,6 +70,9 @@ def endpoint_calls_name(endpoint, name: str) -> bool:
     builtin_namespace = getattr(endpoint, "__builtins__", builtins)
     if not isinstance(builtin_namespace, dict):
         builtin_namespace = vars(builtin_namespace)
+    code = endpoint.__code__
+    closure = getattr(endpoint, "__closure__", None) or ()
+    closure_namespace = dict(zip(code.co_freevars, (cell.cell_contents for cell in closure)))
 
     instructions = list(dis.get_instructions(endpoint))
     for index, instruction in enumerate(instructions):
@@ -87,7 +90,11 @@ def endpoint_calls_name(endpoint, name: str) -> bool:
                 break
             if candidate.opname in {"LOAD_GLOBAL", "LOAD_DEREF", "LOAD_NAME"}:
                 # Another callable may be the real callee before this CALL.
-                value = namespace.get(candidate.argval, builtin_namespace.get(candidate.argval))
+                value = namespace.get(candidate.argval)
+                if value is None:
+                    value = closure_namespace.get(candidate.argval)
+                if value is None:
+                    value = builtin_namespace.get(candidate.argval)
                 if callable(value):
                     break
     return False
