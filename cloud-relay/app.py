@@ -421,7 +421,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             if role == "mobile":
                 action = message.get("action")
                 request_id = message.get("request_id")
-                if message.get("type") != "command" or action not in ALLOWED_ACTIONS:
+                if message.get("type") != "command" or not isinstance(action, str) or action not in ALLOWED_ACTIONS:
                     await websocket.send_json({"type": "error", "error": "action_not_allowed"})
                     continue
                 if not isinstance(request_id, str) or not (1 <= len(request_id) <= 80):
