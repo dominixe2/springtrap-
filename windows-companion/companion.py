@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import json
 import secrets
+import ssl
 import sys
 import time
 import urllib.error
@@ -56,6 +57,30 @@ def register_device() -> tuple[str, str]:
     return pairing_code, desktop_token
 
 
+def _is_transient_registration_error(error: BaseException) -> bool:
+    """Retry cold starts and network failures, but never hide TLS or client errors."""
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code in {408, 429, 500, 502, 503, 504}
+    if isinstance(error, urllib.error.URLError):
+        return not isinstance(error.reason, ssl.SSLError)
+    return isinstance(error, (TimeoutError, ConnectionError))
+
+
+def register_device_with_retry(sleep_impl=None) -> tuple[str, str]:
+    """Keep the Companion alive while a sleeping/free relay wakes up."""
+    sleep = sleep_impl or time.sleep
+    retry_delay = 2
+    while True:
+        try:
+            return register_device()
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            if not _is_transient_registration_error(error):
+                raise
+            print("[Micro Helper] Relay při párování není dostupný. Zkouším znovu…")
+            sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 30)
+
+
 def serve() -> None:
     if sys.platform != "win32":
         raise SystemExit("Micro Helper Windows Companion je určen pro Windows.")
@@ -63,7 +88,7 @@ def serve() -> None:
     from websockets.sync.client import connect
 
     retry_delay = 2
-    pairing_code, desktop_token = register_device()
+    pairing_code, desktop_token = register_device_with_retry()
     print("=" * 58)
     print("MICRO HELPER · BEZPEČNÉ CLOUDOVÉ PROPOJENÍ")
     print("Párovací kód pro telefon:", pairing_code)
