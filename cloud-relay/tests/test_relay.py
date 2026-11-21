@@ -84,7 +84,7 @@ def test_pairing_http_body_limit_counts_utf8_bytes():
         "pairing_code": "123456",
         "desktop_token": "d" * 40,
         "padding": "é" * 5000,
-    }).encode("utf-8")
+    }, ensure_ascii=False).encode("utf-8")
     assert len(body) > 8192
     response = client.post(
         "/v1/pair/register",
