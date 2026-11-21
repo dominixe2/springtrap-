@@ -333,9 +333,32 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     await websocket.accept()
     try:
-        auth_message = await asyncio.wait_for(websocket.receive_json(), timeout=10)
+        auth_event = await asyncio.wait_for(websocket.receive(), timeout=10)
     except Exception:
         await websocket.close(code=4401, reason="Authentication required")
+        return
+
+    if auth_event.get("type") == "websocket.disconnect":
+        return
+    if auth_event.get("type") != "websocket.receive":
+        await websocket.close(code=4401, reason="Authentication required")
+        return
+
+    auth_text = auth_event.get("text")
+    auth_binary = auth_event.get("bytes")
+    auth_size = len(auth_text.encode("utf-8")) if isinstance(auth_text, str) else (
+        len(auth_binary) if isinstance(auth_binary, bytes) else 0
+    )
+    if auth_size > MAX_WEBSOCKET_MESSAGE_BYTES:
+        await websocket.close(code=1009, reason="Authentication message too large")
+        return
+    if not isinstance(auth_text, str):
+        await websocket.close(code=4401, reason="Text authentication required")
+        return
+    try:
+        auth_message = json.loads(auth_text)
+    except json.JSONDecodeError:
+        await websocket.close(code=4401, reason="Invalid authentication message")
         return
 
     token = auth_message.get("token", "") if isinstance(auth_message, dict) and auth_message.get("type") == "auth" else ""
