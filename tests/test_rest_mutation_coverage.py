@@ -12,9 +12,14 @@ from micro_helper.api import (
     CHAT_ACTION,
     REST_POLICY,
     app,
+    _consume_tool_confirmation,
+    _normalize_rest_arguments,
+    _normalize_tool_arguments,
+    _record_tool_audit,
     _resolve_rest_action,
+    database,
 )
-from micro_helper.trust_policy import permission_key
+from micro_helper.trust_policy import evaluate_action, permission_key
 
 
 SEPARATE_GATE_CALLS = {
@@ -32,6 +37,20 @@ SEPARATE_GATE_CALLS = {
     ("POST", "/v1/tools/{tool_id}/execute"): {
         "TOOL_ACTIONS", "_normalize_tool_arguments", "evaluate_action",
         "TOOL_POLICY", "_consume_tool_confirmation",
+    },
+}
+
+SEPARATE_GATE_REQUIRED_CALLS = {
+    ("POST", "/v1/actions/confirm"): {
+        "_resolve_rest_action", "_normalize_rest_arguments",
+        "evaluate_action", "_record_tool_audit",
+    },
+    ("POST", "/v1/tools/{tool_id}/confirm"): {
+        "_normalize_tool_arguments", "evaluate_action", "_record_tool_audit",
+    },
+    ("POST", "/v1/tools/{tool_id}/execute"): {
+        "_normalize_tool_arguments", "evaluate_action",
+        "_consume_tool_confirmation", "_record_tool_audit",
     },
 }
 
@@ -118,8 +137,17 @@ def route_gate_errors(routes) -> list[str]:
                 missing = SEPARATE_GATE_CALLS[key] - names
                 if missing:
                     uncovered.append(
-                        f"{method} {route_path} separate gate missing calls: "
+                        f"{method} {route_path} separate gate missing references: "
                         + ", ".join(sorted(missing))
+                    )
+                missing_calls = [
+                    name for name in sorted(SEPARATE_GATE_REQUIRED_CALLS[key])
+                    if not endpoint_calls_name(route.endpoint, name)
+                ]
+                if missing_calls:
+                    uncovered.append(
+                        f"{method} {route_path} separate gate does not call: "
+                        + ", ".join(missing_calls)
                     )
                 continue
 
@@ -203,3 +231,30 @@ def test_route_gate_checker_rejects_a_reference_followed_by_an_unrelated_call():
 
     errors = route_gate_errors([route])
     assert any("does not call _authorize_rest_mutation" in error for error in errors)
+
+
+def test_route_gate_checker_requires_real_calls_in_separate_confirmation_routes():
+    from types import SimpleNamespace
+
+    def unrelated_helper():
+        return True
+
+    def endpoint_that_only_references_confirmation_dependencies():
+        return (
+            _resolve_rest_action,
+            _normalize_rest_arguments,
+            evaluate_action,
+            REST_POLICY,
+            _record_tool_audit,
+            database,
+            unrelated_helper(),
+        )
+
+    route = SimpleNamespace(
+        path="/v1/actions/confirm",
+        methods={"POST"},
+        endpoint=endpoint_that_only_references_confirmation_dependencies,
+    )
+
+    errors = route_gate_errors([route])
+    assert any("separate gate does not call:" in error for error in errors)
