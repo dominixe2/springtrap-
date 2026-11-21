@@ -42,5 +42,33 @@ class CompanionSecurityTests(unittest.TestCase):
                 companion.execute_action("notepad")
 
 
+    def test_registration_retries_transient_relay_cold_start(self):
+        error = companion.urllib.error.URLError("relay is waking")
+        with patch.object(companion, "register_device", side_effect=[error, ("123456", "desktop-token")]), patch.object(
+            companion.time, "sleep"
+        ) as sleep:
+            result = companion.register_device_with_retry()
+        self.assertEqual(result, ("123456", "desktop-token"))
+        sleep.assert_called_once_with(2)
+
+    def test_registration_does_not_retry_tls_certificate_errors(self):
+        error = companion.urllib.error.URLError(companion.ssl.SSLCertVerificationError("invalid certificate"))
+        with patch.object(companion, "register_device", side_effect=error), patch.object(
+            companion.time, "sleep"
+        ) as sleep:
+            with self.assertRaises(companion.urllib.error.URLError):
+                companion.register_device_with_retry()
+        sleep.assert_not_called()
+
+    def test_registration_does_not_retry_permanent_http_errors(self):
+        error = companion.urllib.error.HTTPError("https://relay.invalid", 400, "bad request", {}, None)
+        with patch.object(companion, "register_device", side_effect=error), patch.object(
+            companion.time, "sleep"
+        ) as sleep:
+            with self.assertRaises(companion.urllib.error.HTTPError):
+                companion.register_device_with_retry()
+        sleep.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
