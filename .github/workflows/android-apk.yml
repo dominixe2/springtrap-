@@ -1,6 +1,10 @@
 name: Build Micro Helper Android APK
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "android-wrapper/**"
+      - ".github/workflows/android-apk.yml"
   push:
     branches: [micro-helper]
     paths:
