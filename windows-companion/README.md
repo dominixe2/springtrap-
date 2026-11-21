@@ -8,7 +8,7 @@
 4. Keep the console window open.
 5. Enter the displayed six-digit one-time pairing code in the Windows Companion panel in Micro Helper.
 
-The current staging relay is hosted on Render. It may take time to wake after inactivity; if the process restarts, launch the Companion again to generate a fresh pairing code.
+The current staging relay is hosted on Render. It may take time to wake after inactivity; the Companion retries temporary registration/network failures with bounded backoff. TLS certificate errors and permanent client errors are not retried. If the process itself restarts, launch the Companion again to generate a fresh pairing code.
 
 ## Supported actions
 
