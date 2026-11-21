@@ -1,3 +1,4 @@
+import json
 import time
 
 import pytest
@@ -76,6 +77,21 @@ def test_invalid_pairing_code_shape_is_rejected():
         json={"pairing_code": "abc", "desktop_token": "d" * 40},
     )
     assert response.status_code == 422
+
+
+def test_pairing_http_body_limit_counts_utf8_bytes():
+    body = json.dumps({
+        "pairing_code": "123456",
+        "desktop_token": "d" * 40,
+        "padding": "é" * 5000,
+    }).encode("utf-8")
+    assert len(body) > 8192
+    response = client.post(
+        "/v1/pair/register",
+        content=body,
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
 
 
 def test_mobile_cannot_claim_twice():
@@ -163,6 +179,24 @@ def test_mobile_can_revoke_entire_pairing():
     assert not sessions
     assert not tokens
     assert digest(desktop_token) not in tokens
+
+
+def test_revoke_closes_both_active_websockets():
+    assert register().status_code == 200
+    desktop_token = "d" * 40
+    mobile_token = claim().json()["token"]
+    with client.websocket_connect("/v1/ws", headers={"origin": APP_ORIGIN}) as desktop:
+        desktop.send_json({"type": "auth", "token": desktop_token})
+        desktop.receive_json()
+        with client.websocket_connect("/v1/ws", headers={"origin": APP_ORIGIN}) as mobile:
+            mobile.send_json({"type": "auth", "token": mobile_token})
+            mobile.receive_json()
+            response = revoke(mobile_token)
+            assert response.status_code == 200
+            with pytest.raises(WebSocketDisconnect):
+                mobile.receive_json()
+            with pytest.raises(WebSocketDisconnect):
+                desktop.receive_json()
 
 
 def test_expired_active_websocket_is_closed_before_forwarding():
