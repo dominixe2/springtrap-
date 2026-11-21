@@ -76,14 +76,26 @@ def register_device_with_retry(sleep_impl=None) -> tuple[str, str]:
         except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
             if not _is_transient_registration_error(error):
                 raise
-            print("[Micro Helper] Relay při párování není dostupný. Zkouším znovu…")
+            print("[Micro Helper] Relay pri parovani neni dostupny. Zkousim znovu...")
             sleep(retry_delay)
             retry_delay = min(retry_delay * 2, 30)
+
+
+def configure_console() -> None:
+    """Use UTF-8 for Czech console messages on Windows where supported."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (OSError, ValueError):
+                pass
 
 
 def serve() -> None:
     if sys.platform != "win32":
         raise SystemExit("Micro Helper Windows Companion je určen pro Windows.")
+    configure_console()
     from websockets.exceptions import ConnectionClosed
     from websockets.sync.client import connect
 
