@@ -1,7 +1,7 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.27
-- **Snapshot date:** 2026-11-21
+- **Checklist version:** 1.0.0-checklist.28
+- **Snapshot date:** 2026-11-22
 - **Snapshot source:** Trust-gateway route-enforcement branch PR #37 head `c566fd8f56ffd32a31cad5187b1bdf679c87730e` is the base for PR #56. PR #56 implementation head `baf507ae9f6ea9544e2264128a54582dbabf7709` now checks that the three separate confirmation endpoints actually call their policy/normalization/audit/token-consumption functions; it also rejects a dead reference to `_authorize_rest_mutation` followed by an unrelated function call. CI run [#44935871771](https://github.com/dominixe2/springtrap-/actions/runs/44935871771) passed 122 project tests and 11 relay tests, plus embedded browser JavaScript syntax and Python compilation. PR #56 remains a draft stacked on PR #37. Earlier PR #34–#36 trust/backup/worker evidence remains historical on this branch; the separate encrypted-vault stack PR #53–#55 is not part of this branch. Merged PRs #18 and #19 provide additional verified Cloudflare-session and local-origin protections.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
@@ -161,3 +161,14 @@ A level may be raised only when new implementation and evidence are linked in th
 - **Release decision:** NOT READY. PR #56 remains draft and stacked on PR #37; no merge or deployment was performed.
 
 - **1.0.0-checklist.27 (2026-11-21):** adds actual-call checks for all three separate confirmation routes and the synthetic false-positive regression; CI run #44935871771 passed 122 project tests and 11 relay tests. Score remains 50.00%.
+
+
+## Verified update — 2026-11-22 (checklist v28)
+
+- **UI confirmation usability:** removed three duplicate per-button prompts for memory deletion, conversation deletion and preference deletion. The central browser wrapper remains the single gate and displays the exact HTTP method, route and request data before requesting a server-issued one-time token.
+- **New behavioral regression suite:** `tests/rest-confirmation-ui.test.mjs` executes the actual confirmation wrapper extracted from `src/micro_helper/static/index.html`. It covers the exact action payload and token header, cancellation without a network mutation, backup restore binding to the SHA-256 of the exact raw request body without sending backup contents to the confirmation endpoint, chat/cross-origin exclusions, missing-token fail-closed behavior and Request-object header preservation.
+- **CI integration:** `.github/workflows/checks.yml` runs the browser confirmation tests with Node 22 in addition to the existing Python, relay and JavaScript syntax checks. Results are pending for the new PR head.
+- **Score:** remains **50.00/100** until the stacked security work is integrated and release-level end-to-end/device evidence exists. Test coverage and removal of duplicate prompts do not independently earn release-completion points.
+- **Release decision:** NOT READY. No merge, deployment, secret change or physical-device acceptance is claimed.
+
+- **1.0.0-checklist.28 (2026-11-22):** records the single-confirmation UX cleanup and executable browser confirmation regressions; score remains 50.00%.
