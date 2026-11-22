@@ -42,31 +42,54 @@ def _is_loopback_hostname(hostname: str | None) -> bool:
         return False
 
 
+
+def _is_loopback_peer(peer: str | None) -> bool:
+    """Require the actual socket peer to be loopback; Host is caller-controlled."""
+    if not peer:
+        return False
+    try:
+        address = ipaddress.ip_address(peer.strip("[]"))
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+            return address.ipv4_mapped.is_loopback
+        return address.is_loopback
+    except ValueError:
+        return False
+
+
 @app.middleware("http")
 async def protect_cross_origin_mutations(request: Request, call_next):
-    """Reject cross-origin writes to the local personal-data API.
+    """Defend private API reads and writes against DNS rebinding, CSRF and cache retention.
 
-    This is CSRF defense in depth, not authentication. Keep the launcher bound to
-    loopback and use a separate authenticated design before exposing the service
-    to a network.
+    This is not authentication. The local service must remain bound to loopback.
     """
-    # Protect reads as well as writes: DNS rebinding could otherwise expose
-    # private memories/history through GET endpoints even if mutations are blocked.
-    if request.url.path == "/v1" or request.url.path.startswith("/v1/"):
-        if not _is_loopback_hostname(request.url.hostname):
-            return JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."})
+    is_private_api = request.url.path == "/v1" or request.url.path.startswith("/v1/")
+
+    def private_response(response):
+        if is_private_api:
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+    # Host and Origin are caller-controlled. Require both a loopback Host and
+    # an actual loopback socket peer before exposing private local data.
+    if is_private_api and not _is_loopback_hostname(request.url.hostname):
+        return private_response(JSONResponse(status_code=403, content={"detail": "Non-loopback host blocked."}))
+
+    peer_host = request.client.host if request.client is not None else None
+    if is_private_api and not _is_loopback_peer(peer_host):
+        return private_response(JSONResponse(status_code=403, content={"detail": "Non-loopback client blocked."}))
 
     if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
         request_host = request.headers.get("host", "").lower()
         fetch_site = request.headers.get("sec-fetch-site", "").lower()
         origin = request.headers.get("origin")
         if fetch_site == "cross-site":
-            return JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."})
+            return private_response(JSONResponse(status_code=403, content={"detail": "Cross-site request blocked."}))
         if origin:
             try:
                 parsed_origin = urlsplit(origin)
             except ValueError:
-                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
+                return private_response(JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."}))
             if (
                 parsed_origin.scheme.lower() != request.url.scheme.lower()
                 or not parsed_origin.netloc
@@ -76,8 +99,9 @@ async def protect_cross_origin_mutations(request: Request, call_next):
                 or bool(parsed_origin.path or parsed_origin.query or parsed_origin.fragment)
                 or not _is_loopback_hostname(parsed_origin.hostname)
             ):
-                return JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."})
-    return await call_next(request)
+                return private_response(JSONResponse(status_code=403, content={"detail": "Cross-origin write blocked."}))
+
+    return private_response(await call_next(request))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 DATABASE_PATH = Path(os.getenv("MICRO_HELPER_DB", str(Path.home() / ".micro-helper" / "micro_helper.sqlite3")))
 MODEL_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{1,100}$")
