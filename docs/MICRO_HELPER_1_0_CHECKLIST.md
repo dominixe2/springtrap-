@@ -1,8 +1,8 @@
 # Micro Helper 1.0 acceptance checklist
 
-- **Checklist version:** 1.0.0-checklist.24
-- **Snapshot date:** 2026-11-15
-- **Snapshot source:** Stacked PR #34 trust-gateway + full backup/restore head `3d517d92a5fa3ee885baaa4be6ce89e7ff990f7b` passed CI run #42679331114: 86 project tests, 11 relay tests, embedded browser JavaScript syntax and Python compilation. PR #34 is based on PR #32 → PR #31 → PR #23 and remains unmerged. PR #25 remains a separate backup/restore implementation reference. Separate PR #33 (`security/render-relay-session-guards`) adds protections to the active Render relay source and passed Micro Helper run #42636316961 plus Cloudflare Relay Checks run #42636316955. PR #35 (`security/backup-export-warning-20261110`) extends the stack with explicit plaintext-export warnings and no-cache headers; its head `d90e2cb632070ddfca41cd222301045bd112997a` passed run #42885578401 with 91 project tests and 11 relay tests. PR #36 (`fix/worker-prompt-and-error-redaction-20261111`) corrects worker preference line breaks and stores categorized task failures instead of raw exception text; head `8e898fe493d7a901bb3c38e2f3da2df803973a01` passed run #43079790199 with 94 project tests and 11 relay tests, embedded JavaScript syntax and Python compilation. Merged PRs #18 and #19 provide additional verified Cloudflare-session and local-origin protections.
+- **Checklist version:** 1.0.0-checklist.28
+- **Snapshot date:** 2026-11-22
+- **Snapshot source:** Trust-gateway route-enforcement branch PR #37 head `c566fd8f56ffd32a31cad5187b1bdf679c87730e` is the base for PR #56. PR #56 head `78690e870f4847d803ccb1efe466a32d300d7f49` adds behavioral tests for the browser's exact REST confirmation flow and removes duplicate delete prompts; run [#45056314969](https://github.com/dominixe2/springtrap-/actions/runs/45056314969) passed 6/6 Node UI tests, 122 project tests and 11 relay tests, plus embedded browser JavaScript syntax and Python compilation. One non-blocking Starlette/httpx TestClient deprecation warning remains in each Python suite. PR #56 remains a draft stacked on PR #37. Earlier PR #34–#36 trust/backup/worker evidence remains historical on this branch; the separate encrypted-vault stack PR #53–#55 is not part of this branch. Merged PRs #18 and #19 provide additional verified Cloudflare-session and local-origin protections.
 - **Purpose:** evidence-based release tracking; this file is not a claim that Micro Helper 1.0 is ready.
 - **Integration snapshot:** PR #37 is the consolidated superset candidate targeting the active `micro-helper` branch. It modifies 12 files and contains the trust/backup/export/worker stack, handler-level REST route enforcement, a negative regression that exercises the checker against an unprotected route, and the versioned release checklist. The consolidated head `a0db3ac3dcf347873b185b8b55ba53155068bd15` passed run #43285515333: install, embedded browser JavaScript, Python compilation, project tests and relay tests all completed successfully. Earlier route-checker runs #43283674964 and #43283893085 also passed. PR #36 remains open as the subset reference; neither PR is merged. PR #38 adds PR-triggered Android/Windows builds and workflow hardening; all five checks passed on head `171d8426d660a097fb37f2dfc8ea15a249bcf76e` (Micro Helper checks, hosted source checks, Cloudflare dry-run, Windows Companion build, Android debug APK build). Artifacts were produced: Windows Companion 9,976,699 bytes and Android debug APK 3,693,569 bytes. These are build artifacts, not physical-device acceptance.
 - **Scoring rule:** `earned points = weight × evidence level`; `completion = sum(earned points) / sum(weights) × 100`.
@@ -130,3 +130,45 @@ A level may be raised only when new implementation and evidence are linked in th
 - **1.0.0-checklist.2 (2026-11-07):** records the first local API tool-gateway integration, one-time argument-bound confirmations and payload-free audit log. Evidence-weighted score remains 44.00% pending current branch CI and target-platform acceptance.
 
 - **1.0.0-checklist.1 (2026-11-06):** established weighted baseline from repository source, PR #15 head and recorded CI results; added high-impact trust-policy confirmation coverage. No platform/device tests are claimed.
+
+
+## Verified update — 2026-11-20 (checklist v25)
+
+- **PR #56 — direct REST authorization regression coverage:** added a runtime matrix that matches the actual FastAPI router for every direct state-changing /v1 route. Each route is invoked without a server-issued token while carrying a forged confirmed=true field; every request must return 403 and leave the profile, memories, messages, tasks, learning plans and preferences unchanged. The test also checks that rejection audit records contain no private body marker.
+- **Static checker hardening:** route coverage now checks for a real bytecode call to _authorize_rest_mutation rather than accepting a dead reference in code object names. A regression explicitly demonstrates that a reference-only handler is rejected by the checker.
+- **CI PASS:** run [#44794096309](https://github.com/dominixe2/springtrap-/actions/runs/44794096309) on head `7fd25d21b889b1adf3b934fa4cd6af56b845f5d8`: 120 project tests and 11 relay tests passed; embedded browser JavaScript syntax and Python compilation passed. One non-blocking Starlette/httpx TestClient deprecation warning appeared in each Python suite.
+- **Score:** remains **50.00/100**. This test-only follow-up strengthens evidence for the local REST gate but does not prove hosted/Windows/JARVIS enforcement, physical-device acceptance or release readiness. No percentage points are added for a test-only change.
+- **Release decision:** NOT READY. PR #56 is a draft stacked on PR #37. No merge, deployment, production signing or physical-device acceptance is claimed.
+
+
+## Verified update — 2026-11-21 (checklist v26)
+
+- **PR #56 — stricter REST gate-checker regression:** `endpoint_calls_name` now resolves callable globals, closure variables and builtins before accepting a nearby bytecode call. This rejects a handler that merely returns the authorization-gate function reference while calling an unrelated helper. The regression was added to `tests/test_rest_mutation_coverage.py`.
+- **CI PASS:** run [#44935578574](https://github.com/dominixe2/springtrap-/actions/runs/44935578574) on head `e05fe9f5b5fb635802671a1de0632bb47d1b996f`: 121 project tests and 11 relay tests passed; embedded browser JavaScript syntax and Python compilation passed. One non-blocking Starlette/httpx TestClient deprecation warning remains in each pytest suite.
+- **Debugging evidence:** the first implementation commit `073fff2220482b56d317e9807da38dd9f163ae0f` exposed that a nested test helper is stored as a closure cell, not a module global. The follow-up commit added closure resolution; the final run above is green.
+- **Score:** remains **50.00/100**. This is test/checker hardening only and adds no release-completion points. It does not prove hosted/Windows/JARVIS enforcement or physical-device acceptance.
+- **Release decision:** NOT READY. PR #56 remains a draft stacked on PR #37. No merge, deployment, signing or physical-device acceptance is claimed.
+
+- **1.0.0-checklist.26 (2026-11-21):** records the stricter bytecode gate-checker regression and passing run #44935578574 (121 project tests, 11 relay tests, embedded JavaScript syntax and Python compilation). Score remains 50.00%; no release points are added for test-only hardening.
+
+
+## Verified update — 2026-11-21 (checklist v27)
+
+- **PR #56 — separate confirmation-route coverage:** the static route checker now verifies real bytecode calls (not just names in `co_names`) for `/v1/actions/confirm`, `/v1/tools/{tool_id}/confirm`, and `/v1/tools/{tool_id}/execute`. Required calls cover action resolution/normalization, policy evaluation, audit recording and one-time token consumption. A synthetic route regression demonstrates that merely referencing these dependencies while calling an unrelated helper is rejected.
+- **REST mutation gate checker:** the previous regression also ensures a dead `_authorize_rest_mutation` reference plus an unrelated call cannot be mistaken for an authorization call.
+- **CI PASS:** run [#44935871771](https://github.com/dominixe2/springtrap-/actions/runs/44935871771) on head `baf507ae9f6ea9544e2264128a54582dbabf7709`: 122 project tests and 11 relay tests passed; embedded browser JavaScript syntax and Python compilation passed. One non-blocking Starlette/httpx TestClient deprecation warning remains in each pytest suite.
+- **Score:** remains **50.00/100**. The work improves security regression detection but is test/checker-only and does not prove hosted, Windows or JARVIS policy enforcement or physical-device acceptance.
+- **Release decision:** NOT READY. PR #56 remains draft and stacked on PR #37; no merge or deployment was performed.
+
+- **1.0.0-checklist.27 (2026-11-21):** adds actual-call checks for all three separate confirmation routes and the synthetic false-positive regression; CI run #44935871771 passed 122 project tests and 11 relay tests. Score remains 50.00%.
+
+
+## Verified update — 2026-11-22 (checklist v28)
+
+- **UI confirmation usability:** removed three duplicate per-button prompts for memory deletion, conversation deletion and preference deletion. The central browser wrapper remains the single gate and displays the exact HTTP method, route and request data before requesting a server-issued one-time token.
+- **New behavioral regression suite:** `tests/rest-confirmation-ui.test.mjs` executes the actual confirmation wrapper extracted from `src/micro_helper/static/index.html`. It covers the exact action payload and token header, cancellation without a network mutation, backup restore binding to the SHA-256 of the exact raw request body without sending backup contents to the confirmation endpoint, chat/cross-origin exclusions, missing-token fail-closed behavior and Request-object header preservation.
+- **CI integration:** `.github/workflows/checks.yml` runs the browser confirmation tests with Node 22 in addition to the existing Python, relay and JavaScript syntax checks. **PASS —** GitHub Actions run [#45056314969](https://github.com/dominixe2/springtrap-/actions/runs/45056314969) on head `78690e870f4847d803ccb1efe466a32d300d7f49`: 6/6 Node UI tests, 122 project tests, 11 relay tests, embedded browser JavaScript syntax and Python compilation passed. One non-blocking Starlette/httpx deprecation warning appeared in each Python suite.
+- **Score:** remains **50.00/100** until the stacked security work is integrated and release-level end-to-end/device evidence exists. Test coverage and removal of duplicate prompts do not independently earn release-completion points.
+- **Release decision:** NOT READY. No merge, deployment, secret change or physical-device acceptance is claimed.
+
+- **1.0.0-checklist.28 (2026-11-22):** records the single-confirmation UX cleanup and executable browser confirmation regressions; score remains 50.00%.

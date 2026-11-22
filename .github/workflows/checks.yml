@@ -24,6 +24,8 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 22
+      - name: Test browser mutation confirmation flow
+        run: node --test tests/rest-confirmation-ui.test.mjs
       - name: Check embedded browser JavaScript
         run: |
           python - <<'PY'
