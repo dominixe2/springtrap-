@@ -32,6 +32,12 @@ def normalize_allowed_origin(value: str | None) -> str | None:
         return None
 
     raw = value.strip()
+    if any(
+        character.isspace() or ord(character) < 0x20 or ord(character) == 0x7f
+        for character in raw
+    ):
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must not contain whitespace or control characters.")
+
     try:
         parsed = urlsplit(raw)
         hostname = parsed.hostname
