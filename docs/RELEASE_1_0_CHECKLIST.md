@@ -1,7 +1,7 @@
 # Micro Helper 1.0 release checklist
 
-**Version:** 0.1  
-**Snapshot date:** 2026-11-23  
+**Version:** 0.2  
+**Snapshot date:** 2026-11-23 (CI evidence added)  
 **Baseline:** `micro-helper` branch at `02125f6b3d90055243a65bfc40800fdcae6827b8`  
 **Related release work:** [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [PR #57](https://github.com/dominixe2/springtrap-/pull/57), [PR #29](https://github.com/dominixe2/springtrap-/pull/29)
 
@@ -24,7 +24,7 @@ A criterion is **complete** only after implementation, relevant automated tests,
 | Adaptive Trust Engine, scoped permissions, confirmation and audit | 18 | 4 | Partial | Existing local API/origin protections and restricted Windows action handling provide a baseline. Full mutation-route enforcement, memory/preference mutation coverage and runtime regression proof remain open work (issues #26 and PRs #31–#37, #56). Learned behavior must never grant permission. |
 | Authenticated phone–Windows pairing, encrypted transport, revocation and least privilege | 10 | 4 | Partial | Pairing codes, separate tokens, session expiry/revocation and a fixed action allowlist exist in the relay/Windows Companion. The staging relay is in-memory and can lose sessions on restart; browser-origin configuration is still under review in PR #61. Physical Android/Windows pairing is not verified. |
 | Safe JARVIS capability reuse through an explicit adapter boundary | 5 | 0 | Missing | JARVIS remains a separate repository and application. No reviewed, tested Micro Helper adapter contract or integrated capability is shipped. Reuse must preserve JARVIS's localhost boundary and write-disabled default. |
-| CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist; the active relay PR chain has green hosted CI (run #45192457111). AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
+| CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist. The base branch has green checks on commit `02125f6b3d` (runs [#42386005788](https://github.com/dominixe2/springtrap-/actions/runs/42386005788) and [#42386005761](https://github.com/dominixe2/springtrap-/actions/runs/42386005761)); historical Android APK and Windows Companion builds passed on older November 7 commits (runs [#42335382982](https://github.com/dominixe2/springtrap-/actions/runs/42335382982) and [#42339009955](https://github.com/dominixe2/springtrap-/actions/runs/42339009955)). The active relay PR chain also passes hosted CI (run [#45235916616](https://github.com/dominixe2/springtrap-/actions/runs/45235916616)). These older packaging runs do not verify the current source head. AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
 
 **Baseline score: 34 / 100 = 34%.**
 
