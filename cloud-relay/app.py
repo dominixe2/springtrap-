@@ -13,6 +13,7 @@ import os
 import re
 import secrets
 import time
+import unicodedata
 from urllib.parse import urlsplit
 from dataclasses import dataclass, field
 from typing import Any
@@ -33,7 +34,7 @@ def normalize_allowed_origin(value: str | None) -> str | None:
 
     raw = value.strip()
     if any(
-        character.isspace() or ord(character) < 0x20 or ord(character) == 0x7f
+        character.isspace() or unicodedata.category(character).startswith("C")
         for character in raw
     ):
         raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must not contain whitespace or control characters.")
