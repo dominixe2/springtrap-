@@ -7,9 +7,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import ipaddress
 import json
+import os
+import re
 import secrets
 import time
+import unicodedata
+from urllib.parse import urlsplit
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -17,11 +22,77 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-APP_ORIGIN = "https://micro-helper-ygeuyn.v2.appdeploy.ai"
-app = FastAPI(title="Micro Helper Relay", version="0.2.0")
+def normalize_allowed_origin(value: str | None) -> str | None:
+    """Normalize one explicitly configured HTTPS frontend origin.
+
+    An unset value disables browser pairing instead of silently trusting a
+    baked-in hosting provider. Paths, credentials, queries and fragments are
+    not origins and are rejected.
+    """
+    if value is None or not value.strip():
+        return None
+
+    raw = value.strip()
+    if any(
+        character.isspace() or unicodedata.category(character).startswith("C")
+        for character in raw
+    ):
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must not contain whitespace or control characters.")
+
+    try:
+        parsed = urlsplit(raw)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must be a valid HTTPS origin.") from error
+
+    if (
+        parsed.scheme.lower() != "https"
+        or not hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+        or "?" in raw
+        or "#" in raw
+    ):
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must contain only an HTTPS origin.")
+
+    if parsed.netloc.endswith(":"):
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an empty port.")
+
+    try:
+        ascii_host = hostname.encode("idna").decode("ascii").lower().rstrip(".")
+    except UnicodeError as error:
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an invalid hostname.") from error
+
+    try:
+        address = ipaddress.ip_address(ascii_host)
+    except ValueError:
+        if not re.fullmatch(
+            r"(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*",
+            ascii_host,
+        ):
+            raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an invalid hostname.")
+        host_part = ascii_host
+    else:
+        host_part = f"[{address.compressed}]" if address.version == 6 else str(address)
+
+    if port is not None:
+        if not 1 <= port <= 65535:
+            raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an invalid port.")
+        if port != 443:
+            host_part = f"{host_part}:{port}"
+
+    return f"https://{host_part}"
+
+
+APP_ORIGIN = normalize_allowed_origin(os.getenv("MICRO_HELPER_ALLOWED_ORIGIN"))
+app = FastAPI(title="Micro Helper Relay", version="0.3.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[APP_ORIGIN],
+    allow_origins=[APP_ORIGIN] if APP_ORIGIN else [],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -177,10 +248,17 @@ def client_key(request: Request) -> str:
     return request.client.host if request.client and request.client.host else "unknown"
 
 
+def browser_origin_allowed(origin: str | None) -> bool:
+    """Allow browser pairing only for the explicitly configured frontend origin."""
+    return APP_ORIGIN is not None and origin == APP_ORIGIN
+
+
 def require_browser_origin(request: Request) -> None:
+    if APP_ORIGIN is None:
+        raise HTTPException(503, "Browser pairing is not configured on this relay.")
     origin = request.headers.get("origin")
     fetch_site = request.headers.get("sec-fetch-site", "").lower()
-    if origin != APP_ORIGIN or fetch_site == "cross-site":
+    if not browser_origin_allowed(origin) or fetch_site == "cross-site":
         raise HTTPException(403, "Požadavek musí pocházet z oficiální aplikace Micro Helper.")
 
 
@@ -327,7 +405,7 @@ async def revoke(body: RevokeRequest, request: Request) -> dict[str, bool]:
 @app.websocket("/v1/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     origin = websocket.headers.get("origin")
-    if origin is not None and origin != APP_ORIGIN:
+    if origin is not None and not browser_origin_allowed(origin):
         await websocket.close(code=4403, reason="Origin not allowed")
         return
 
@@ -377,7 +455,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         return
     # The mobile endpoint is browser-only. The desktop companion is a native
     # client and may omit Origin, but any Origin it sends must be official.
-    if role == "mobile" and origin != APP_ORIGIN:
+    if role == "mobile" and not browser_origin_allowed(origin):
         await websocket.close(code=4403, reason="Browser origin required")
         return
 

@@ -1,9 +1,12 @@
 import json
+import os
 import time
 
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
+
+os.environ["MICRO_HELPER_ALLOWED_ORIGIN"] = "https://micro-helper.test"
 
 import app as relay
 from app import (
@@ -312,3 +315,73 @@ def test_websocket_rejects_oversized_auth_frame_before_json_parsing(frame_type):
         with pytest.raises(WebSocketDisconnect) as disconnected:
             websocket.receive_json()
         assert disconnected.value.code == 1009
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("https://micro-helper.test", "https://micro-helper.test"),
+        ("HTTPS://EXAMPLE.COM:443/", "https://example.com"),
+        ("https://micro-helper.test:8443", "https://micro-helper.test:8443"),
+        ("https://[::1]:443", "https://[::1]"),
+        ("", None),
+        ("   ", None),
+        (None, None),
+    ],
+)
+def test_configured_browser_origin_is_normalized(configured, expected):
+    assert relay.normalize_allowed_origin(configured) == expected
+
+
+@pytest.mark.parametrize(
+    "configured",
+    [
+        "http://micro-helper.test",
+        "https://user@micro-helper.test",
+        "https://micro-helper.test/path",
+        "https://micro-helper.test?query=1",
+        "https://micro-helper.test#fragment",
+        "https://micro-helper.test:invalid",
+        "https://",
+        "https://bad..host",
+        "https://micro-helper.test:",
+        "https://*.micro-helper.test",
+        "https://micro\n-helper.test",
+        "https://micro\thelper.test",
+        "https://micro helper.test",
+        "https://micro\u00a0helper.test",
+        "https://micro\u200b-helper.test",
+        "https://micro\u200d-helper.test",
+        "https://micro\ufeff-helper.test",
+    ],
+)
+def test_invalid_browser_origin_configuration_is_rejected(configured):
+    with pytest.raises(ValueError):
+        relay.normalize_allowed_origin(configured)
+
+
+def test_browser_pairing_fails_closed_when_origin_is_not_configured(monkeypatch):
+    assert register().status_code == 200
+    monkeypatch.setattr(relay, "APP_ORIGIN", None)
+
+    response = client.post(
+        "/v1/pair/claim",
+        json={"pairing_code": "123456"},
+        headers={"Origin": "https://micro-helper.test"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Browser pairing is not configured on this relay."
+
+    monkeypatch.setattr(relay, "APP_ORIGIN", "https://micro-helper.test")
+    assert claim().status_code == 200
+
+
+def test_browser_origin_helper_requires_a_configured_exact_origin(monkeypatch):
+    monkeypatch.setattr(relay, "APP_ORIGIN", None)
+    assert relay.browser_origin_allowed("https://micro-helper.test") is False
+    assert relay.browser_origin_allowed(None) is False
+
+    monkeypatch.setattr(relay, "APP_ORIGIN", "https://micro-helper.test")
+    assert relay.browser_origin_allowed("https://micro-helper.test") is True
+    assert relay.browser_origin_allowed("https://attacker.example") is False

@@ -18,6 +18,14 @@ A Worker + Durable Object implementation is available in [../cloudflare/](../clo
 
 Follow [Cloudflare setup](../cloudflare/README.md). After deploying, update the relay base URL in the Windows Companion and hosted app before switching clients to the Cloudflare endpoint.
 
+## Browser origin configuration
+
+Set `MICRO_HELPER_ALLOWED_ORIGIN` in the relay host to the exact HTTPS origin of the Micro Helper frontend, for example `https://helper.example.com`. The relay no longer embeds a hosting-provider URL in source code.
+
+The value must be an HTTPS origin only; credentials, paths, queries and fragments are rejected. A trailing slash and the default HTTPS port are normalized. If the variable is unset or empty, browser pairing and browser WebSocket access fail closed; native Windows registration can still start, but mobile claiming remains disabled until an origin is configured.
+
+This variable is configuration, not a secret. Do not put API keys or private credentials in it.
+
 ## Pairing flow
 
 1. Windows Companion generates a random desktop token and a six-digit one-time pairing code.
