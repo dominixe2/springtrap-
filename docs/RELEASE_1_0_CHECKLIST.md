@@ -1,6 +1,6 @@
 # Micro Helper 1.0 release checklist
 
-**Version:** 0.3  
+**Version:** 0.4  
 **Snapshot date:** 2026-11-23 (CI evidence added)  
 **Baseline:** `micro-helper` branch at `02125f6b3d90055243a65bfc40800fdcae6827b8`  
 **Related release work:** [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [PR #57](https://github.com/dominixe2/springtrap-/pull/57), [PR #29](https://github.com/dominixe2/springtrap-/pull/29)
@@ -50,7 +50,7 @@ A criterion is **complete** only after implementation, relevant automated tests,
 
 ## Defect ledger
 
-- **Fixed in the open PR #61 branch (not merged yet):** embedded whitespace/control characters in `MICRO_HELPER_ALLOWED_ORIGIN` could be silently removed by Python's `urlsplit` before validation. The parser now rejects whitespace/control characters before parsing; regression cases cover newline, tab, embedded ASCII space and non-breaking space. Commits: [d5f81ba](https://github.com/dominixe2/springtrap-/commit/d5f81baec2b0cedaa94e6d8a649f57742a1a8e20) and [7a65f23](https://github.com/dominixe2/springtrap-/commit/7a65f236c24b7768e00abcf21f51f701763ce45c). CI: [#45235916616](https://github.com/dominixe2/springtrap-/actions/runs/45235916616) passed with 52 project tests and 49 relay tests.
+- **Fixed in the open PR #61 branch (not merged yet):** embedded whitespace/control characters in `MICRO_HELPER_ALLOWED_ORIGIN` could be silently removed by Python's `urlsplit` before validation. The parser now rejects whitespace/control characters before parsing; regression cases cover newline, tab, embedded ASCII space and non-breaking space. Commits: [d5f81ba](https://github.com/dominixe2/springtrap-/commit/d5f81baec2b0cedaa94e6d8a649f57742a1a8e20) and [7a65f23](https://github.com/dominixe2/springtrap-/commit/7a65f236c24b7768e00abcf21f51f701763ce45c). CI: [#45235916616](https://github.com/dominixe2/springtrap-/actions/runs/45235916616) passed with 52 project tests and 52 relay tests.
 - **Open confirmed issues labeled `bug`:** 0 in Micro Helper; 0 in JARVIS as of this snapshot. This does not prove the absence of unreported runtime defects; physical-device testing remains outstanding.
 
 ## Known issue accounting
