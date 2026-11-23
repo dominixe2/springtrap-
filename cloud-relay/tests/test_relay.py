@@ -346,6 +346,10 @@ def test_configured_browser_origin_is_normalized(configured, expected):
         "https://bad..host",
         "https://micro-helper.test:",
         "https://*.micro-helper.test",
+        "https://micro\n-helper.test",
+        "https://micro\thelper.test",
+        "https://micro helper.test",
+        "https://micro\u00a0helper.test",
     ],
 )
 def test_invalid_browser_origin_configuration_is_rejected(configured):
