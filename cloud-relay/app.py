@@ -52,18 +52,23 @@ def normalize_allowed_origin(value: str | None) -> str | None:
     ):
         raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must contain only an HTTPS origin.")
 
+    if parsed.netloc.endswith(":"):
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an empty port.")
+
     try:
         ascii_host = hostname.encode("idna").decode("ascii").lower().rstrip(".")
+    except UnicodeError as error:
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an invalid hostname.") from error
+
+    try:
         address = ipaddress.ip_address(ascii_host)
     except ValueError:
         if not re.fullmatch(
             r"(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*",
-            ascii_host if "ascii_host" in locals() else "",
+            ascii_host,
         ):
             raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an invalid hostname.")
         host_part = ascii_host
-    except UnicodeError as error:
-        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN contains an invalid hostname.") from error
     else:
         host_part = f"[{address.compressed}]" if address.version == 6 else str(address)
 
