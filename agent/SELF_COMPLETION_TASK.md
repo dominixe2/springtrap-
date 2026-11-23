@@ -1,4 +1,4 @@
-undefined
+# Micro Helper self-completion task
 
 ## Feature requests must become implementation work
 When the owner describes a new Micro Helper capability or product feature in chat, treat it as a request to change the Micro Helper product, not merely as feedback to remember or a roadmap note.
