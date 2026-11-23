@@ -1,6 +1,6 @@
 # Micro Helper 1.0 release checklist
 
-**Version:** 0.4  
+**Version:** 0.5  
 **Snapshot date:** 2026-11-23 (CI evidence added)  
 **Baseline:** `micro-helper` branch at `02125f6b3d90055243a65bfc40800fdcae6827b8`  
 **Related release work:** [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [PR #57](https://github.com/dominixe2/springtrap-/pull/57), [PR #29](https://github.com/dominixe2/springtrap-/pull/29)
@@ -24,13 +24,13 @@ A criterion is **complete** only after implementation, relevant automated tests,
 | Adaptive Trust Engine, scoped permissions, confirmation and audit | 18 | 4 | Partial | Existing local API/origin protections and restricted Windows action handling provide a baseline. Full mutation-route enforcement, memory/preference mutation coverage and runtime regression proof remain open work (issues #26 and PRs #31–#37, #56). Learned behavior must never grant permission. |
 | Authenticated phone–Windows pairing, encrypted transport, revocation and least privilege | 10 | 4 | Partial | Pairing codes, separate tokens, session expiry/revocation and a fixed action allowlist exist in the relay/Windows Companion. The staging relay is in-memory and can lose sessions on restart; browser-origin configuration is still under review in PR #61. Physical Android/Windows pairing is not verified. |
 | Safe JARVIS capability reuse through an explicit adapter boundary | 5 | 0 | Missing | JARVIS remains a separate repository and application. No reviewed, tested Micro Helper adapter contract or integrated capability is shipped. Reuse must preserve JARVIS's localhost boundary and write-disabled default. |
-| CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist. The base branch has green checks on commit `02125f6b3d` (runs [#42386005788](https://github.com/dominixe2/springtrap-/actions/runs/42386005788) and [#42386005761](https://github.com/dominixe2/springtrap-/actions/runs/42386005761)); historical Android APK and Windows Companion builds passed on older November 7 commits (runs [#42335382982](https://github.com/dominixe2/springtrap-/actions/runs/42335382982) and [#42339009955](https://github.com/dominixe2/springtrap-/actions/runs/42339009955)). The active relay PR chain also passes hosted CI (run [#45235916616](https://github.com/dominixe2/springtrap-/actions/runs/45235916616)). These older packaging runs do not verify the current source head. AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
+| CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist. The base branch has green checks on commit `02125f6b3d` (runs [#42386005788](https://github.com/dominixe2/springtrap-/actions/runs/42386005788) and [#42386005761](https://github.com/dominixe2/springtrap-/actions/runs/42386005761)); historical Android APK and Windows Companion builds passed on older November 7 commits (runs [#42335382982](https://github.com/dominixe2/springtrap-/actions/runs/42335382982) and [#42339009955](https://github.com/dominixe2/springtrap-/actions/runs/42339009955)). The active relay PR chain passes hosted CI after the latest parser hardening (run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909)). These older packaging runs do not verify the current source head. AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
 
 **Baseline score: 34 / 100 = 34%.**
 
 ## Current verification snapshot
 
-- GitHub Actions Micro Helper checks: **PASS** on PR #61 base/head snapshot, run [#45192457111](https://github.com/dominixe2/springtrap-/actions/runs/45192457111) (52 project tests, 45 relay tests, embedded JavaScript syntax and Python compilation).
+- GitHub Actions Micro Helper checks: **PASS** on PR #61 base/head snapshot, run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909) (52 project tests, 52 relay tests, embedded JavaScript syntax and Python compilation).
 - Physical Android: **NOT RUN**.
 - Physical Windows pairing/automation: **NOT RUN**.
 - AppDeploy live publication and post-deploy QA: **BLOCKED** by the previously documented usage limit; source changes are not automatically live.
@@ -50,7 +50,7 @@ A criterion is **complete** only after implementation, relevant automated tests,
 
 ## Defect ledger
 
-- **Fixed in the open PR #61 branch (not merged yet):** embedded whitespace/control characters in `MICRO_HELPER_ALLOWED_ORIGIN` could be silently removed by Python's `urlsplit` before validation. The parser now rejects whitespace/control characters before parsing; regression cases cover newline, tab, embedded ASCII space and non-breaking space. Commits: [d5f81ba](https://github.com/dominixe2/springtrap-/commit/d5f81baec2b0cedaa94e6d8a649f57742a1a8e20) and [7a65f23](https://github.com/dominixe2/springtrap-/commit/7a65f236c24b7768e00abcf21f51f701763ce45c). CI: [#45235916616](https://github.com/dominixe2/springtrap-/actions/runs/45235916616) passed with 52 project tests and 52 relay tests.
+- **Fixed in the open PR #61 branch (not merged yet):** embedded whitespace/control and invisible Unicode format characters in `MICRO_HELPER_ALLOWED_ORIGIN` could be normalized away by Python's `urlsplit`/IDNA conversion before validation. The parser now rejects whitespace and Unicode `C*` category characters before normalization; regression cases cover newline, tab, embedded ASCII space, non-breaking space, zero-width space/joiner and BOM. Commits: [d5f81ba](https://github.com/dominixe2/springtrap-/commit/d5f81baec2b0cedaa94e6d8a649f57742a1a8e20), [7a65f23](https://github.com/dominixe2/springtrap-/commit/7a65f236c24b7768e00abcf21f51f701763ce45c), [dc8342f](https://github.com/dominixe2/springtrap-/commit/dc8342fdc54b6f8e7870f83256bddcc600462a28) and [78ed354](https://github.com/dominixe2/springtrap-/commit/78ed3548870ea70544d88d95474cbccca1c59baa). CI: [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909) passed with 52 project tests and 52 relay tests.
 - **Open confirmed issues labeled `bug`:** 0 in Micro Helper; 0 in JARVIS as of this snapshot. This does not prove the absence of unreported runtime defects; physical-device testing remains outstanding.
 
 ## Known issue accounting
