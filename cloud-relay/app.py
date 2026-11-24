@@ -32,7 +32,9 @@ def normalize_allowed_origin(value: str | None) -> str | None:
     if value is None or not value.strip():
         return None
 
-    raw = value.strip()
+    raw = value
+    if raw != raw.strip():
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must not contain surrounding whitespace.")
     if any(
         character.isspace() or unicodedata.category(character).startswith("C")
         for character in raw
@@ -45,6 +47,10 @@ def normalize_allowed_origin(value: str | None) -> str | None:
         port = parsed.port
     except ValueError as error:
         raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must be a valid HTTPS origin.") from error
+
+    if hostname and "%" in hostname:
+        # Scoped IPv6 literals are interface-local and are not valid browser origins.
+        raise ValueError("MICRO_HELPER_ALLOWED_ORIGIN must not contain an IPv6 zone identifier.")
 
     if (
         parsed.scheme.lower() != "https"
