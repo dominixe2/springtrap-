@@ -1,9 +1,9 @@
 # Micro Helper 1.0 release checklist
 
-**Version:** 0.5  
-**Snapshot date:** 2026-11-23 (CI evidence added)  
+**Version:** 0.6  
+**Snapshot date:** 2026-11-24 (offline-workspace CI evidence added)  
 **Baseline:** `micro-helper` branch at `02125f6b3d90055243a65bfc40800fdcae6827b8`  
-**Related release work:** [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [PR #57](https://github.com/dominixe2/springtrap-/pull/57), [PR #29](https://github.com/dominixe2/springtrap-/pull/29)
+**Related release work:** [PR #63](https://github.com/dominixe2/springtrap-/pull/63) (draft, local Python offline workspace), [PR #55](https://github.com/dominixe2/springtrap-/pull/55), [PR #62](https://github.com/dominixe2/springtrap-/pull/62), [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [JARVIS PR #15](https://github.com/dominixe2/jarvis/pull/15), [PR #29](https://github.com/dominixe2/springtrap-/pull/29)
 
 ## Scoring rules
 
@@ -19,18 +19,21 @@ A criterion is **complete** only after implementation, relevant automated tests,
 | Original Micro Helper identity, configurable personality and avatar | 5 | 0 | Missing | `docs/PRODUCT_SPEC.md` defines optional identity/mascot settings, but the original avatar implementation remains in open PR #15 and is not credited as shipped. |
 | Czech-first text and honest voice input/output | 8 | 3 | Partial | Browser voice controls and Czech defaults are documented in `README.md` and `docs/SECURITY.md`. Browser support, installed Czech voices, microphone permissions and background limitations still require platform verification. |
 | Modular AI providers with local/offline fallback and truthful limits | 10 | 4 | Partial | The local FastAPI/Ollama path and hosted cloud AI path exist. Local inference requires a configured model/runtime; cloud AI and hosted features require network/account/provider quota. Provider switching and fallback behavior still need end-to-end tests. |
-| User-controlled memory, preferences, correction and deletion | 10 | 3 | Partial | Account-scoped state and private notes/preferences are present in the hosted source. The browser-local fallback is not encrypted by this app; encrypted offline vault and backup improvements remain in open PRs #48–#55. |
+| User-controlled memory, preferences, correction and deletion | 10 | 3 | Partial | Account-scoped state and private notes/preferences are present in the hosted source. Draft PR #63 adds encrypted offline memory/preference editing and history review/clear to the separate local Python edition, stacked on PR #55; it does not modify the hosted app or provide sync. The hosted browser-local fallback remains unencrypted, and real-browser/target-platform acceptance is still NOT RUN, so no points are added yet. |
 | Tools, file handling, search, analysis and durable task lifecycle | 10 | 4 | Partial | Search/image-related handlers and a durable SQLite task queue exist. The current worker supports only the bounded `agent.draft` task; Windows Companion actions remain a small fixed allowlist. See `docs/ARCHITECTURE.md`. |
 | Adaptive Trust Engine, scoped permissions, confirmation and audit | 18 | 4 | Partial | Existing local API/origin protections and restricted Windows action handling provide a baseline. Full mutation-route enforcement, memory/preference mutation coverage and runtime regression proof remain open work (issues #26 and PRs #31–#37, #56). Learned behavior must never grant permission. |
 | Authenticated phone–Windows pairing, encrypted transport, revocation and least privilege | 10 | 4 | Partial | Pairing codes, separate tokens, session expiry/revocation and a fixed action allowlist exist in the relay/Windows Companion. The staging relay is in-memory and can lose sessions on restart; browser-origin configuration is still under review in PR #61. Physical Android/Windows pairing is not verified. |
 | Safe JARVIS capability reuse through an explicit adapter boundary | 5 | 0 | Missing | JARVIS remains a separate repository and application. No reviewed, tested Micro Helper adapter contract or integrated capability is shipped. Reuse must preserve JARVIS's localhost boundary and write-disabled default. |
 | CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist. The base branch has green checks on commit `02125f6b3d` (runs [#42386005788](https://github.com/dominixe2/springtrap-/actions/runs/42386005788) and [#42386005761](https://github.com/dominixe2/springtrap-/actions/runs/42386005761)); historical Android APK and Windows Companion builds passed on older November 7 commits (runs [#42335382982](https://github.com/dominixe2/springtrap-/actions/runs/42335382982) and [#42339009955](https://github.com/dominixe2/springtrap-/actions/runs/42339009955)). The active relay PR chain passes hosted CI after the latest parser hardening (run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909)). These older packaging runs do not verify the current source head. AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
 
-**Baseline score: 34 / 100 = 34%.**
+**Baseline score: 34 / 100 = 34%.**  
+**Change this run:** 0 percentage points. The offline workspace is a separate local-edition draft and has not met hosted-PWA or real-device acceptance.
 
 ## Current verification snapshot
 
 - GitHub Actions Micro Helper checks: **PASS** on PR #61 base/head snapshot, run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909) (52 project tests, 52 relay tests, embedded JavaScript syntax and Python compilation).
+- Local Python offline-workspace regression suite: **PASS** on draft PR #63 head `62ee676a4b0e9aedc8296e7a3c5ea4c373bdfc3b`, run [#45458039933](https://github.com/dominixe2/springtrap-/actions/runs/45458039933): 48 Node tests, 123 Python project tests and 11 relay tests — **182 passed, 0 failed**. Embedded browser JavaScript syntax and Python compilation passed; two non-blocking Starlette/httpx deprecation warnings remain. This does not verify the hosted PWA or real-browser IndexedDB behavior.
+- JARVIS PR #15: **OPEN / NOT RUN** — no Actions run is associated with head `f9c596bc2147df5002417a649383287cb35be1c8`; the latest available JARVIS run on main is historical and does not validate this PR.
 - Physical Android: **NOT RUN**.
 - Physical Windows pairing/automation: **NOT RUN**.
 - AppDeploy live publication and post-deploy QA: **BLOCKED** by the previously documented usage limit; source changes are not automatically live.
@@ -40,7 +43,7 @@ A criterion is **complete** only after implementation, relevant automated tests,
 ## Open release blockers
 
 1. Complete and test the Adaptive Trust Engine on every state-changing API route, including memory and preference mutations; prove fresh operation-bound confirmation and revocation.
-2. Finish encrypted offline memory/backup lifecycle and verify inspect, correct, export and delete behavior.
+2. Finish encrypted offline memory/backup lifecycle across the hosted PWA and local edition. Draft PR #63 covers only the local Python edition; verify real-browser IndexedDB/WebCrypto, export/import and recovery, and decide whether/when a separately reviewed hosted-PWA implementation is appropriate.
 3. Complete the original configurable Micro Helper identity/avatar and responsive user flows.
 4. Verify voice and chat on a physical Android device and Windows browser; keep browser/API limitations visible.
 5. Finish secure phone–Windows pairing with explicit origin configuration, authenticated sessions, transport protection and revocation; verify on both physical devices.
@@ -51,6 +54,7 @@ A criterion is **complete** only after implementation, relevant automated tests,
 ## Defect ledger
 
 - **Fixed in the open PR #61 branch (not merged yet):** embedded whitespace/control and invisible Unicode format characters in `MICRO_HELPER_ALLOWED_ORIGIN` could be normalized away by Python's `urlsplit`/IDNA conversion before validation. The parser now rejects whitespace and Unicode `C*` category characters before normalization; regression cases cover newline, tab, embedded ASCII space, non-breaking space, zero-width space/joiner and BOM. Commits: [d5f81ba](https://github.com/dominixe2/springtrap-/commit/d5f81baec2b0cedaa94e6d8a649f57742a1a8e20), [7a65f23](https://github.com/dominixe2/springtrap-/commit/7a65f236c24b7768e00abcf21f51f701763ce45c), [dc8342f](https://github.com/dominixe2/springtrap-/commit/dc8342fdc54b6f8e7870f83256bddcc600462a28) and [78ed354](https://github.com/dominixe2/springtrap-/commit/78ed3548870ea70544d88d95474cbccca1c59baa). CI: [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909) passed with 52 project tests and 52 relay tests.
+- **Security lifecycle addressed in draft PR #63 (not merged):** the encrypted vault core now emits an inactivity-lock notification; the local workspace clears decrypted DOM content and aborts a pending encrypted save on backgrounding/lock. Regression coverage verifies DOM clearing and transaction cancellation. This closes a new lifecycle risk before the offline workspace is exposed; real-browser timing is still NOT RUN.
 - **Open confirmed issues labeled `bug`:** 0 in Micro Helper; 0 in JARVIS as of this snapshot. This does not prove the absence of unreported runtime defects; physical-device testing remains outstanding.
 
 ## Known issue accounting
