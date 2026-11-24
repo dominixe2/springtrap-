@@ -168,6 +168,7 @@
     function handleSessionLock(candidate) {
       if (session !== candidate) return;
       session = null;
+      try { activeWorkspaceAbortController?.abort(); } catch {}
       unsubscribeSessionLock = null;
       clearPassphrase();
       clearWorkspace();
