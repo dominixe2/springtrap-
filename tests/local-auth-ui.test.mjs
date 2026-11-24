@@ -59,6 +59,7 @@ test("offline auth failure leaves only the encrypted vault accessible", async ()
     readyState: "complete",
     body,
     head,
+    documentElement: {dataset: {}},
     createElement: makeElement,
     querySelector(selector) {
       if (selector === "main") return main;
@@ -90,6 +91,7 @@ test("offline auth failure leaves only the encrypted vault accessible", async ()
 
   assert.ok(gate, "offline status banner should be visible");
   assert.equal(gate.attributes.role, "status");
+  assert.equal(document.documentElement.dataset.mhOfflineAuthUnavailable, "true");
   assert.equal(gate.attributes["aria-live"], "polite");
   assert.equal(card.attributes.role, undefined, "the offline notice is not a login dialog");
   assert.equal(card.attributes["aria-modal"], undefined);
