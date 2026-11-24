@@ -12,7 +12,7 @@ function createHarness() {
   const listeners = new Map();
   const calls = { cacheOpen: 0, cacheMatch: 0, cachePut: 0, fetch: 0 };
   const cache = {
-    async addAll() {},
+    async addAll(urls) { calls.addAllUrls = [...urls]; },
     async put() { calls.cachePut += 1; }
   };
   const caches = {
@@ -60,8 +60,20 @@ function createHarness() {
     return { intercepted, responsePromise };
   }
 
-  return { calls, dispatch };
+  return { calls, dispatch, listeners };
 }
+
+test("install precaches the encrypted offline vault modules with the app shell", async () => {
+  const {calls, listeners} = createHarness();
+  let installPromise;
+  listeners.get("install")({
+    waitUntil(value) { installPromise = Promise.resolve(value); }
+  });
+  await installPromise;
+  assert.ok(calls.addAllUrls.includes("/static/offline-vault.js"));
+  assert.ok(calls.addAllUrls.includes("/static/offline-vault-storage.js"));
+  assert.ok(calls.addAllUrls.includes("/static/offline-vault-ui.js"));
+});
 
 test("service worker never intercepts or caches same-origin private API reads", async () => {
   const { calls, dispatch } = createHarness();
