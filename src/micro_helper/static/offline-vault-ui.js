@@ -542,7 +542,10 @@
           backup.learning_plans.length + " plánů a " +
           backup.preferences.length + " preferencí."
         );
-        renderWorkspace();
+        if (!renderWorkspace() || !hasUnlockedSession()) {
+          setStatus("Trezor se během odemykání uzamkl. Pro další přístup zadej heslo znovu.");
+          return false;
+        }
         setStatus("Trezor odemčen. Po 5 minutách nečinnosti se automaticky uzamkne.");
         return true;
       } catch {
