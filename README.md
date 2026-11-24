@@ -52,3 +52,15 @@ uvicorn micro_helper.api:app --host 127.0.0.1 --port 8000
 ```
 
 Open http://127.0.0.1:8000 and run `pytest -q` for local tests.
+
+### Encrypted offline workspace (local Python edition)
+
+After the local API is available and you create an encrypted backup (or import one), the browser can reopen that copy without the API:
+
+- The vault uses AES-256-GCM with PBKDF2-SHA-256 and stores only the encrypted envelope in IndexedDB. The passphrase is not stored.
+- When the local API cannot verify a session, the normal chat and server-backed data stay locked. Only the separately scoped encrypted-vault panel remains interactive.
+- After entering the vault passphrase, you can view and edit memories and preferences, review the saved conversation history, and inspect saved tasks and learning plans. Clearing the offline history and deleting a memory or preference require explicit confirmation.
+- Every offline edit is re-encrypted before it is persisted. It changes only this browser's offline copy; there is no automatic merge or sync with the local SQLite database. Restoring that copy to the app requires the API to be online, an authenticated session and a separate confirmation.
+- The vault UI clears decrypted content on manual lock, inactivity timeout, page backgrounding and page unload. The service worker precaches the vault code but still never caches private `/v1/` API responses. Offline AI/chat is not provided.
+
+Real-browser IndexedDB timing and physical Android/Windows acceptance are still required; the automated Node controller tests do not replace those checks.
