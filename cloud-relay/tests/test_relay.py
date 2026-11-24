@@ -353,6 +353,9 @@ def test_configured_browser_origin_is_normalized(configured, expected):
         "https://micro\u200b-helper.test",
         "https://micro\u200d-helper.test",
         "https://micro\ufeff-helper.test",
+        " https://micro-helper.test",
+        "https://micro-helper.test ",
+        "https://[fe80::1%25eth0]",
     ],
 )
 def test_invalid_browser_origin_configuration_is_rejected(configured):
