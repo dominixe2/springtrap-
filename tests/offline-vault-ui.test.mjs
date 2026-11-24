@@ -73,7 +73,10 @@ function makeHarness(options = {}) {
     },
     addEventListener(name, callback) { this.listeners[name] = callback; }
   });
-  const documentImpl = {createElement: makeElement};
+  const documentImpl = {
+    createElement: makeElement,
+    documentElement: {dataset: options.offlineAuthUnavailable ? {mhOfflineAuthUnavailable: "true"} : {}}
+  };
   const elements = {
     passphrase: {value: ""},
     passphraseConfirm: {value: "", hidden: false, focus() { this.focused = true; }},
@@ -371,6 +374,19 @@ test("imports only an encrypted envelope and keeps the previous record on invali
   assert.equal(await h.controller.importEncryptedFile(valid), true);
   assert.deepEqual(h.getStored(), envelope);
   assert.equal(h.saves.length, 1);
+});
+
+test("offline auth state disables and rejects server backup and restore actions", async () => {
+  const h = makeHarness({existing: envelope, offlineAuthUnavailable: true});
+  await h.controller.refresh();
+  assert.equal(h.elements.create.disabled, true);
+  assert.equal(h.elements.restore.disabled, true);
+  assert.equal(await h.controller.createBackup(), false);
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true, "the separate local vault remains available");
+  assert.equal(await h.controller.restore(), false);
+  assert.equal(h.requests.length, 0, "offline workspace never attempts server restore");
+  assert.match(h.elements.status.textContent, /ověřené přihlášení/);
 });
 
 test("unlocked offline workspace reads and persists local-only memory and preferences", async () => {
