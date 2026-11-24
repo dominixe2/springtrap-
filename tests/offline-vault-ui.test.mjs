@@ -437,7 +437,7 @@ test("failed offline persistence rolls back the in-memory edit and preserves the
   assert.equal(await h.controller.addMemory("nesmí se uložit", "context"), false);
   assert.equal(h.getSessionData().memories.length, 1);
   assert.equal(h.getStored().ciphertext, envelope.ciphertext);
-  assert.match(h.elements.status.textContent, /původní šifrovaná kopie zůstala zachována/);
+  assert.match(h.elements.status.textContent, /původní šifrovaná kopie zůstala zachována/i);
 });
 
 test("inactivity lock clears decrypted offline workspace content from the page", async () => {
