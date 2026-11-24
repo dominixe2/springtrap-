@@ -1,5 +1,5 @@
 /* Micro Helper offline shell. API responses and personal data are never cached here. */
-const CACHE_NAME = "micro-helper-pwa-v5";
+const CACHE_NAME = "micro-helper-pwa-v6";
 const APP_SHELL = [
   "/",
   "/static/manifest.webmanifest",
