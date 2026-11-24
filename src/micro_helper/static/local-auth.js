@@ -208,22 +208,44 @@
     header.append(button);
   }
 
+  function markAuthReady() {
+    if (document.documentElement?.dataset) {
+      document.documentElement.dataset.mhAuthReady = "true";
+    }
+  }
+
   async function init() {
-    addStyles();
+    try {
+      addStyles();
+    } catch {
+      // Keep the initial document hidden if the gate cannot be styled safely.
+      return;
+    }
+
+    let state;
     try {
       const response = await fetch(endpoint + "/status", {
         credentials: "same-origin",
         cache: "no-store"
       });
       if (!response.ok) throw new Error("auth status unavailable");
-      const state = await response.json();
-      if (state.authenticated) {
-        addLogout();
-        return;
-      }
-      showGate(Boolean(state.configured));
+      state = await response.json();
     } catch {
-      showOfflineLock();
+      try {
+        showOfflineLock();
+        markAuthReady();
+      } catch {
+        // Fail closed: the document remains hidden if the offline gate cannot render.
+      }
+      return;
+    }
+
+    try {
+      if (state.authenticated) addLogout();
+      else showGate(Boolean(state.configured));
+      markAuthReady();
+    } catch {
+      // Fail closed: do not reveal private UI if authentication isolation failed.
     }
   }
 
