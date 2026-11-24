@@ -92,6 +92,7 @@ test("offline auth failure leaves only the encrypted vault accessible", async ()
   assert.ok(gate, "offline status banner should be visible");
   assert.equal(gate.attributes.role, "status");
   assert.equal(document.documentElement.dataset.mhOfflineAuthUnavailable, "true");
+  assert.equal(document.documentElement.dataset.mhAuthReady, "true");
   assert.equal(gate.attributes["aria-live"], "polite");
   assert.equal(card.attributes.role, undefined, "the offline notice is not a login dialog");
   assert.equal(card.attributes["aria-modal"], undefined);
@@ -107,6 +108,58 @@ test("offline auth failure leaves only the encrypted vault accessible", async ()
 });
 
 
+
+test("keeps the app shell hidden until authentication status is verified", async () => {
+  const header = makeElement("header");
+  const main = makeElement("main");
+  main.append(header);
+  const body = makeElement("body");
+  body.append(main);
+  const head = makeElement("head");
+  const document = {
+    readyState: "complete",
+    body,
+    head,
+    documentElement: {dataset: {}},
+    createElement: makeElement,
+    querySelector(selector) {
+      return selector === "header" ? header : null;
+    },
+    getElementById(id) {
+      return findById(body, id);
+    },
+    addEventListener() {},
+  };
+  let resolveStatus;
+  const pendingStatus = new Promise(resolve => { resolveStatus = resolve; });
+  const fetch = () => pendingStatus;
+  const window = {location: {reload() {}}};
+  const source = await readFile(
+    new URL("../src/micro_helper/static/local-auth.js", import.meta.url),
+    "utf8",
+  );
+  const html = await readFile(
+    new URL("../src/micro_helper/static/index.html", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(html, /html:not\\(\\[data-mh-auth-ready="true"\\]\\) body\\{visibility:hidden\\}/);
+  vm.runInNewContext(source, {document, window, URL, fetch});
+  await Promise.resolve();
+  assert.equal(document.documentElement.dataset.mhAuthReady, undefined);
+
+  resolveStatus({
+    ok: true,
+    async json() {
+      return {configured: true, authenticated: true};
+    },
+  });
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(document.documentElement.dataset.mhAuthReady, "true");
+  assert.ok(findById(body, "mh-local-auth-logout"));
+});
+
 test("setup and login gates expose an accessible modal and isolate the private page", async () => {
   for (const configured of [false, true]) {
     const header = makeElement("header");
@@ -118,6 +171,7 @@ test("setup and login gates expose an accessible modal and isolate the private p
       readyState: "complete",
       body,
       head,
+      documentElement: {dataset: {}},
       createElement: makeElement,
       querySelector(selector) {
         return selector === "header" ? header : null;
@@ -150,6 +204,7 @@ test("setup and login gates expose an accessible modal and isolate the private p
     const password = form?.children[0];
 
     assert.ok(gate, "authentication gate should be visible");
+    assert.equal(document.documentElement.dataset.mhAuthReady, "true");
     assert.equal(dialog?.attributes.role, "dialog");
     assert.equal(dialog?.attributes["aria-modal"], "true");
     assert.equal(dialog?.attributes["aria-labelledby"], "mh-local-auth-title");
