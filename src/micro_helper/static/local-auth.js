@@ -143,6 +143,9 @@
 
   function showOfflineLock() {
     if (document.getElementById("mh-local-auth-gate")) return;
+    if (document.documentElement?.dataset) {
+      document.documentElement.dataset.mhOfflineAuthUnavailable = "true";
+    }
     const gate = document.createElement("div");
     gate.id = "mh-local-auth-gate";
     const card = document.createElement("section");
