@@ -462,7 +462,7 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert icon.status_code == 200
     assert "<svg" in icon.text
     assert worker.status_code == 200
-    assert "micro-helper-pwa-v5" in worker.text
+    assert "micro-helper-pwa-v6" in worker.text
     assert "/static/local-auth.js" in worker.text
     assert "/static/offline-vault.js" in worker.text
     assert "/static/offline-vault-storage.js" in worker.text
