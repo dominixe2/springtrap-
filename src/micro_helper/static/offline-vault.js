@@ -203,8 +203,10 @@
     let activeData = data;
     let locked = false;
     let idleTimer = null;
+    const lockListeners = new Set();
 
     const lock = () => {
+      if (locked) return;
       if (idleTimer !== null) {
         globalThis.clearTimeout(idleTimer);
         idleTimer = null;
@@ -213,6 +215,11 @@
       activeKey = null;
       activeSalt = null;
       locked = true;
+      const listeners = Array.from(lockListeners);
+      lockListeners.clear();
+      for (const listener of listeners) {
+        try { listener(); } catch {}
+      }
     };
     const scheduleLock = () => {
       if (idleTimer !== null) globalThis.clearTimeout(idleTimer);
@@ -226,6 +233,15 @@
     scheduleLock();
     return Object.freeze({
       isLocked: () => locked,
+      onLock: callback => {
+        if (typeof callback !== "function") throw new TypeError("Posluchač uzamčení musí být funkce.");
+        if (locked) {
+          try { callback(); } catch {}
+          return () => {};
+        }
+        lockListeners.add(callback);
+        return () => lockListeners.delete(callback);
+      },
       read: () => {
         assertUnlocked();
         return cloneJson(activeData);
