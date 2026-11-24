@@ -59,6 +59,8 @@
       if (elements.passphraseConfirm) elements.passphraseConfirm.value = "";
     };
     const hasUnlockedSession = () => Boolean(session && !session.isLocked());
+    const isApiUnavailable = () =>
+      documentImpl?.documentElement?.dataset?.mhOfflineAuthUnavailable === "true";
 
     function clearWorkspace() {
       if (elements.workspace) elements.workspace.hidden = true;
@@ -82,10 +84,11 @@
 
     function updateControls() {
       const unlocked = hasUnlockedSession();
-      if (elements.create) elements.create.disabled = busy;
+      const apiUnavailable = isApiUnavailable();
+      if (elements.create) elements.create.disabled = busy || apiUnavailable;
       if (elements.unlock) elements.unlock.disabled = busy || !storedEnvelope;
       if (elements.lock) elements.lock.disabled = busy || !unlocked;
-      if (elements.restore) elements.restore.disabled = busy || !unlocked;
+      if (elements.restore) elements.restore.disabled = busy || !unlocked || apiUnavailable;
       if (elements.export) elements.export.disabled = busy || !storedEnvelope;
       if (elements.import) elements.import.disabled = busy;
       if (elements.workspace) elements.workspace.hidden = !unlocked;
@@ -405,6 +408,10 @@
 
     async function createBackup() {
       if (busy) return false;
+      if (isApiUnavailable()) {
+        setStatus("Vytvoření zálohy vyžaduje dostupné místní API a ověřené přihlášení.");
+        return false;
+      }
       if (pageHidden) {
         clearPassphrase();
         setStatus("Trezor lze zálohovat pouze při zobrazené aplikaci.");
@@ -565,6 +572,10 @@
 
     async function restore() {
       if (busy) return false;
+      if (isApiUnavailable()) {
+        setStatus("Obnova na server vyžaduje dostupné místní API a ověřené přihlášení.");
+        return false;
+      }
       if (!hasUnlockedSession()) {
         lock({silent: true});
         setStatus("Trezor je uzamčený. Nejdřív jej znovu odemkni.");
