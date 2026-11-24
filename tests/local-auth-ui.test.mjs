@@ -143,7 +143,7 @@ test("keeps the app shell hidden until authentication status is verified", async
     "utf8",
   );
 
-  assert.match(html, /html:not\\(\\[data-mh-auth-ready="true"\\]\\) body\\{visibility:hidden\\}/);
+  assert.ok(html.includes('html:not([data-mh-auth-ready="true"]) body{visibility:hidden}'));
   vm.runInNewContext(source, {document, window, URL, fetch});
   await Promise.resolve();
   assert.equal(document.documentElement.dataset.mhAuthReady, undefined);
