@@ -23,3 +23,9 @@ The current repository describes a local-first development service. The API curr
 
 ## Free hosting candidate
 Render free web services can host a Python/FastAPI service for a preview, but sleep after inactivity and use ephemeral storage. This makes them unsuitable for the current private-data service without security and durable storage changes. A static host such as Cloudflare Pages only applies if the client can be separated from its API; it does not solve the backend/auth/data requirements.
+
+
+## Local privacy regression coverage
+
+- The mobile-browser suite now fetches the private conversation endpoint online, switches the browser context offline, and asserts the response cannot be recovered from the PWA cache.
+- This is a local cache-boundary regression only. It does not establish API authentication, account isolation, or safe public hosting.
