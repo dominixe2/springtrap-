@@ -46,6 +46,7 @@
     let visibilityEpoch = 0;
     let activeCreateAbortController = null;
     let activeWorkspaceAbortController = null;
+    let activeImportAbortController = null;
     let unsubscribeSessionLock = null;
 
     const setStatus = value => {
@@ -629,32 +630,67 @@
 
     async function importEncryptedFile(file) {
       if (busy || !file) return false;
+      if (pageHidden) {
+        setStatus("Šifrovaný soubor lze importovat pouze při zobrazené aplikaci.");
+        return false;
+      }
       if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > MAX_IMPORT_BYTES) {
         setStatus("Šifrovaný soubor je prázdný nebo přesahuje limit 12 MiB.");
         return false;
       }
+      const operationVisibilityEpoch = visibilityEpoch;
+      let operationAbortController = null;
       busy = true;
       updateControls();
       try {
+        operationAbortController = abortControllerFactory();
+        if (!operationAbortController || !operationAbortController.signal ||
+            typeof operationAbortController.abort !== "function") {
+          throw new Error("abort");
+        }
+        activeImportAbortController = operationAbortController;
         const existing = await storage.load();
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch ||
+            operationAbortController.signal.aborted) {
+          throw new Error("hidden");
+        }
         if (existing && !confirmImpl(
           "Import nahradí šifrovanou zálohu uloženou v tomto prohlížeči. Pokračovat?"
         )) {
           setStatus("Import šifrované zálohy byl zrušen.");
           return false;
         }
-        const parsed = JSON.parse(await file.text());
+        const fileText = await file.text();
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch ||
+            operationAbortController.signal.aborted) {
+          throw new Error("hidden");
+        }
+        const parsed = JSON.parse(fileText);
         if (session) lock({silent: true});
-        await storage.save(parsed);
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch ||
+            operationAbortController.signal.aborted) {
+          throw new Error("hidden");
+        }
+        await storage.save(parsed, {signal: operationAbortController.signal});
         storedEnvelope = parsed;
         if (elements.passphraseConfirm) elements.passphraseConfirm.hidden = true;
         setSummary("Šifrovaný soubor byl uložen. Pro zobrazení souhrnu jej odemkni heslem.");
+        if (pageHidden || visibilityEpoch !== operationVisibilityEpoch ||
+            operationAbortController.signal.aborted) {
+          setStatus("Šifrovaná záloha byla uložena před uzamčením aplikace. Trezor zůstává uzamčený.");
+          return true;
+        }
         setStatus("Šifrovaná záloha byla importována.");
         return true;
       } catch {
-        setStatus("Soubor není platná podporovaná šifrovaná záloha. Původní záznam nebyl změněn.");
+        setStatus(pageHidden || visibilityEpoch !== operationVisibilityEpoch
+          ? "Import byl přerušen při přechodu aplikace do pozadí. Původní šifrovaná kopie zůstala zachována."
+          : "Soubor není platná podporovaná šifrovaná záloha. Původní záznam nebyl změněn.");
         return false;
       } finally {
+        if (activeImportAbortController === operationAbortController) {
+          activeImportAbortController = null;
+        }
         busy = false;
         updateControls();
       }
@@ -665,6 +701,7 @@
       if (pageHidden) {
         visibilityEpoch += 1;
         try { activeCreateAbortController?.abort(); } catch {}
+        try { activeImportAbortController?.abort(); } catch {}
         try { activeWorkspaceAbortController?.abort(); } catch {}
         lock();
       }
@@ -674,6 +711,7 @@
       visibilityEpoch += 1;
       pageHidden = true;
       try { activeCreateAbortController?.abort(); } catch {}
+      try { activeImportAbortController?.abort(); } catch {}
       try { activeWorkspaceAbortController?.abort(); } catch {}
       lock({silent: true});
       try { storage.close?.(); } catch {}
