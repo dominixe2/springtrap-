@@ -101,3 +101,31 @@ def test_chat_interaction_with_mocked_local_model(app_url):
         page.get_by_text("Testovací odpověď Mykly").wait_for(state="visible", timeout=5000)
         assert page.get_by_text("Testovací odpověď Mykly").is_visible()
         browser.close()
+
+
+def test_service_worker_does_not_cache_private_api_responses(app_url):
+    with sync_playwright() as p:
+        browser = launch_chromium(p)
+        context = browser.new_context()
+        page = context.new_page()
+        try:
+            page.goto(app_url, wait_until="networkidle")
+            page.reload(wait_until="networkidle")
+            page.wait_for_function("() => navigator.serviceWorker && navigator.serviceWorker.controller !== null")
+
+            online_status = page.evaluate("async () => (await fetch('/v1/conversations')).status")
+            assert online_status == 200
+
+            context.set_offline(True)
+            offline_result = page.evaluate("""async () => {
+                try {
+                    const response = await fetch('/v1/conversations');
+                    return {ok: true, status: response.status};
+                } catch {
+                    return {ok: false};
+                }
+            }""")
+            assert offline_result["ok"] is False, "Private API responses must not be served from the PWA cache while offline."
+        finally:
+            context.set_offline(False)
+            browser.close()
