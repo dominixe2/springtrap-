@@ -376,6 +376,45 @@ test("imports only an encrypted envelope and keeps the previous record on invali
   assert.equal(h.saves.length, 1);
 });
 
+test("does not import an encrypted envelope if the app backgrounds during file reading", async () => {
+  const h = makeHarness({existing: envelope});
+  let releaseRead;
+  let markReadStarted;
+  const readGate = new Promise(resolve => { releaseRead = resolve; });
+  const readStarted = new Promise(resolve => { markReadStarted = resolve; });
+  const file = {
+    size: 300,
+    async text() {
+      markReadStarted();
+      await readGate;
+      return JSON.stringify(envelope);
+    }
+  };
+  const pending = h.controller.importEncryptedFile(file);
+  await readStarted;
+  h.visibility.setState("hidden");
+  h.visibility.setState("visible");
+  releaseRead();
+  assert.equal(await pending, false);
+  assert.equal(h.saves.length, 0);
+  assert.deepEqual(h.getStored(), envelope);
+});
+
+test("aborts encrypted-envelope import if the app backgrounds during IndexedDB save", async () => {
+  let releaseSave;
+  const saveGate = new Promise(resolve => { releaseSave = resolve; });
+  const h = makeHarness({existing: envelope, saveGate});
+  const file = {size: 300, async text() { return JSON.stringify(envelope); }};
+  const pending = h.controller.importEncryptedFile(file);
+  await h.waitForSave();
+  h.visibility.setState("hidden");
+  h.visibility.setState("visible");
+  releaseSave();
+  assert.equal(await pending, false);
+  assert.equal(h.saves.length, 0);
+  assert.deepEqual(h.getStored(), envelope);
+});
+
 test("offline auth state disables and rejects server backup and restore actions", async () => {
   const h = makeHarness({existing: envelope, offlineAuthUnavailable: true});
   await h.controller.refresh();
