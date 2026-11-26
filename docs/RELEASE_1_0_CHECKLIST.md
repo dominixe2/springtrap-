@@ -1,9 +1,9 @@
 # Micro Helper 1.0 release checklist
 
-**Version:** 0.7  
-**Snapshot date:** 2026-11-24 (offline-workspace CI evidence added)  
+**Version:** 0.8  
+**Snapshot date:** 2026-11-26 (latest PR CI evidence refreshed)  
 **Baseline:** `micro-helper` branch at `02125f6b3d90055243a65bfc40800fdcae6827b8`  
-**Related release work:** [PR #63](https://github.com/dominixe2/springtrap-/pull/63) (draft, local Python offline workspace), [PR #55](https://github.com/dominixe2/springtrap-/pull/55), [PR #62](https://github.com/dominixe2/springtrap-/pull/62), [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [JARVIS PR #15](https://github.com/dominixe2/jarvis/pull/15), [PR #29](https://github.com/dominixe2/springtrap-/pull/29)
+**Related release work:** [PR #64](https://github.com/dominixe2/springtrap-/pull/64) (draft, auth bootstrap), [PR #66](https://github.com/dominixe2/springtrap-/pull/66) (draft, cache boundary), [PR #67](https://github.com/dominixe2/springtrap-/pull/67) (draft, workflow maintenance), [PR #63](https://github.com/dominixe2/springtrap-/pull/63) (draft, local Python offline workspace), [PR #55](https://github.com/dominixe2/springtrap-/pull/55), [PR #62](https://github.com/dominixe2/springtrap-/pull/62), [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [JARVIS PR #15](https://github.com/dominixe2/jarvis/pull/15), [PR #29](https://github.com/dominixe2/springtrap-/pull/29)
 
 ## Scoring rules
 
@@ -27,13 +27,13 @@ A criterion is **complete** only after implementation, relevant automated tests,
 | CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist. The base branch has green checks on commit `02125f6b3d` (runs [#42386005788](https://github.com/dominixe2/springtrap-/actions/runs/42386005788) and [#42386005761](https://github.com/dominixe2/springtrap-/actions/runs/42386005761)); historical Android APK and Windows Companion builds passed on older November 7 commits (runs [#42335382982](https://github.com/dominixe2/springtrap-/actions/runs/42335382982) and [#42339009955](https://github.com/dominixe2/springtrap-/actions/runs/42339009955)). The active relay PR chain passes hosted CI after the latest parser hardening (run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909)). These older packaging runs do not verify the current source head. AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
 
 **Baseline score: 34 / 100 = 34%.**  
-**Change this run:** 0 percentage points. The new offline workspace is still confined to the local Python edition and has not met hosted-PWA or real-device acceptance. The offline workspace is a separate local-edition draft and has not met hosted-PWA or real-device acceptance.
+**Change this run:** 0 percentage points (34/100 remains 34%). This refresh adds verified CI evidence only; none of the newly tested changes is merged or independently accepted on physical devices, so earned points are unchanged.
 
 ## Current verification snapshot
 
 - GitHub Actions Micro Helper checks: **PASS** on PR #61 base/head snapshot, run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909) (52 project tests, 52 relay tests, embedded JavaScript syntax and Python compilation).
 - Local Python offline-workspace regression suite: **PASS** on draft PR #63 head `375dcefa144aa21c122086c29b25bca1a6627343`, run [#45459534856](https://github.com/dominixe2/springtrap-/actions/runs/45459534856): 49 Node tests, 123 Python project tests and 11 relay tests — **183 passed, 0 failed**. The preceding code and checklist heads also passed runs [#45458039933](https://github.com/dominixe2/springtrap-/actions/runs/45458039933) and [#45458626071](https://github.com/dominixe2/springtrap-/actions/runs/45458626071). Embedded browser JavaScript syntax and Python compilation passed; two non-blocking Starlette/httpx deprecation warnings remain. Offline auth now disables and method-guards server backup/restore. This does not verify the hosted PWA or real-browser IndexedDB behavior.
-- JARVIS PR #15: **OPEN / NOT RUN** — no Actions run is associated with head `f9c596bc2147df5002417a649383287cb35be1c8`; the latest available JARVIS run on main is historical and does not validate this PR.
+- Micro Helper draft PR #64 auth-bootstrap head `9a2078d40f4626ed72d4a0065e54fa70f212b9f6`: **PASS**, run [#45461674788](https://github.com/dominixe2/springtrap-/actions/runs/45461674788) — 184 tests passed (50 Node, 123 Python, 11 relay); syntax/compile checks passed. This is stacked work and remains unmerged.\n- Micro Helper PR #66 cache-boundary head `41de7b8615dd91994507d08e341c9f288268046a`: **PASS**, core run [#45673450775](https://github.com/dominixe2/springtrap-/actions/runs/45673450775) and browser run [#45673450701](https://github.com/dominixe2/springtrap-/actions/runs/45673450701).\n- Micro Helper PR #67 workflow-maintenance head `ffcc80e47a55f9c3199e070d58dd4e84770687a2`: **PASS**, core run [#45827611194](https://github.com/dominixe2/springtrap-/actions/runs/45827611194) and mobile-browser run [#45827610692](https://github.com/dominixe2/springtrap-/actions/runs/45827610692). This only upgrades workflow actions/permissions; it is not application-feature evidence.\n- JARVIS PR #15: **OPEN / NOT RUN** — no Actions run is associated with head `f9c596bc2147df5002417a649383287cb35be1c8`; the latest available JARVIS run on main is historical and does not validate this PR.
 - Physical Android: **NOT RUN**.
 - Physical Windows pairing/automation: **NOT RUN**.
 - AppDeploy live publication and post-deploy QA: **BLOCKED** by the previously documented usage limit; source changes are not automatically live.
@@ -48,7 +48,7 @@ A criterion is **complete** only after implementation, relevant automated tests,
 4. Verify voice and chat on a physical Android device and Windows browser; keep browser/API limitations visible.
 5. Finish secure phone–Windows pairing with explicit origin configuration, authenticated sessions, transport protection and revocation; verify on both physical devices.
 6. Define and test a narrow JARVIS adapter contract; do not copy its UI, assets or broad computer-control surface.
-7. Publish only through the authorized release path after AppDeploy access is available; produce release-signed packages and complete post-deploy smoke tests.
+7. Publish only through the authorized release path after AppDeploy access is available; produce release-signed packages and complete post-deploy smoke tests.\n9. Protect `main` and `micro-helper` with required review/CI rules (issue #51); both are reported unprotected and this run did not change repository settings.
 8. Triage open repository issues separately from defects; do not count every roadmap issue as a bug.
 
 ## Defect ledger
@@ -61,6 +61,6 @@ A criterion is **complete** only after implementation, relevant automated tests,
 
 This checklist does not equate open issues with confirmed defects. At this snapshot the repository has open tracked work for branch protection (#51), encrypted offline vault (#44), self-completion (#28), memory/preference mutation authorization (#26), and a broader product integration request (#12). These are tracked blockers/requirements, not five independently verified bugs. New and fixed defects must be recorded by unique root cause in the run report and linked to a regression test or commit.
 
-## Update procedure
+## Run 11 evidence update — 2026-11-26\n\n- **Verified improvement:** refreshed this versioned acceptance checklist with the latest completed GitHub Actions evidence for PRs #64, #66 and #67. The results are linked above; no application-feature points were added because these PRs are unmerged and the device acceptance remains missing.\n- **Local validation:** NOT RUN — the execution environment cannot resolve `github.com` for a repository clone. The change is documentation-only; remote GitHub CI is the available validation path.\n- **Defects fixed this run:** 0. **New confirmed defects found:** 0. Open issue/roadmap items are not reclassified as bugs.\n\n## Update procedure
 
 For each development run, update this file in the same reviewable PR or a focused release-status PR. Increment the version, snapshot date and baseline commit; change earned points only when new implementation and evidence satisfy the scoring rules. Record each newly fixed defect once, keep open issues separate from bugs, and never mark version 1.0 released until every release gate above is satisfied.
