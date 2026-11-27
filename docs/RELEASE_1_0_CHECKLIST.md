@@ -1,0 +1,80 @@
+# Micro Helper 1.0 release checklist
+
+**Version:** 0.9  
+**Snapshot date:** 2026-11-27 (JARVIS security and repository protection state refreshed)  
+**Baseline:** `micro-helper` branch at `02125f6b3d90055243a65bfc40800fdcae6827b8`  
+**Related release work:** [PR #64](https://github.com/dominixe2/springtrap-/pull/64) (draft, auth bootstrap), [PR #66](https://github.com/dominixe2/springtrap-/pull/66) (draft, cache boundary), [PR #67](https://github.com/dominixe2/springtrap-/pull/67) (draft, workflow maintenance), [PR #63](https://github.com/dominixe2/springtrap-/pull/63) (draft, local Python offline workspace), [PR #55](https://github.com/dominixe2/springtrap-/pull/55), [PR #62](https://github.com/dominixe2/springtrap-/pull/62), [PR #61](https://github.com/dominixe2/springtrap-/pull/61), [JARVIS PR #15](https://github.com/dominixe2/jarvis/pull/15), [PR #29](https://github.com/dominixe2/springtrap-/pull/29), [JARVIS adapter contract](JARVIS_ADAPTER_CONTRACT.md)
+
+## Scoring rules
+
+The release score is the sum of verified points earned divided by 100 weighted points. A partial score is allowed only where working code exists and at least one relevant automated check or repository-level verification supports it. A proposal, mock-up, documentation-only design, open PR, untested code, or passing static build alone does not count as a completed user-facing capability. Open PRs are tracked as work in progress and are not treated as shipped.
+
+A criterion is **complete** only after implementation, relevant automated tests, security review where applicable, and the required platform/user-flow verification. Physical-device checks are called out separately. The score is intentionally conservative and is not a claim of release readiness.
+
+## Weighted acceptance criteria
+
+| Area | Weight | Earned | Status | Evidence and remaining acceptance |
+|---|---:|---:|---|---|
+| Responsive client, chat, history, settings and installable PWA | 15 | 8 | Partial | `hosted-app/`, `android-wrapper/`, service-worker and hosted-app workflows exist. The published AppDeploy snapshot is older than the GitHub source; Android/desktop real-device acceptance is not complete. See `README.md` and `hosted-app/RELEASE_VALIDATION.md`. |
+| Original Micro Helper identity, configurable personality and avatar | 5 | 0 | Missing | `docs/PRODUCT_SPEC.md` defines optional identity/mascot settings, but the original avatar implementation remains in open PR #15 and is not credited as shipped. |
+| Czech-first text and honest voice input/output | 8 | 3 | Partial | Browser voice controls and Czech defaults are documented in `README.md` and `docs/SECURITY.md`. Browser support, installed Czech voices, microphone permissions and background limitations still require platform verification. |
+| Modular AI providers with local/offline fallback and truthful limits | 10 | 4 | Partial | The local FastAPI/Ollama path and hosted cloud AI path exist. Local inference requires a configured model/runtime; cloud AI and hosted features require network/account/provider quota. Provider switching and fallback behavior still need end-to-end tests. |
+| User-controlled memory, preferences, correction and deletion | 10 | 3 | Partial | Account-scoped state and private notes/preferences are present in the hosted source. Draft PR #63 adds encrypted offline memory/preference editing and history review/clear to the separate local Python edition, stacked on PR #55; it does not modify the hosted app or provide sync. The hosted browser-local fallback remains unencrypted, and real-browser/target-platform acceptance is still NOT RUN, so no points are added yet. |
+| Tools, file handling, search, analysis and durable task lifecycle | 10 | 4 | Partial | Search/image-related handlers and a durable SQLite task queue exist. The current worker supports only the bounded `agent.draft` task; Windows Companion actions remain a small fixed allowlist. See `docs/ARCHITECTURE.md`. |
+| Adaptive Trust Engine, scoped permissions, confirmation and audit | 18 | 4 | Partial | Existing local API/origin protections and restricted Windows action handling provide a baseline. Full mutation-route enforcement, memory/preference mutation coverage and runtime regression proof remain open work (issues #26 and PRs #31–#37, #56). Learned behavior must never grant permission. |
+| Authenticated phone–Windows pairing, encrypted transport, revocation and least privilege | 10 | 4 | Partial | Pairing codes, separate tokens, session expiry/revocation and a fixed action allowlist exist in the relay/Windows Companion. The staging relay is in-memory and can lose sessions on restart; browser-origin configuration is still under review in PR #61. Physical Android/Windows pairing is not verified. |
+| Safe JARVIS capability reuse through an explicit adapter boundary | 5 | 0 | Missing | Draft contract in `docs/JARVIS_ADAPTER_CONTRACT.md` defines the future local-only adapter and acceptance tests. No adapter code is implemented; JARVIS PRs #13–#15 are unmerged and have no checks on their current heads. No points are credited. |
+| CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist. The base branch has green checks on commit `02125f6b3d` (runs [#42386005788](https://github.com/dominixe2/springtrap-/actions/runs/42386005788) and [#42386005761](https://github.com/dominixe2/springtrap-/actions/runs/42386005761)); historical Android APK and Windows Companion builds passed on older November 7 commits (runs [#42335382982](https://github.com/dominixe2/springtrap-/actions/runs/42335382982) and [#42339009955](https://github.com/dominixe2/springtrap-/actions/runs/42339009955)). The active relay PR chain passes hosted CI after the latest parser hardening (run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909)). These older packaging runs do not verify the current source head. AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
+
+**Baseline score: 34 / 100 = 34%.**  
+**Change this run:** 0 percentage points (34/100 remains 34%). This run adds a draft adapter boundary and refreshes repository/CI evidence; neither is shipped functionality or physical-device acceptance, so earned points are unchanged.
+
+## Current verification snapshot
+
+- GitHub Actions Micro Helper checks: **PASS** on PR #61 base/head snapshot, run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909) (52 project tests, 52 relay tests, embedded JavaScript syntax and Python compilation).
+- Local Python offline-workspace regression suite: **PASS** on draft PR #63 head `375dcefa144aa21c122086c29b25bca1a6627343`, run [#45459534856](https://github.com/dominixe2/springtrap-/actions/runs/45459534856): 49 Node tests, 123 Python project tests and 11 relay tests — **183 passed, 0 failed**. The preceding code and checklist heads also passed runs [#45458039933](https://github.com/dominixe2/springtrap-/actions/runs/45458039933) and [#45458626071](https://github.com/dominixe2/springtrap-/actions/runs/45458626071). Embedded browser JavaScript syntax and Python compilation passed; two non-blocking Starlette/httpx deprecation warnings remain. Offline auth now disables and method-guards server backup/restore. This does not verify the hosted PWA or real-browser IndexedDB behavior.
+- Micro Helper draft PR #64 auth-bootstrap head `9a2078d40f4626ed72d4a0065e54fa70f212b9f6`: **PASS**, run [#45461674788](https://github.com/dominixe2/springtrap-/actions/runs/45461674788) — 184 tests passed (50 Node, 123 Python, 11 relay); syntax/compile checks passed. This is stacked work and remains unmerged.
+- Micro Helper PR #66 cache-boundary head `41de7b8615dd91994507d08e341c9f288268046a`: **PASS**, core run [#45673450775](https://github.com/dominixe2/springtrap-/actions/runs/45673450775) and browser run [#45673450701](https://github.com/dominixe2/springtrap-/actions/runs/45673450701).
+- Micro Helper PR #67 workflow-maintenance head `ffcc80e47a55f9c3199e070d58dd4e84770687a2`: **PASS**, core run [#45827611194](https://github.com/dominixe2/springtrap-/actions/runs/45827611194) and mobile-browser run [#45827610692](https://github.com/dominixe2/springtrap-/actions/runs/45827610692). This only upgrades workflow actions/permissions; it is not application-feature evidence.
+- JARVIS PR #13 (BuildPilot foundation), #14 (workspace/tool hardening) and #15 (exact Origin/Host binding): **OPEN / DRAFT / NOT RUN** on current heads `2bad1ff4659aa41c3d1a434cdc6572a46d48fca4`, `91cef35e91cf4c043648790aa17a6f2feb561482` and `f5c5f5239240338b7ea5106a66d0465ed1c4248d`. Combined status checks are empty on all three. The latest available JARVIS main CI run [#39864922344](https://github.com/dominixe2/jarvis/actions/runs/39864922344) is historical (2026-10-22) and does not validate these PRs.
+- Physical Android: **NOT RUN**.
+- Physical Windows pairing/automation: **NOT RUN**.
+- AppDeploy live publication and post-deploy QA: **BLOCKED** by the previously documented usage limit; source changes are not automatically live.
+- Cloudflare Durable Object relay deployment: **NOT RUN**.
+- JARVIS-to-Micro-Helper adapter acceptance: **NOT RUN**.
+
+## Open release blockers
+
+1. Complete and test the Adaptive Trust Engine on every state-changing API route, including memory and preference mutations; prove fresh operation-bound confirmation and revocation.
+2. Finish encrypted offline memory/backup lifecycle across the hosted PWA and local edition. Draft PR #63 covers only the local Python edition; verify real-browser IndexedDB/WebCrypto, export/import and recovery, and decide whether/when a separately reviewed hosted-PWA implementation is appropriate.
+3. Complete the original configurable Micro Helper identity/avatar and responsive user flows.
+4. Verify voice and chat on a physical Android device and Windows browser; keep browser/API limitations visible.
+5. Finish secure phone–Windows pairing with explicit origin configuration, authenticated sessions, transport protection and revocation; verify on both physical devices.
+6. Review JARVIS PR #13–#15 and implement only a narrow, local-only adapter after CI and security acceptance. The draft contract in `docs/JARVIS_ADAPTER_CONTRACT.md` is not code or release evidence; do not copy its UI, assets or broad computer-control surface.
+7. Triage open repository issues separately from defects; do not count every roadmap issue as a bug.
+8. Protect `main` and `micro-helper` with required review/CI rules (issue #51); both are reported unprotected and this run did not change repository settings.
+9. Publish only through the authorized release path after AppDeploy access is available; produce release-signed packages and complete post-deploy smoke tests.
+
+## Defect ledger
+
+- **Fixed in the open PR #61 branch (not merged yet):** embedded whitespace/control and invisible Unicode format characters in `MICRO_HELPER_ALLOWED_ORIGIN` could be normalized away by Python's `urlsplit`/IDNA conversion before validation. The parser now rejects whitespace and Unicode `C*` category characters before normalization; regression cases cover newline, tab, embedded ASCII space, non-breaking space, zero-width space/joiner and BOM. Commits: [d5f81ba](https://github.com/dominixe2/springtrap-/commit/d5f81baec2b0cedaa94e6d8a649f57742a1a8e20), [7a65f23](https://github.com/dominixe2/springtrap-/commit/7a65f236c24b7768e00abcf21f51f701763ce45c), [dc8342f](https://github.com/dominixe2/springtrap-/commit/dc8342fdc54b6f8e7870f83256bddcc600462a28) and [78ed354](https://github.com/dominixe2/springtrap-/commit/78ed3548870ea70544d88d95474cbccca1c59baa). CI: [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909) passed with 52 project tests and 52 relay tests.
+- **Security lifecycle addressed in draft PR #63 (not merged):** the encrypted vault core now emits an inactivity-lock notification; the local workspace clears decrypted DOM content and aborts a pending encrypted save on backgrounding/lock. Server backup/restore are disabled and method-guarded while offline authentication is unavailable. Regression coverage verifies DOM clearing, transaction cancellation and no API calls from offline mode. This closes lifecycle and offline-action risks before the workspace is exposed; real-browser timing is still NOT RUN.
+- **Open confirmed issues labeled `bug`:** 0 in Micro Helper; 0 in JARVIS as of this snapshot. This does not prove the absence of unreported runtime defects; physical-device testing remains outstanding.
+
+## Known issue accounting
+
+This checklist does not equate open issues with confirmed defects. At this snapshot the repository has open tracked work for branch protection (#51), encrypted offline vault (#44), self-completion (#28), memory/preference mutation authorization (#26), and a broader product integration request (#12). The fresh query returned zero open issues labelled `bug` in Micro Helper and JARVIS, but that is not proof of no defects. These tracked items are requirements/blockers, not confirmed bugs. New and fixed defects must be recorded by unique root cause in the run report and linked to a regression test or commit.
+
+## Run 12 evidence update — 2026-11-27
+
+- **Repository state verified:** Micro Helper `main` is still at `6724afedeb5d36069cc67363daf932db1bd0a2aa` (2026-11-05); `micro-helper` is at `02125f6b3d90055243a65bfc40800fdcae6827b8` (2026-11-07). The active release checklist branch remains reviewable through PR #29.
+- **CI evidence refreshed:** PR #67 head `ffcc80e47a55f9c3199e070d58dd4e84770687a2` has PASS core checks [#45827611194](https://github.com/dominixe2/springtrap-/actions/runs/45827611194) and PASS mobile-browser checks [#45827610692](https://github.com/dominixe2/springtrap-/actions/runs/45827610692). PR #66 core and mobile-browser checks also remain PASS [#45673450775](https://github.com/dominixe2/springtrap-/actions/runs/45673450775), [#45673450701](https://github.com/dominixe2/springtrap-/actions/runs/45673450701). These are unmerged changes and do not earn release points.
+- **JARVIS boundary:** PRs #13, #14 and #15 are current draft security work; no status checks are attached to their current heads. The latest main CI is from 2026-10-22 and does not validate them. Added the draft adapter contract in `docs/JARVIS_ADAPTER_CONTRACT.md` to prevent premature code reuse; no feature points are added.
+- **Branch protection rechecked:** Micro Helper `main` and `micro-helper` both report `protected=false`; the rulesets API returned an empty list. JARVIS `main` also reports `protected=false` and its rulesets list is empty. Repository settings were not changed.
+- **Defect accounting:** zero open issues labelled `bug` returned for Micro Helper or JARVIS. **Defects fixed this run: 0. New confirmed defects: 0.** Open roadmap/security PRs are not counted as bugs.
+- **Score:** remains **34/100 (34%)**. Documentation/contract work, CI-only workflow maintenance and unmerged PRs do not earn points. Physical Android/Windows acceptance, release packaging, live hosting, auth/isolation, memory lifecycle and adapter integration remain unverified.
+- **Local validation:** NOT RUN — no repository checkout/runtime was available in this environment. GitHub CI is the remote verification path; this documentation commit must still pass its checks.
+
+## Update procedure
+
+For each development run, update this file in the same reviewable PR or a focused release-status PR. Increment the version, snapshot date and baseline commit; change earned points only when new implementation and evidence satisfy the scoring rules. Record each newly fixed defect once, keep open issues separate from bugs, and never mark version 1.0 released until every release gate above is satisfied.
