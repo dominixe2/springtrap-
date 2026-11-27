@@ -27,7 +27,7 @@ A criterion is **complete** only after implementation, relevant automated tests,
 | CI, security review, release packaging and supported-platform acceptance | 9 | 4 | Partial | GitHub checks and Android/Windows packaging workflows exist. The base branch has green checks on commit `02125f6b3d` (runs [#42386005788](https://github.com/dominixe2/springtrap-/actions/runs/42386005788) and [#42386005761](https://github.com/dominixe2/springtrap-/actions/runs/42386005761)); historical Android APK and Windows Companion builds passed on older November 7 commits (runs [#42335382982](https://github.com/dominixe2/springtrap-/actions/runs/42335382982) and [#42339009955](https://github.com/dominixe2/springtrap-/actions/runs/42339009955)). The active relay PR chain passes hosted CI after the latest parser hardening (run [#45237469909](https://github.com/dominixe2/springtrap-/actions/runs/45237469909)). These older packaging runs do not verify the current source head. AppDeploy publication is blocked by its usage limit, Android package is debug-signed, Windows EXE is unsigned, and physical-device acceptance is outstanding. |
 
 **Baseline score: 34 / 100 = 34%.**  
-**Change this run:** 0 percentage points (34/100 remains 34%). This refresh adds verified CI evidence only; none of the newly tested changes is merged or independently accepted on physical devices, so earned points are unchanged.
+**Change this run:** 0 percentage points (34/100 remains 34%). This run adds a draft adapter boundary and refreshes repository/CI evidence; neither is shipped functionality or physical-device acceptance, so earned points are unchanged.
 
 ## Current verification snapshot
 
@@ -51,9 +51,9 @@ A criterion is **complete** only after implementation, relevant automated tests,
 4. Verify voice and chat on a physical Android device and Windows browser; keep browser/API limitations visible.
 5. Finish secure phone–Windows pairing with explicit origin configuration, authenticated sessions, transport protection and revocation; verify on both physical devices.
 6. Review JARVIS PR #13–#15 and implement only a narrow, local-only adapter after CI and security acceptance. The draft contract in `docs/JARVIS_ADAPTER_CONTRACT.md` is not code or release evidence; do not copy its UI, assets or broad computer-control surface.
-7. Publish only through the authorized release path after AppDeploy access is available; produce release-signed packages and complete post-deploy smoke tests.
-9. Protect `main` and `micro-helper` with required review/CI rules (issue #51); both are reported unprotected and this run did not change repository settings.
-8. Triage open repository issues separately from defects; do not count every roadmap issue as a bug.
+7. Triage open repository issues separately from defects; do not count every roadmap issue as a bug.
+8. Protect `main` and `micro-helper` with required review/CI rules (issue #51); both are reported unprotected and this run did not change repository settings.
+9. Publish only through the authorized release path after AppDeploy access is available; produce release-signed packages and complete post-deploy smoke tests.
 
 ## Defect ledger
 
