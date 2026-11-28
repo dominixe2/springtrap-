@@ -247,9 +247,35 @@ async def restore_backup(request: RestoreRequest):
             if type(completed) not in (bool, int) or completed not in (0, 1, False, True):
                 raise ValueError()
 
-        memory_rows = [(record_id(x["id"]), str(x["content"]), str(x["category"]), str(x["created_at"])) for x in memories]
-        message_rows = [(record_id(x["id"]), x["role"], str(x["content"]), str(x["created_at"])) for x in messages]
-        task_rows = [(record_id(x["id"]), str(x["title"]), str(x.get("description", "")), x.get("due_at"), int(bool(x.get("completed", 0))), str(x["created_at"])) for x in tasks]
+        # Validate record shapes and text fields before any existing data is deleted.
+        # Avoid coercing malformed backup values to strings or allowing .get() on
+        # non-object task records to escape as an internal 500 response.
+        for collection in (memories, messages, tasks):
+            if any(not isinstance(item, dict) for item in collection):
+                raise ValueError()
+
+        def text_value(value):
+            if not isinstance(value, str):
+                raise ValueError()
+            return value
+
+        memory_rows = [(record_id(x["id"]), text_value(x["content"]), text_value(x["category"]), text_value(x["created_at"])) for x in memories]
+        message_rows = [(record_id(x["id"]), text_value(x["role"]), text_value(x["content"]), text_value(x["created_at"])) for x in messages]
+        task_rows = [
+            (
+                record_id(x["id"]),
+                text_value(x["title"]),
+                text_value(x.get("description", "")),
+                x.get("due_at"),
+                int(bool(x.get("completed", 0))),
+                text_value(x["created_at"]),
+            )
+            for x in tasks
+        ]
+        if any(row[4] is not None and not isinstance(row[4], str) for row in task_rows):
+            raise ValueError()
+        if any(x.get("due_at") is not None and not isinstance(x.get("due_at"), str) for x in tasks):
+            raise ValueError()
         if any(row[1] not in ("user", "assistant") for row in message_rows):
             raise ValueError()
         if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows) or any(not row[1] for row in task_rows):
