@@ -346,3 +346,64 @@ def test_restore_rejects_non_integer_record_ids_without_replacing_data(collectio
     assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == [
         "Zachovat původní úkol"
     ]
+
+
+
+@pytest.mark.parametrize("collection,bad_record", [
+    ("memories", None),
+    ("messages", 7),
+    ("tasks", None),
+])
+def test_restore_rejects_non_object_records_without_replacing_data(collection, bad_record):
+    client.put("/v1/profile", json={"agent_name": "Zachovat profil", "language": "cs-CZ", "style": "stručný"})
+    client.post("/v1/memories", json={"content": "Zachovat paměť", "category": "preference"})
+    client.post("/v1/tasks", json={"title": "Zachovat úkol"})
+    with api.database() as db:
+        db.execute("INSERT INTO messages(role, content, created_at) VALUES (?, ?, ?)", ("user", "Zachovat zprávu", "now"))
+        db.commit()
+    backup = client.get("/v1/backup").json()
+    backup[collection] = [bad_record]
+
+    response = client.post("/v1/backup/restore", json={"backup": backup, "confirm_replace": True})
+
+    assert response.status_code == 422
+    assert client.get("/v1/profile").json()["agent_name"] == "Zachovat profil"
+    assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Zachovat paměť"]
+    assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == ["Zachovat úkol"]
+    assert [item["content"] for item in client.get("/v1/conversations").json()["messages"]] == ["Zachovat zprávu"]
+
+
+@pytest.mark.parametrize("collection,field,bad_value", [
+    ("memories", "content", {"not": "text"}),
+    ("memories", "category", ""),
+    ("memories", "created_at", ""),
+    ("messages", "created_at", ["not", "text"]),
+    ("messages", "created_at", ""),
+    ("tasks", "due_at", 123),
+    ("tasks", "description", {"not": "text"}),
+    ("tasks", "created_at", ""),
+    ("profile", "agent_name", ""),
+    ("profile", "language", "x"),
+    ("profile", "style", ""),
+    ("profile", "updated_at", ""),
+])
+def test_restore_rejects_wrong_field_types_without_replacing_data(collection, field, bad_value):
+    client.put("/v1/profile", json={"agent_name": "Zachovat profil", "language": "cs-CZ", "style": "stručný"})
+    client.post("/v1/memories", json={"content": "Zachovat paměť", "category": "preference"})
+    client.post("/v1/tasks", json={"title": "Zachovat úkol", "description": "Popis", "due_at": "2026-01-01"})
+    with api.database() as db:
+        db.execute("INSERT INTO messages(role, content, created_at) VALUES (?, ?, ?)", ("user", "Zachovat zprávu", "now"))
+        db.commit()
+    backup = client.get("/v1/backup").json()
+    if collection == "profile":
+        backup["profile"][field] = bad_value
+    else:
+        backup[collection][0][field] = bad_value
+
+    response = client.post("/v1/backup/restore", json={"backup": backup, "confirm_replace": True})
+
+    assert response.status_code == 422
+    assert client.get("/v1/profile").json()["agent_name"] == "Zachovat profil"
+    assert [item["content"] for item in client.get("/v1/memories").json()["memories"]] == ["Zachovat paměť"]
+    assert [item["title"] for item in client.get("/v1/tasks").json()["tasks"]] == ["Zachovat úkol"]
+    assert [item["content"] for item in client.get("/v1/conversations").json()["messages"]] == ["Zachovat zprávu"]
