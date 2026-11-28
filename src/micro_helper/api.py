@@ -242,18 +242,19 @@ async def restore_backup(request: RestoreRequest):
                 raise ValueError()
             return value
 
+        # Validate record shapes before accessing nested fields so malformed
+        # records fail with a client error and cannot reach the replacement phase.
+        for collection in (memories, messages, tasks):
+            if any(not isinstance(item, dict) for item in collection):
+                raise ValueError()
+
         for task in tasks:
             completed = task.get("completed", 0)
             if type(completed) not in (bool, int) or completed not in (0, 1, False, True):
                 raise ValueError()
 
-        # Validate record shapes and text fields before any existing data is deleted.
-        # Avoid coercing malformed backup values to strings or allowing .get() on
-        # non-object task records to escape as an internal 500 response.
-        for collection in (memories, messages, tasks):
-            if any(not isinstance(item, dict) for item in collection):
-                raise ValueError()
-
+        # Validate text fields before any existing data is deleted; avoid coercing
+        # malformed backup values to strings.
         def text_value(value):
             if not isinstance(value, str):
                 raise ValueError()
