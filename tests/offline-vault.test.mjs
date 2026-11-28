@@ -120,6 +120,20 @@ test("locks automatically after the configured inactivity timeout", async () => 
   assert.throws(() => session.read(), /trezor je uzamčený/);
 });
 
+test("notifies subscribers when inactivity locks an unlocked session", async () => {
+  const envelope = await vault.create(passphrase, payload);
+  const session = await vault.unlock(passphrase, envelope, { idleTimeoutMs: 12000 });
+  let notifications = 0;
+  const unsubscribe = session.onLock(() => { notifications += 1; });
+  const timerId = Array.from(activeTimers.keys()).at(-1);
+  activeTimers.get(timerId).callback();
+  assert.equal(session.isLocked(), true);
+  assert.equal(notifications, 1);
+  unsubscribe();
+  session.lock();
+  assert.equal(notifications, 1, "a lock notification is delivered only once");
+});
+
 test("rejects unsafe or unsupported inactivity timeout values", async () => {
   const envelope = await vault.create(passphrase, payload);
   await assert.rejects(() => vault.unlock(passphrase, envelope, { idleTimeoutMs: 999 }), /mezi 1 sekundou/);

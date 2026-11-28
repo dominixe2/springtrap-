@@ -462,8 +462,11 @@ def test_pwa_manifest_icon_and_service_worker_are_served():
     assert icon.status_code == 200
     assert "<svg" in icon.text
     assert worker.status_code == 200
-    assert "micro-helper-pwa-v4" in worker.text
+    assert "micro-helper-pwa-v5" in worker.text
     assert "/static/local-auth.js" in worker.text
+    assert "/static/offline-vault.js" in worker.text
+    assert "/static/offline-vault-storage.js" in worker.text
+    assert "/static/offline-vault-ui.js" in worker.text
     assert 'url.pathname.startsWith("/v1/")' in worker.text
 
 
@@ -472,6 +475,9 @@ def test_home_page_locks_private_data_when_offline():
     response = client.get("/")
     assert response.status_code == 200
     assert "Offline private data is locked" in response.text
+    assert 'id="offlineVaultAccess"' in response.text
+    assert 'id="offlineVaultWorkspace"' in response.text
+    assert 'id="offlineWorkspaceMemoryForm"' in response.text
     assert "micro_helper_offline_v1" not in response.text
     assert "status: 503" in response.text
 

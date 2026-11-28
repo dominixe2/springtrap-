@@ -14,7 +14,12 @@
       "#mh-local-auth-card button{padding:12px;border:1px solid #328e80;border-radius:10px;background:#23695f;color:#fff;font:inherit;font-weight:650;cursor:pointer}",
       "#mh-local-auth-error{min-height:1.4em;color:#ffb4a8;font-size:13px}",
       "#mh-local-auth-logout{margin-left:8px;padding:6px 10px;border:1px solid #344866;border-radius:9px;background:#18263b;color:#edf4ff;font:inherit;font-size:12px;cursor:pointer}",
-      "#mh-local-auth-offline{margin:8px 0;padding:10px 12px;border:1px solid #6a5734;border-radius:10px;color:#f0d9a6;background:#302719;font-size:13px}"
+      "#mh-local-auth-offline{margin:8px 0;padding:10px 12px;border:1px solid #6a5734;border-radius:10px;color:#f0d9a6;background:#302719;font-size:13px}",
+      "#mh-local-auth-gate.mh-offline-banner{position:sticky;inset:auto;z-index:99999;display:block;padding:10px 12px;background:#302719;border-bottom:1px solid #6a5734;color:#f0d9a6;backdrop-filter:none}",
+      "#mh-local-auth-gate.mh-offline-banner #mh-local-auth-card{width:min(900px,100%);margin:0 auto;padding:10px 14px;box-shadow:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px}",
+      "#mh-local-auth-gate.mh-offline-banner h2{font-size:15px;margin:0}",
+      "#mh-local-auth-gate.mh-offline-banner p{margin:0;flex:1}",
+      "#mh-local-auth-gate.mh-offline-banner small{display:block;width:100%}"
     ].join("");
     document.head.append(style);
   }
@@ -27,6 +32,29 @@
       }
     }
     document.body.style.overflow = "hidden";
+  }
+
+  function isolateOfflinePage(gate) {
+    const main = document.querySelector("main");
+    const offlineAccess = document.getElementById("offlineVaultAccess");
+    if (!main || !offlineAccess || !Array.from(main.children).includes(offlineAccess)) return false;
+    for (const child of document.body.children) {
+      if (child !== gate && child !== main) {
+        child.setAttribute("inert", "");
+        child.setAttribute("aria-hidden", "true");
+      }
+    }
+    for (const child of main.children) {
+      if (child === offlineAccess) {
+        child.removeAttribute("inert");
+        child.removeAttribute("aria-hidden");
+      } else {
+        child.setAttribute("inert", "");
+        child.setAttribute("aria-hidden", "true");
+      }
+    }
+    document.body.style.overflow = "";
+    return true;
   }
 
   function showGate(configured) {
@@ -115,30 +143,44 @@
 
   function showOfflineLock() {
     if (document.getElementById("mh-local-auth-gate")) return;
+    if (document.documentElement?.dataset) {
+      document.documentElement.dataset.mhOfflineAuthUnavailable = "true";
+    }
     const gate = document.createElement("div");
     gate.id = "mh-local-auth-gate";
     const card = document.createElement("section");
     card.id = "mh-local-auth-card";
-    card.setAttribute("role", "dialog");
-    card.setAttribute("aria-modal", "true");
     card.setAttribute("aria-labelledby", "mh-local-auth-offline-title");
     card.setAttribute("aria-describedby", "mh-local-auth-offline-description");
     const title = document.createElement("h2");
     title.id = "mh-local-auth-offline-title";
-    title.textContent = "Offline data jsou uzamčená";
+    title.textContent = "Offline režim — serverová data jsou uzamčená";
     const description = document.createElement("p");
     description.id = "mh-local-auth-offline-description";
-    description.textContent = "Místní API není dostupné, proto nelze ověřit přihlášení. Soukromá paměť, historie, úkoly a plány se offline nenačítají. Starší offline data zůstávají zachována, ale aplikace je zatím nečte ani nemění.";
+    description.textContent = "Místní API není dostupné, proto nelze ověřit přihlášení. Běžný chat a serverová soukromá data zůstávají uzamčené. Samostatně můžeš otevřít pouze šifrovanou offline kopii.";
     const note = document.createElement("small");
-    note.textContent = "Offline soukromé úložiště bude znovu povoleno až po dokončení šifrovaného úložiště.";
+    note.textContent = "Offline kopie vyžaduje vlastní heslo. Změny se ukládají jen do tohoto prohlížeče a automaticky se nesynchronizují.";
     const retry = document.createElement("button");
     retry.type = "button";
-    retry.textContent = "Zkusit znovu";
+    retry.textContent = "Znovu ověřit přihlášení";
     retry.addEventListener("click", () => window.location.reload());
     card.append(title, description, note, retry);
+    gate.className = "mh-offline-banner";
+    gate.setAttribute("role", "status");
+    gate.setAttribute("aria-live", "polite");
     gate.append(card);
-    document.body.append(gate);
-    isolateBackground(gate);
+    const main = document.querySelector("main");
+    if (main && typeof document.body.insertBefore === "function") {
+      document.body.insertBefore(gate, main);
+    } else {
+      document.body.append(gate);
+    }
+    if (!isolateOfflinePage(gate)) {
+      gate.className = "";
+      card.setAttribute("role", "dialog");
+      card.setAttribute("aria-modal", "true");
+      isolateBackground(gate);
+    }
     retry.focus();
   }
 

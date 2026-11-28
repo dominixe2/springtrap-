@@ -55,6 +55,28 @@ function makeHarness(options = {}) {
   };
   let reloads = 0;
   let locked = false;
+  let activeSession = null;
+  let sessionData = null;
+  let confirmImpl = options.confirmImpl ?? (() => true);
+  let promptImpl = options.promptImpl ?? (() => "upravená offline hodnota");
+  const makeElement = (tagName = "div") => ({
+    tagName: tagName.toUpperCase(),
+    value: "",
+    textContent: "",
+    hidden: false,
+    disabled: false,
+    children: [],
+    listeners: {},
+    replaceChildren(...children) {
+      this.children = children;
+      if (this.tagName === "SELECT") this.value = children[0]?.value ?? "";
+    },
+    addEventListener(name, callback) { this.listeners[name] = callback; }
+  });
+  const documentImpl = {
+    createElement: makeElement,
+    documentElement: {dataset: options.offlineAuthUnavailable ? {mhOfflineAuthUnavailable: "true"} : {}}
+  };
   const elements = {
     passphrase: {value: ""},
     passphraseConfirm: {value: "", hidden: false, focus() { this.focused = true; }},
@@ -65,8 +87,32 @@ function makeHarness(options = {}) {
     lock: {disabled: false},
     restore: {disabled: false},
     export: {disabled: false},
-    import: {disabled: false}
+    import: {disabled: false},
+    workspace: makeElement("section"),
+    workspaceSummary: makeElement("small"),
+    workspaceMemoryForm: makeElement("form"),
+    workspaceMemoryText: makeElement("input"),
+    workspaceMemoryCategory: makeElement("select"),
+    workspaceMemorySave: makeElement("button"),
+    workspaceMemorySelect: makeElement("select"),
+    workspaceMemoryEdit: makeElement("button"),
+    workspaceMemoryDelete: makeElement("button"),
+    workspaceMemoryList: makeElement("small"),
+    workspacePreferenceForm: makeElement("form"),
+    workspacePreferenceCategory: makeElement("select"),
+    workspacePreferenceName: makeElement("input"),
+    workspacePreferenceValue: makeElement("input"),
+    workspacePreferenceSave: makeElement("button"),
+    workspacePreferenceSelect: makeElement("select"),
+    workspacePreferenceEdit: makeElement("button"),
+    workspacePreferenceDelete: makeElement("button"),
+    workspacePreferenceList: makeElement("small"),
+    workspaceHistoryList: makeElement("pre"),
+    workspaceClearHistory: makeElement("button"),
+    workspaceTaskList: makeElement("small"),
+    workspacePlanList: makeElement("small")
   };
+  elements.workspace.hidden = true;
   const storage = {
     async load() {
       if (options.failLoadAfterSave && saveCompleted) throw new Error("simulated readback failure");
@@ -98,6 +144,7 @@ function makeHarness(options = {}) {
         });
       }
       if (saveOptions.signal?.aborted) throw new Error("aborted");
+      if (options.failSave) throw new Error("simulated persistence failure");
       stored = JSON.parse(JSON.stringify(value));
       saves.push(JSON.parse(JSON.stringify(value)));
       saveCompleted = true;
@@ -117,13 +164,37 @@ function makeHarness(options = {}) {
       if (options.rejectUnlock || passphrase !== "dostatecne-dlouhe-heslo") {
         throw new Error("wrong passphrase");
       }
-      assert.deepEqual(JSON.parse(JSON.stringify(value)), envelope);
+      assert.equal(value?.format, "micro-helper-offline-vault");
       locked = false;
-      return {
+      sessionData = JSON.parse(JSON.stringify(backup));
+      const listeners = new Set();
+      activeSession = {
         isLocked: () => locked,
-        read: () => JSON.parse(JSON.stringify(backup)),
-        lock() { locked = true; }
+        read: () => {
+          if (locked) throw new Error("locked");
+          return JSON.parse(JSON.stringify(sessionData));
+        },
+        write(next) {
+          if (locked) throw new Error("locked");
+          sessionData = JSON.parse(JSON.stringify(next));
+        },
+        async seal() {
+          if (locked) throw new Error("locked");
+          return {...envelope, ciphertext: "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"};
+        },
+        onLock(callback) {
+          if (locked) { callback(); return () => {}; }
+          listeners.add(callback);
+          return () => listeners.delete(callback);
+        },
+        lock() {
+          if (locked) return;
+          locked = true;
+          for (const listener of Array.from(listeners)) listener();
+          listeners.clear();
+        }
       };
+      return activeSession;
     }
   };
   const fetchImpl = async (url, init = {}) => {
@@ -140,7 +211,9 @@ function makeHarness(options = {}) {
     vault,
     storage,
     fetchImpl,
-    confirmImpl: options.confirmImpl ?? (() => true),
+    confirmImpl: message => confirmImpl(message),
+    promptImpl: message => promptImpl(message),
+    documentImpl,
     downloadImpl: (value, filename) => downloads.push({value, filename}),
     reloadImpl: () => { reloads += 1; },
     lifecycle: {addEventListener(name, callback) { lifecycle[name] = callback; }},
@@ -153,9 +226,12 @@ function makeHarness(options = {}) {
     waitForCreate: () => createStarted,
     waitForSave: () => saveStarted,
     getStored: () => stored,
+    getSessionData: () => sessionData ? JSON.parse(JSON.stringify(sessionData)) : null,
     getReloads: () => reloads,
-    expireSession: () => { locked = true; },
-    isSessionLocked: () => locked
+    expireSession: () => activeSession?.lock(),
+    isSessionLocked: () => locked,
+    setConfirmImpl: value => { confirmImpl = value; },
+    setPromptImpl: value => { promptImpl = value; }
   };
 }
 
@@ -298,6 +374,118 @@ test("imports only an encrypted envelope and keeps the previous record on invali
   assert.equal(await h.controller.importEncryptedFile(valid), true);
   assert.deepEqual(h.getStored(), envelope);
   assert.equal(h.saves.length, 1);
+});
+
+test("offline auth state disables and rejects server backup and restore actions", async () => {
+  const h = makeHarness({existing: envelope, offlineAuthUnavailable: true});
+  await h.controller.refresh();
+  assert.equal(h.elements.create.disabled, true);
+  assert.equal(h.elements.restore.disabled, true);
+  assert.equal(await h.controller.createBackup(), false);
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true, "the separate local vault remains available");
+  assert.equal(await h.controller.restore(), false);
+  assert.equal(h.requests.length, 0, "offline workspace never attempts server restore");
+  assert.match(h.elements.status.textContent, /ověřené přihlášení/);
+});
+
+test("unlocked offline workspace reads and persists local-only memory and preferences", async () => {
+  const h = makeHarness({existing: envelope});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  assert.equal(h.controller.getState().workspaceVisible, true);
+  assert.match(h.elements.workspaceHistoryList.textContent, /soukromá historie/);
+
+  assert.equal(await h.controller.addMemory("nová offline poznámka", "project"), true);
+  assert.equal(await h.controller.addPreference("communication", "styl", "stručně"), true);
+  const data = h.getSessionData();
+  assert.equal(data.memories.at(-1).content, "nová offline poznámka");
+  assert.equal(data.preferences.at(-1).value, "stručně");
+  assert.equal(h.saves.length, 2);
+  assert.equal(JSON.stringify(h.getStored()).includes("nová offline poznámka"), false);
+  assert.equal(JSON.stringify(h.getStored()).includes("stručně"), false);
+  assert.match(h.elements.workspaceMemoryList.textContent, /2 uložených poznámek/);
+});
+
+test("offline memory and preference edits and deletions require local explicit confirmation", async () => {
+  const h = makeHarness({existing: envelope});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  assert.equal(await h.controller.editMemory(1), true);
+  assert.equal(h.getSessionData().memories[0].content, "upravená offline hodnota");
+
+  h.setConfirmImpl(() => false);
+  assert.equal(await h.controller.deleteMemory(1), false);
+  assert.equal(h.getSessionData().memories.length, 1);
+  h.setConfirmImpl(() => true);
+  assert.equal(await h.controller.deleteMemory(1), true);
+  assert.equal(h.getSessionData().memories.length, 0);
+
+  assert.equal(await h.controller.editPreference(1), false, "missing preference is not edited");
+  assert.equal(await h.controller.addPreference("communication", "odpovědi", "česky"), true);
+  const preference = h.getSessionData().preferences[0];
+  assert.equal(await h.controller.editPreference(preference.id), true);
+  assert.equal(h.getSessionData().preferences[0].value, "upravená offline hodnota");
+  assert.equal(await h.controller.deletePreference(preference.id), true);
+  assert.equal(h.getSessionData().preferences.length, 0);
+});
+
+test("clearing offline history is separately confirmed and does not call the server", async () => {
+  const h = makeHarness({existing: envelope, confirmImpl: () => false});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  assert.equal(await h.controller.clearHistory(), false);
+  assert.equal(h.getSessionData().messages.length, 1);
+  h.setConfirmImpl(() => true);
+  assert.equal(await h.controller.clearHistory(), true);
+  assert.equal(h.getSessionData().messages.length, 0);
+  assert.equal(h.requests.length, 0);
+});
+
+test("failed offline persistence rolls back the in-memory edit and preserves the stored envelope", async () => {
+  const h = makeHarness({existing: envelope, failSave: true});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  assert.equal(await h.controller.addMemory("nesmí se uložit", "context"), false);
+  assert.equal(h.getSessionData().memories.length, 1);
+  assert.equal(h.getStored().ciphertext, envelope.ciphertext);
+  assert.match(h.elements.status.textContent, /původní šifrovaná kopie zůstala zachována/i);
+});
+
+test("inactivity lock clears decrypted offline workspace content from the page", async () => {
+  const h = makeHarness({existing: envelope});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  assert.equal(h.elements.workspace.hidden, false);
+  assert.match(h.elements.workspaceHistoryList.textContent, /soukromá historie/);
+  h.expireSession();
+  assert.equal(h.controller.getState().unlocked, false);
+  assert.equal(h.elements.workspace.hidden, true);
+  assert.equal(h.elements.workspaceHistoryList.textContent, "");
+  assert.equal(h.elements.workspaceMemoryList.textContent, "");
+});
+
+test("aborts a pending offline workspace save when the page becomes hidden", async () => {
+  let releaseSave;
+  const saveGate = new Promise(resolve => { releaseSave = resolve; });
+  const h = makeHarness({existing: envelope, saveGate});
+  await h.controller.refresh();
+  h.elements.passphrase.value = "dostatecne-dlouhe-heslo";
+  assert.equal(await h.controller.unlock(), true);
+  const pending = h.controller.addMemory("přerušená offline změna", "context");
+  await h.waitForSave();
+  h.visibility.setState("hidden");
+  h.visibility.setState("visible");
+  assert.equal(await pending, false);
+  assert.equal(h.getStored().ciphertext, envelope.ciphertext);
+  assert.equal(h.controller.getState().unlocked, false);
+  assert.equal(h.elements.workspace.hidden, true);
+  releaseSave();
 });
 
 test("does not save a new encrypted backup when the page is hidden during encryption", async () => {
