@@ -272,8 +272,6 @@ async def restore_backup(request: RestoreRequest):
             )
             for x in tasks
         ]
-        if any(row[4] is not None and not isinstance(row[4], str) for row in task_rows):
-            raise ValueError()
         if any(x.get("due_at") is not None and not isinstance(x.get("due_at"), str) for x in tasks):
             raise ValueError()
         if any(row[1] not in ("user", "assistant") for row in message_rows):
