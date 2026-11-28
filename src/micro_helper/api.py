@@ -231,7 +231,13 @@ async def restore_backup(request: RestoreRequest):
     if not isinstance(profile, dict) or not isinstance(memories, list) or not isinstance(messages, list) or not isinstance(tasks, list):
         raise HTTPException(status_code=422, detail="Záloha neobsahuje kompletní profil, paměti a historii.")
     keys = ("agent_name", "language", "style", "updated_at")
-    if any(not isinstance(profile.get(key), str) for key in keys):
+    if (
+        any(not isinstance(profile.get(key), str) for key in keys)
+        or not profile["agent_name"]
+        or len(profile["language"]) < 2
+        or not profile["style"]
+        or not profile["updated_at"]
+    ):
         raise HTTPException(status_code=422, detail="Profil v záloze není platný.")
     if len(memories) > 10000 or len(messages) > 100000 or len(tasks) > 10000:
         raise HTTPException(status_code=413, detail="Záloha je příliš velká.")
@@ -277,7 +283,11 @@ async def restore_backup(request: RestoreRequest):
             raise ValueError()
         if any(row[1] not in ("user", "assistant") for row in message_rows):
             raise ValueError()
-        if any(not row[1] for row in memory_rows) or any(not row[2] for row in message_rows) or any(not row[1] for row in task_rows):
+        if (
+            any(not row[1] or not row[2] or not row[3] for row in memory_rows)
+            or any(not row[2] or not row[3] for row in message_rows)
+            or any(not row[1] or not row[5] for row in task_rows)
+        ):
             raise ValueError()
         # Primary keys must be positive and unique within each restored collection.
         # Otherwise SQLite would raise an internal error during restore instead of
