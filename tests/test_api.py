@@ -375,9 +375,16 @@ def test_restore_rejects_non_object_records_without_replacing_data(collection, b
 
 @pytest.mark.parametrize("collection,field,bad_value", [
     ("memories", "content", {"not": "text"}),
+    ("memories", "category", ""),
+    ("memories", "created_at", ""),
     ("messages", "created_at", ["not", "text"]),
+    ("messages", "created_at", ""),
     ("tasks", "due_at", 123),
     ("tasks", "description", {"not": "text"}),
+    ("tasks", "created_at", ""),
+    ("profile", "agent_name", ""),
+    ("profile", "language", "x"),
+    ("profile", "updated_at", ""),
 ])
 def test_restore_rejects_wrong_field_types_without_replacing_data(collection, field, bad_value):
     client.put("/v1/profile", json={"agent_name": "Zachovat profil", "language": "cs-CZ", "style": "stručný"})
@@ -387,7 +394,10 @@ def test_restore_rejects_wrong_field_types_without_replacing_data(collection, fi
         db.execute("INSERT INTO messages(role, content, created_at) VALUES (?, ?, ?)", ("user", "Zachovat zprávu", "now"))
         db.commit()
     backup = client.get("/v1/backup").json()
-    backup[collection][0][field] = bad_value
+    if collection == "profile":
+        backup["profile"][field] = bad_value
+    else:
+        backup[collection][0][field] = bad_value
 
     response = client.post("/v1/backup/restore", json={"backup": backup, "confirm_replace": True})
 
