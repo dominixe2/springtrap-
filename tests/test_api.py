@@ -384,6 +384,7 @@ def test_restore_rejects_non_object_records_without_replacing_data(collection, b
     ("tasks", "created_at", ""),
     ("profile", "agent_name", ""),
     ("profile", "language", "x"),
+    ("profile", "style", ""),
     ("profile", "updated_at", ""),
 ])
 def test_restore_rejects_wrong_field_types_without_replacing_data(collection, field, bad_value):
